@@ -326,8 +326,6 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 signal, signal_desc = generate_trading_signal(predicted_return, row, 1.0)
                 reason = signal_desc + f" | ML예측: {predicted_return:.2%}"
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
-            # 진단용 로그 추가
-            logger.info(f"[{timestamp_str}] 신호: {signal}, 방향: {direction}, 포지션존재: {positions.get((symbol, direction))}, 예측수익률: {predicted_return:.5f}, RSI: {row.get('rsi_14', 50):.2f}, 변동성: {row.get('volatility_20', 0.05):.4f}")
             
             # 매매 현황 로그 (매 100번째마다 출력)
             if idx % 100 == 0:
