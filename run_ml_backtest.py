@@ -187,13 +187,14 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 symbol = candidate_symbols[0]
             regime_desc = f"시장국면: {regime}"
             strategy_desc = f"전략: {strategy_name}"
+            # === 예측수익률 항상 0으로 초기화 ===
+            predicted_return = 0
             # ML 예측수익률 계산 및 진단 로그 추가
             if 'ml_model' in locals() and ml_model is not None and 'prediction_data' in locals():
                 if len(prediction_data) > 60:
                     predicted_return = ml_model.predict(prediction_data)[-1]
                     logger.info(f"[{timestamp}] ML 예측값: {predicted_return}")
                 else:
-                    predicted_return = 0
                     logger.info(f"[{timestamp}] 예측데이터 부족, predicted_return=0")
             rsi = row.get('rsi_14', 50)
             vol = row.get('volatility_20', 0.05)
