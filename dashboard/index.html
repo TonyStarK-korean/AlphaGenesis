@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>상위 0.01%급 자동매매 시스템 대시보드</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Socket.IO -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        body {
+            background-color: #0a0e1a;
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            padding: 20px 0;
+            margin-bottom: 30px;
+        }
+        
+        .metric-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .metric-label {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+        }
+        
+        .chart-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+        
+        .status-running { background-color: #28a745; }
+        .status-warning { background-color: #ffc107; }
+        .status-error { background-color: #dc3545; }
+        
+        .nav-tabs {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        
+        .nav-tabs .nav-link {
+            color: #ffffff;
+            border: none;
+            border-bottom: 2px solid transparent;
+        }
+        
+        .nav-tabs .nav-link.active {
+            background: transparent;
+            border-bottom: 2px solid #667eea;
+            color: #667eea;
+        }
+        
+        .table {
+            color: #ffffff;
+        }
+        
+        .table th {
+            border-top: none;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+            color: #a0a0a0;
+        }
+        
+        .table td {
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            border-radius: 25px;
+        }
+        
+        .btn-primary:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+        }
+        
+        .alert {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+        }
+        
+        .real-time-indicator {
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+    <!-- 헤더 -->
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="fas fa-chart-line"></i> 상위 0.01%급 자동매매 시스템</h1>
+                    <p class="mb-0">실시간 성과 모니터링 및 분석 대시보드</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="real-time-indicator">
+                        <span class="status-indicator status-running"></span>
+                        <span id="connection-status">연결됨</span>
+                    </div>
+                    <div id="last-update">마지막 업데이트: <span id="update-time">-</span></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container">
+        <!-- 실시간 지표 -->
+        <div class="row mb-4">
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value" id="current-capital">$100,000,000</div>
+                    <div class="metric-label">현재 자본</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value" id="total-return">0.00%</div>
+                    <div class="metric-label">총 수익률</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value" id="daily-pnl">$0</div>
+                    <div class="metric-label">일일 손익</div>
+                </div>
+            </div>
+            <div class="col-md-3">
+                <div class="metric-card">
+                    <div class="metric-value" id="open-positions">0</div>
+                    <div class="metric-label">오픈 포지션</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 탭 네비게이션 -->
+        <ul class="nav nav-tabs" id="dashboardTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="overview-tab" data-bs-toggle="tab" data-bs-target="#overview" type="button" role="tab">
+                    <i class="fas fa-tachometer-alt"></i> 개요
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="performance-tab" data-bs-toggle="tab" data-bs-target="#performance" type="button" role="tab">
+                    <i class="fas fa-chart-bar"></i> 성과 분석
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="backtest-tab" data-bs-toggle="tab" data-bs-target="#backtest" type="button" role="tab">
+                    <i class="fas fa-history"></i> 백테스트
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="trades-tab" data-bs-toggle="tab" data-bs-target="#trades" type="button" role="tab">
+                    <i class="fas fa-exchange-alt"></i> 거래 기록
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="system-tab" data-bs-toggle="tab" data-bs-target="#system" type="button" role="tab">
+                    <i class="fas fa-cogs"></i> 시스템 상태
+                </button>
+            </li>
+        </ul>
+
+        <!-- 탭 콘텐츠 -->
+        <div class="tab-content" id="dashboardTabContent">
+            <!-- 개요 탭 -->
+            <div class="tab-pane fade show active" id="overview" role="tabpanel">
+                <div class="row mt-4">
+                    <div class="col-md-8">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-chart-line"></i> 자본 변화 추이</h5>
+                            <canvas id="capitalChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-pie-chart"></i> Phase 분포</h5>
+                            <canvas id="phaseChart" width="200" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-chart-area"></i> 수익률 분포</h5>
+                            <canvas id="returnChart" width="300" height="200"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-exclamation-triangle"></i> 리스크 지표</h5>
+                            <div id="risk-metrics">
+                                <div class="row">
+                                    <div class="col-6">
+                                        <div class="metric-card">
+                                            <div class="metric-value" id="max-drawdown">0.00%</div>
+                                            <div class="metric-label">최대 낙폭</div>
+                                        </div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="metric-card">
+                                            <div class="metric-value" id="sharpe-ratio">0.00</div>
+                                            <div class="metric-label">샤프 비율</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 성과 분석 탭 -->
+            <div class="tab-pane fade" id="performance" role="tabpanel">
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-chart-bar"></i> 복리 효과 비교</h5>
+                            <canvas id="compoundChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-chart-line"></i> Phase별 성과</h5>
+                            <canvas id="phasePerformanceChart" width="300" height="200"></canvas>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-chart-pie"></i> 거래소 분산 효과</h5>
+                            <canvas id="exchangeChart" width="300" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 백테스트 탭 -->
+            <div class="tab-pane fade" id="backtest" role="tabpanel">
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-cogs"></i> 백테스트 설정</h5>
+                            <div class="row">
+                                <div class="col-md-3">
+                                    <label for="backtest-days" class="form-label">기간 (일)</label>
+                                    <select class="form-select" id="backtest-days">
+                                        <option value="30">30일</option>
+                                        <option value="90">90일</option>
+                                        <option value="180">180일</option>
+                                        <option value="365" selected>365일</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="compound-mode" class="form-label">복리 모드</label>
+                                    <select class="form-select" id="compound-mode">
+                                        <option value="NO_COMPOUND">복리 없음</option>
+                                        <option value="DAILY_COMPOUND" selected>일일 복리</option>
+                                        <option value="WEEKLY_COMPOUND">주간 복리</option>
+                                        <option value="MONTHLY_COMPOUND">월간 복리</option>
+                                        <option value="CONTINUOUS_COMPOUND">연속 복리</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <button class="btn btn-primary mt-4" onclick="runBacktest()">
+                                        <i class="fas fa-play"></i> 백테스트 실행
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="row">
+                    <div class="col-md-12">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-chart-line"></i> 백테스트 결과</h5>
+                            <canvas id="backtestChart" width="400" height="200"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 거래 기록 탭 -->
+            <div class="tab-pane fade" id="trades" role="tabpanel">
+                <div class="row mt-4">
+                    <div class="col-md-12">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-table"></i> 최근 거래 기록</h5>
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>ID</th>
+                                            <th>심볼</th>
+                                            <th>진입가</th>
+                                            <th>청산가</th>
+                                            <th>수량</th>
+                                            <th>손익</th>
+                                            <th>수익률</th>
+                                            <th>상태</th>
+                                            <th>시간</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="trades-table">
+                                        <!-- 거래 기록이 여기에 동적으로 추가됩니다 -->
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 시스템 상태 탭 -->
+            <div class="tab-pane fade" id="system" role="tabpanel">
+                <div class="row mt-4">
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-server"></i> 시스템 리소스</h5>
+                            <div class="row">
+                                <div class="col-6">
+                                    <div class="metric-card">
+                                        <div class="metric-value" id="cpu-usage">23%</div>
+                                        <div class="metric-label">CPU 사용률</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="metric-card">
+                                        <div class="metric-value" id="memory-usage">45%</div>
+                                        <div class="metric-label">메모리 사용률</div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row mt-3">
+                                <div class="col-6">
+                                    <div class="metric-card">
+                                        <div class="metric-value" id="disk-usage">67%</div>
+                                        <div class="metric-label">디스크 사용률</div>
+                                    </div>
+                                </div>
+                                <div class="col-6">
+                                    <div class="metric-card">
+                                        <div class="metric-value" id="uptime">24h 15m</div>
+                                        <div class="metric-label">가동 시간</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="chart-container">
+                            <h5><i class="fas fa-bell"></i> 시스템 알림</h5>
+                            <div id="system-alerts">
+                                <!-- 알림이 여기에 동적으로 추가됩니다 -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- 대시보드 JavaScript -->
+    <script>
+        // Socket.IO 연결
+        const socket = io();
+        
+        // 차트 객체들
+        let capitalChart, phaseChart, returnChart, compoundChart, phasePerformanceChart, exchangeChart, backtestChart;
+        
+        // 실시간 데이터 업데이트
+        socket.on('real_time_update', function(data) {
+            updateRealTimeData(data);
+        });
+        
+        // 연결 상태 업데이트
+        socket.on('connection_status', function(data) {
+            document.getElementById('connection-status').textContent = data.status === 'connected' ? '연결됨' : '연결 끊김';
+        });
+        
+        // 실시간 데이터 업데이트 함수
+        function updateRealTimeData(data) {
+            document.getElementById('current-capital').textContent = '$' + data.current_capital.toLocaleString();
+            document.getElementById('total-return').textContent = data.total_return.toFixed(2) + '%';
+            document.getElementById('daily-pnl').textContent = '$' + data.daily_pnl.toLocaleString();
+            document.getElementById('open-positions').textContent = data.open_positions;
+            document.getElementById('update-time').textContent = new Date(data.last_update).toLocaleTimeString();
+            
+            // 차트 업데이트
+            updateCharts(data);
+        }
+        
+        // 차트 초기화
+        function initializeCharts() {
+            // 자본 변화 차트
+            const capitalCtx = document.getElementById('capitalChart').getContext('2d');
+            capitalChart = new Chart(capitalCtx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '자본',
+                        data: [],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#ffffff'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                color: '#ffffff'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#ffffff'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // Phase 분포 차트
+            const phaseCtx = document.getElementById('phaseChart').getContext('2d');
+            phaseChart = new Chart(phaseCtx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Phase 1', 'Phase 2'],
+                    datasets: [{
+                        data: [70, 30],
+                        backgroundColor: ['#667eea', '#764ba2']
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#ffffff'
+                            }
+                        }
+                    }
+                }
+            });
+            
+            // 수익률 분포 차트
+            const returnCtx = document.getElementById('returnChart').getContext('2d');
+            returnChart = new Chart(returnCtx, {
+                type: 'bar',
+                data: {
+                    labels: ['-5%', '-2%', '0%', '2%', '5%', '8%'],
+                    datasets: [{
+                        label: '거래 수',
+                        data: [5, 15, 25, 30, 20, 5],
+                        backgroundColor: '#667eea'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#ffffff'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                color: '#ffffff'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#ffffff'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 차트 업데이트
+        function updateCharts(data) {
+            // 자본 차트 업데이트
+            const now = new Date().toLocaleTimeString();
+            capitalChart.data.labels.push(now);
+            capitalChart.data.datasets[0].data.push(data.current_capital);
+            
+            if (capitalChart.data.labels.length > 20) {
+                capitalChart.data.labels.shift();
+                capitalChart.data.datasets[0].data.shift();
+            }
+            
+            capitalChart.update();
+        }
+        
+        // 백테스트 실행
+        function runBacktest() {
+            const days = document.getElementById('backtest-days').value;
+            const mode = document.getElementById('compound-mode').value;
+            
+            fetch(`/api/backtest?days=${days}&mode=${mode}`)
+                .then(response => response.json())
+                .then(data => {
+                    displayBacktestResults(data);
+                })
+                .catch(error => {
+                    console.error('백테스트 오류:', error);
+                });
+        }
+        
+        // 백테스트 결과 표시
+        function displayBacktestResults(data) {
+            // 백테스트 차트 업데이트
+            if (backtestChart) {
+                backtestChart.destroy();
+            }
+            
+            const backtestCtx = document.getElementById('backtestChart').getContext('2d');
+            backtestChart = new Chart(backtestCtx, {
+                type: 'line',
+                data: {
+                    labels: Object.keys(data),
+                    datasets: [{
+                        label: '최종 자본',
+                        data: Object.values(data).map(result => result.final_capital),
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#ffffff'
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: {
+                                color: '#ffffff'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        },
+                        x: {
+                            ticks: {
+                                color: '#ffffff'
+                            },
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+        
+        // 거래 기록 로드
+        function loadTradeHistory() {
+            fetch('/api/trade-history')
+                .then(response => response.json())
+                .then(data => {
+                    displayTradeHistory(data.trades);
+                })
+                .catch(error => {
+                    console.error('거래 기록 로드 오류:', error);
+                });
+        }
+        
+        // 거래 기록 표시
+        function displayTradeHistory(trades) {
+            const tableBody = document.getElementById('trades-table');
+            tableBody.innerHTML = '';
+            
+            trades.slice(0, 20).forEach(trade => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${trade.id}</td>
+                    <td>${trade.symbol}</td>
+                    <td>$${trade.entry_price.toFixed(2)}</td>
+                    <td>$${trade.exit_price.toFixed(2)}</td>
+                    <td>${trade.quantity.toFixed(4)}</td>
+                    <td class="${trade.pnl >= 0 ? 'text-success' : 'text-danger'}">$${trade.pnl.toFixed(2)}</td>
+                    <td class="${trade.return_rate >= 0 ? 'text-success' : 'text-danger'}">${(trade.return_rate * 100).toFixed(2)}%</td>
+                    <td><span class="badge ${trade.success ? 'bg-success' : 'bg-danger'}">${trade.success ? '성공' : '실패'}</span></td>
+                    <td>${new Date(trade.exit_time).toLocaleString()}</td>
+                `;
+                tableBody.appendChild(row);
+            });
+        }
+        
+        // 시스템 상태 로드
+        function loadSystemStatus() {
+            fetch('/api/system-status')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('cpu-usage').textContent = data.cpu_usage;
+                    document.getElementById('memory-usage').textContent = data.memory_usage;
+                    document.getElementById('disk-usage').textContent = data.disk_usage;
+                    document.getElementById('uptime').textContent = data.uptime;
+                    
+                    // 알림 표시
+                    const alertsContainer = document.getElementById('system-alerts');
+                    alertsContainer.innerHTML = '';
+                    
+                    data.alerts.forEach(alert => {
+                        const alertDiv = document.createElement('div');
+                        alertDiv.className = `alert alert-${alert.level.toLowerCase()}`;
+                        alertDiv.innerHTML = `
+                            <i class="fas fa-${alert.level === 'INFO' ? 'info-circle' : alert.level === 'WARNING' ? 'exclamation-triangle' : 'times-circle'}"></i>
+                            ${alert.message}
+                        `;
+                        alertsContainer.appendChild(alertDiv);
+                    });
+                })
+                .catch(error => {
+                    console.error('시스템 상태 로드 오류:', error);
+                });
+        }
+        
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeCharts();
+            loadTradeHistory();
+            loadSystemStatus();
+            
+            // 실시간 모니터링 시작
+            socket.emit('start_monitoring');
+            
+            // 주기적 업데이트
+            setInterval(loadTradeHistory, 30000);  // 30초마다
+            setInterval(loadSystemStatus, 60000);  // 1분마다
+        });
+    </script>
+</body>
+</html> 
