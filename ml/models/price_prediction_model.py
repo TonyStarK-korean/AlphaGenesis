@@ -130,7 +130,6 @@ class PricePredictionModel:
             return False
             
         df_feat = make_features(df)
-        print(f"[ML 모델] 피처 생성 완료: {len(df_feat)}개 행, {len(df_feat.columns)}개 컬럼")
         
         if len(df_feat) < 20:  # 피처 생성 후 최소 요구사항을 낮춤
             print(f"[ML 모델] 피처 생성 후 데이터 부족: {len(df_feat)}개 (최소 20개 필요)")
@@ -158,11 +157,9 @@ class PricePredictionModel:
         
         # NaN 값 처리
         if np.isnan(X).any():
-            print("[ML 모델] 훈련 데이터에 NaN 값이 있어 0으로 대체합니다.")
             X = np.nan_to_num(X, nan=0.0)
         
         if np.isnan(y).any():
-            print("[ML 모델] 타겟 데이터에 NaN 값이 있어 제거합니다.")
             valid_indices = ~np.isnan(y)
             X = X[valid_indices]
             y = y[valid_indices]
@@ -173,9 +170,9 @@ class PricePredictionModel:
 
         # 앙상블 모델 정의
         self.models = {
-            'rf': RandomForestRegressor(n_estimators=100, max_depth=6, random_state=42),  # 파라미터 축소
-            'xgb': xgb.XGBRegressor(n_estimators=100, max_depth=6, random_state=42),
-            'lgb': lgb.LGBMRegressor(n_estimators=100, max_depth=6, random_state=42),
+            'rf': RandomForestRegressor(n_estimators=100, max_depth=6, random_state=42, verbose=0),  # verbose=0 추가
+            'xgb': xgb.XGBRegressor(n_estimators=100, max_depth=6, random_state=42, verbosity=0),  # verbosity=0 추가
+            'lgb': lgb.LGBMRegressor(n_estimators=100, max_depth=6, random_state=42, verbose=-1),  # verbose=-1 추가
             'ridge': Ridge(alpha=1.0)
         }
 
@@ -186,7 +183,7 @@ class PricePredictionModel:
                     'n_estimators': trial.suggest_int('n_estimators', 50, 200),
                     'max_depth': trial.suggest_int('max_depth', 3, 8)
                 }
-                model = RandomForestRegressor(**params)
+                model = RandomForestRegressor(**params, verbose=0)
                 tscv = TimeSeriesSplit(n_splits=min(3, len(X)//10))  # fold 수 축소
                 scores = []
                 for i, (train_idx, val_idx) in enumerate(tscv.split(X)):
@@ -199,14 +196,13 @@ class PricePredictionModel:
                 if not scores:
                     return float('inf')
                 mean_score = np.mean(scores)
-                print(f"[Optuna 튜닝] trial={trial.number}, RMSE={mean_score:.4f}")
                 return mean_score
             study = optuna.create_study(direction='minimize')
             study.optimize(objective, n_trials=min(10, len(X)//3))  # trial 수 축소
             if study.best_params:
                 self.best_params['rf'] = study.best_params
-                self.models['rf'] = RandomForestRegressor(**study.best_params)
-                print(f"[Optuna 최적화] best_params: {self.best_params['rf']}")
+                self.models['rf'] = RandomForestRegressor(**study.best_params, verbose=0)
+                print(f"[ML 모델] 최적화 완료: {self.best_params['rf']}")
 
         # 각 모델 학습 및 성능 리포트
         tscv = TimeSeriesSplit(n_splits=min(3, len(X)//10))  # fold 수 축소
@@ -227,12 +223,12 @@ class PricePredictionModel:
                     'MAE': np.mean(fold_mae),
                     'R2': np.mean(fold_r2)
                 }
-                print(f"[CV리포트] {name}: RMSE={np.mean(fold_rmse):.4f}, MAE={np.mean(fold_mae):.4f}, R2={np.mean(fold_r2):.4f}")
+                print(f"[ML 모델] {name} 모델 훈련 완료 - RMSE: {np.mean(fold_rmse):.2f}, R²: {np.mean(fold_r2):.3f}")
             else:
-                print(f"[ML 모델] {name} 모델 훈련 실패 - 데이터 부족")
+                print(f"[ML 모델] {name} 모델 훈련 실패")
                 return False
         
-        print(f"[ML 모델] 모든 모델 훈련 완료. 훈련 데이터: {len(X)}개, 피처: {len(self.feature_names)}개")
+        print(f"[ML 모델] 모든 모델 훈련 완료 - 데이터: {len(X)}개, 피처: {len(self.feature_names)}개")
         return True
 
     def predict(self, df):
