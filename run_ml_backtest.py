@@ -323,6 +323,13 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
 
     # 결과 분석 및 리포트
     analyze_backtest_results(results, initial_capital)
+    # 최종 자본을 results에 추가
+    try:
+        df_results = pd.DataFrame(results)
+        if not df_results.empty and 'total_capital' in df_results:
+            results['final_capital'] = df_results['total_capital'].iloc[-1]
+    except Exception:
+        results['final_capital'] = None
     return results
 
 def analyze_market_condition(row: pd.Series) -> MarketCondition:
