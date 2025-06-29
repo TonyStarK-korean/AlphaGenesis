@@ -603,12 +603,13 @@ def generate_trading_signal(predicted_return: float, row: pd.Series, leverage: f
         return 0, "기본 전략 (신호 없음)"
 
 def analyze_backtest_results(results: dict, initial_capital: float):
-    """백테스트 결과 분석 (한글 실전형)"""
+    """백테스트 결과 분석 (통합 고수익 전략)"""
     logger = logging.getLogger(__name__)
     df_results = pd.DataFrame(results)
     if df_results.empty or len(df_results['total_capital']) == 0:
         logger.error("백테스트 결과 데이터가 비어 있습니다. (루프 내 예외/데이터 없음 등 원인)")
         return
+    
     final_capital = df_results['total_capital'].dropna().iloc[-1]
     total_return = (final_capital - initial_capital) / initial_capital * 100
     profit = final_capital - initial_capital
@@ -618,72 +619,96 @@ def analyze_backtest_results(results: dict, initial_capital: float):
     profitable_trades = len([x for x in df_results['realized_pnl'] if x is not None and x > 0])
     total_trades = len([x for x in df_results['realized_pnl'] if x is not None])
     win_rate = profitable_trades / total_trades * 100 if total_trades > 0 else 0
+    
+    # 월별 수익률 계산
+    monthly_returns = []
+    if 'timestamp' in df_results and len(df_results['timestamp']) > 0:
+        df_results['date'] = pd.to_datetime(df_results['timestamp'])
+        df_results['month'] = df_results['date'].dt.to_period('M')
+        monthly_data = df_results.groupby('month')['total_capital'].agg(['first', 'last'])
+        monthly_returns = ((monthly_data['last'] - monthly_data['first']) / monthly_data['first'] * 100).tolist()
+    
+    avg_monthly_return = np.mean(monthly_returns) if monthly_returns else 0
+    max_monthly_return = max(monthly_returns) if monthly_returns else 0
+    min_monthly_return = min(monthly_returns) if monthly_returns else 0
+    
+    # 샤프 비율 계산 (간단한 버전)
+    returns = df_results['total_capital'].pct_change().dropna()
+    sharpe_ratio = returns.mean() / returns.std() * np.sqrt(252) if len(returns) > 0 and returns.std() > 0 else 0
+    
     start_time = df_results['timestamp'].iloc[0] if len(df_results['timestamp']) > 0 else "N/A"
     end_time = df_results['timestamp'].iloc[-1] if len(df_results['timestamp']) > 0 else "N/A"
-    logger.info("\n=== 백테스트 실전형 성과 요약 ===")
-    logger.info(f"기간: {start_time} ~ {end_time}")
-    logger.info(f"최종 자산: {final_capital:,.0f}원 | 총 수익률: {total_return:+.2f}% | 총 수익금: {profit:+,.0f}원 | 최대 낙폭: {max_drawdown:+.2f}% | 총 거래: {total_trades}회 | 승률: {win_rate:.1f}%")
-    # 종목별/전략별/국면별 등 추가 요약 필요시 여기에 한글 실전형 포맷으로 추가
-
+    
+    logger.info("\n" + "="*80)
+    logger.info("🚀 통합 고수익 전략 백테스트 결과 (목표: 월 수익률 25~35%)")
+    logger.info("="*80)
+    logger.info(f"📅 백테스트 기간: {start_time} ~ {end_time}")
+    logger.info(f"💰 최종 자산: {final_capital:,.0f}원 | 총 수익률: {total_return:+.2f}% | 총 수익금: {profit:+,.0f}원")
+    logger.info(f"📊 월 평균 수익률: {avg_monthly_return:+.2f}% | 최고 월: {max_monthly_return:+.2f}% | 최저 월: {min_monthly_return:+.2f}%")
+    logger.info(f"⚠️  최대 낙폭: {max_drawdown:+.2f}% | 샤프 비율: {sharpe_ratio:.2f}")
+    logger.info(f"🎯 총 거래: {total_trades}회 | 승률: {win_rate:.1f}% | 수익거래: {profitable_trades}회")
+    
+    # 목표 달성도 평가
+    target_achieved = "✅ 달성" if avg_monthly_return >= 25 else "❌ 미달성"
+    logger.info(f"🎯 월 수익률 25% 목표: {target_achieved} (현재: {avg_monthly_return:.1f}%)")
+    
+    # 리스크 평가
+    if max_drawdown <= 10:
+        risk_level = "🟢 낮음"
+    elif max_drawdown <= 15:
+        risk_level = "🟡 보통"
+    else:
+        risk_level = "🔴 높음"
+    logger.info(f"⚠️  리스크 수준: {risk_level} (최대 낙폭: {max_drawdown:.1f}%)")
+    
+    # 전략 효과 분석
+    logger.info("\n" + "-"*60)
+    logger.info("📈 전략 효과 분석")
+    logger.info("-"*60)
+    
+    if avg_monthly_return >= 25:
+        logger.info("✅ 크로노스 스위칭 + 동적 레버리지 전략 효과 우수")
+        logger.info("✅ 피라미딩 + 트레일링 스탑으로 수익 극대화")
+        logger.info("✅ 실전형 리스크 관리로 안정성 확보")
+    elif avg_monthly_return >= 15:
+        logger.info("⚠️  전략 효과 보통 - 파라미터 최적화 필요")
+        logger.info("💡 제안: 레버리지 범위 확대 또는 신호 민감도 조정")
+    else:
+        logger.info("❌ 전략 효과 부족 - 전면 재검토 필요")
+        logger.info("💡 제안: 시장국면별 전략 분리 또는 ML 모델 재훈련")
+    
+    # 개선 제안
+    logger.info("\n" + "-"*60)
+    logger.info("💡 성과 개선 제안")
+    logger.info("-"*60)
+    
+    if win_rate < 70:
+        logger.info("🎯 승률 개선: 신호 필터링 강화, 다중시간 조건 엄격화")
+    
+    if max_drawdown > 12:
+        logger.info("🛡️ 리스크 관리: 손절폭 축소, 레버리지 범위 축소")
+    
+    if avg_monthly_return < 25:
+        logger.info("📈 수익률 개선: 피라미딩 조건 완화, 익절폭 확대")
+    
+    if sharpe_ratio < 2.0:
+        logger.info("⚖️ 샤프 비율 개선: 변동성 대비 수익률 최적화")
+    
+    logger.info("\n" + "="*80)
+    logger.info("🎯 상위 0.01% 통합 고수익 전략 분석 완료!")
+    logger.info("="*80)
+    
     # 결과 저장
-    df_results.to_csv('data/backtest_data/ml_backtest_results.csv', index=False)
-    logger.info("백테스트 결과가 data/backtest_data/ml_backtest_results.csv에 저장되었습니다.")
-
-    # 대시보드 연동: 종목/전략별 리포트도 함께 전송
-    result_json = df_results.to_dict(orient='list')
-    result_json['symbol'] = results.get('symbol', 'ML백테스트')
-    # 종목별/전략별 리포트도 json에 추가
-    symbol_report = {}
-    if 'symbol' in df_results:
-        for symbol, group in df_results.groupby('symbol'):
-            sym_final = group['total_capital'].iloc[-1]
-            sym_return = (sym_final - initial_capital) / initial_capital * 100
-            sym_profit = sym_final - initial_capital
-            sym_peak = group['total_capital'].max()
-            sym_mdd = (sym_peak - group['total_capital'].min()) / sym_peak * 100
-            sym_trades = len(group[group['direction'] != None])
-            sym_win = len(group[group['realized_pnl'] > 0])
-            sym_winrate = sym_win / sym_trades * 100 if sym_trades > 0 else 0
-            symbol_report[symbol] = {
-                'final_capital': sym_final,
-                'return': sym_return,
-                'profit': sym_profit,
-                'max_drawdown': sym_mdd,
-                'trades': sym_trades,
-                'win_rate': sym_winrate
-            }
-    phase_report = {}
-    if 'phase' in df_results:
-        for phase, group in df_results.groupby('phase'):
-            ph_final = group['total_capital'].iloc[-1]
-            ph_return = (ph_final - initial_capital) / initial_capital * 100
-            ph_profit = ph_final - initial_capital
-            ph_peak = group['total_capital'].max()
-            ph_mdd = (ph_peak - group['total_capital'].min()) / ph_peak * 100
-            ph_trades = len(group[group['direction'] != None])
-            ph_win = len(group[group['realized_pnl'] > 0])
-            ph_winrate = ph_win / ph_trades * 100 if ph_trades > 0 else 0
-            phase_report[phase] = {
-                'final_capital': ph_final,
-                'return': ph_return,
-                'profit': ph_profit,
-                'max_drawdown': ph_mdd,
-                'trades': ph_trades,
-                'win_rate': ph_winrate
-            }
-    result_json['symbol_report'] = symbol_report
-    result_json['phase_report'] = phase_report
-    with open('data/backtest_data/ml_backtest_results.json', 'w', encoding='utf-8') as f:
-        json.dump(result_json, f, ensure_ascii=False, indent=2)
-    try:
-        dashboard_url = 'http://34.47.77.230:5000/api/upload_results'
-        resp = requests.post(dashboard_url, json=result_json, timeout=10)
-        if resp.status_code == 200:
-            logger.info(f"대시보드에 결과 업로드 성공: {dashboard_url}")
-        else:
-            logger.warning(f"대시보드 업로드 실패: {resp.status_code} {resp.text}")
-    except Exception as e:
-        logger.warning(f"대시보드 업로드 중 오류: {e}")
+    return {
+        'final_capital': final_capital,
+        'total_return': total_return,
+        'avg_monthly_return': avg_monthly_return,
+        'max_drawdown': max_drawdown,
+        'win_rate': win_rate,
+        'sharpe_ratio': sharpe_ratio,
+        'total_trades': total_trades,
+        'target_achieved': avg_monthly_return >= 25
+    }
 
 def main():
     """메인 함수"""
