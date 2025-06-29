@@ -964,10 +964,7 @@ if __name__ == "__main__":
     # 데이터 로드 (예시)
     df = pd.read_csv('data/market_data/BNB_USDT_1h.csv')
     initial_capital = 10000000
-    print("[고정비중 백테스트]")
-    result_fixed = run_ml_backtest(df, initial_capital=initial_capital, use_dynamic_position=False)
     print("[동적비중 백테스트]")
     result_dynamic = run_ml_backtest(df, initial_capital=initial_capital, use_dynamic_position=True)
-    # 결과 비교 출력 (예시)
-    print_summary(result_fixed, '고정비중')
+    # 결과 출력
     print_summary(result_dynamic, '동적비중') 
