@@ -187,14 +187,11 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 symbol = candidate_symbols[0]
             regime_desc = f"시장국면: {regime}"
             strategy_desc = f"전략: {strategy_name}"
-            # === 예측수익률 항상 0으로 초기화 ===
+            # === 예측수익률 계산 ===
+            # prediction_data: 현재 시점까지의 데이터로 생성
+            prediction_data = df_with_indicators.iloc[:train_size + (idx - test_data.index[0]) + 1]
             predicted_return = 0
-            # prediction_data 상태 로그
-            if 'prediction_data' in locals():
-                logger.info(f"[{timestamp}] prediction_data shape: {prediction_data.shape}, columns: {list(prediction_data.columns) if hasattr(prediction_data, 'columns') else 'N/A'}")
-                logger.info(f"[{timestamp}] prediction_data head: {prediction_data.head(1) if hasattr(prediction_data, 'head') else prediction_data}")
-            # ML 예측수익률 계산 및 진단 로그 추가
-            if 'ml_model' in locals() and ml_model is not None and 'prediction_data' in locals():
+            if ml_model is not None and prediction_data is not None:
                 if len(prediction_data) > 60:
                     try:
                         pred = ml_model.predict(prediction_data)
