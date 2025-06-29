@@ -188,7 +188,6 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             regime_desc = f"시장국면: {regime}"
             strategy_desc = f"전략: {strategy_name}"
             # === 예측수익률 계산 ===
-            # prediction_data: 현재 시점까지의 데이터로 생성
             prediction_data = df_with_indicators.iloc[:train_size + (idx - test_data.index[0]) + 1]
             predicted_return = 0
             if ml_model is not None and prediction_data is not None:
