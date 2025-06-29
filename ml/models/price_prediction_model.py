@@ -34,7 +34,7 @@ class PricePredictionModel:
 
     def fit(self, df, target_col='close', horizon=1, tune=False):
         df_feat = make_features(df)
-        X = df_feat.drop([target_col], axis=1).values
+        X = df_feat.drop([target_col, 'symbol'], axis=1, errors='ignore').values
         y = df_feat[target_col].shift(-horizon).dropna().values
         X = X[:len(y)]  # y와 길이 맞추기
 
@@ -73,7 +73,7 @@ class PricePredictionModel:
 
     def predict(self, df):
         df_feat = make_features(df)
-        X = df_feat.drop(['close'], axis=1).values
+        X = df_feat.drop([target_col, 'symbol'], axis=1, errors='ignore').values
         preds = []
         for name, model in self.models.items():
             preds.append(model.predict(X))
