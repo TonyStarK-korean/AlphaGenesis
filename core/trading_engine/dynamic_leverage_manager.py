@@ -17,21 +17,22 @@ from config.backtest_config import backtest_config
 
 class MarketCondition(Enum):
     """시장 국면"""
-    BULL_MARKET = "BULL_MARKET"      # 상승장
-    BEAR_MARKET = "BEAR_MARKET"      # 하락장
-    SIDEWAYS = "SIDEWAYS"            # 횡보장
+    BULL = 1
+    BEAR = 2
+    SIDEWAYS = 3
     HIGH_VOLATILITY = "HIGH_VOLATILITY"  # 고변동성
     LOW_VOLATILITY = "LOW_VOLATILITY"    # 저변동성
 
 class PhaseType(Enum):
     """Phase 타입"""
-    PHASE1_AGGRESSIVE = "PHASE1_AGGRESSIVE"  # 공격 모드
-    PHASE2_DEFENSIVE = "PHASE2_DEFENSIVE"    # 방어 모드
+    PHASE1 = 1
+    PHASE2 = 2
 
 class DynamicLeverageManager:
     """동적 레버리지 관리자"""
     
-    def __init__(self):
+    def __init__(self, base_leverage=1):
+        self.base_leverage = base_leverage
         self.current_leverage = 1.0
         self.leverage_history = []
         self.adjustment_reasons = []
@@ -47,11 +48,11 @@ class DynamicLeverageManager:
                 'max_leverage': 7.0,
                 'min_leverage': 1.5,
                 'market_adjustments': {
-                    MarketCondition.BULL_MARKET: 1.3,      # 30% 증가
-                    MarketCondition.BEAR_MARKET: 0.6,      # 40% 감소
-                    MarketCondition.HIGH_VOLATILITY: 0.5,  # 50% 감소
-                    MarketCondition.LOW_VOLATILITY: 1.2,   # 20% 증가
-                    MarketCondition.SIDEWAYS: 1.0          # 변화 없음
+                    MarketCondition.BULL: 2.0,
+                    MarketCondition.BEAR: 0.5,
+                    MarketCondition.HIGH_VOLATILITY: 0.5,
+                    MarketCondition.LOW_VOLATILITY: 1.2,
+                    MarketCondition.SIDEWAYS: 1.0
                 }
             },
             'phase2': {
@@ -59,11 +60,11 @@ class DynamicLeverageManager:
                 'max_leverage': 5.0,
                 'min_leverage': 1.0,
                 'market_adjustments': {
-                    MarketCondition.BULL_MARKET: 1.4,      # 40% 증가
-                    MarketCondition.BEAR_MARKET: 0.7,      # 30% 감소
-                    MarketCondition.HIGH_VOLATILITY: 0.6,  # 40% 감소
-                    MarketCondition.LOW_VOLATILITY: 1.3,   # 30% 증가
-                    MarketCondition.SIDEWAYS: 1.0          # 변화 없음
+                    MarketCondition.BULL: 2.8,
+                    MarketCondition.BEAR: 0.7,
+                    MarketCondition.HIGH_VOLATILITY: 0.6,
+                    MarketCondition.LOW_VOLATILITY: 1.3,
+                    MarketCondition.SIDEWAYS: 1.0
                 }
             }
         }
@@ -80,7 +81,7 @@ class DynamicLeverageManager:
         """동적 레버리지 계산"""
         
         # 기본 설정 가져오기
-        phase_config = self.leverage_config['phase1'] if phase == PhaseType.PHASE1_AGGRESSIVE else self.leverage_config['phase2']
+        phase_config = self.leverage_config['phase1'] if phase == PhaseType.PHASE1 else self.leverage_config['phase2']
         
         # 기본 레버리지
         leverage = phase_config['base_leverage']
@@ -133,13 +134,13 @@ class DynamicLeverageManager:
             leverage *= 1.1  # 10% 증가
             
         # 6. Phase별 특별 조정
-        if phase == PhaseType.PHASE1_AGGRESSIVE:
+        if phase == PhaseType.PHASE1:
             # 공격 모드에서의 추가 조정
-            if market_condition == MarketCondition.BULL_MARKET and volatility < 0.05:
+            if market_condition == MarketCondition.BULL:
                 leverage *= 1.1  # 상승장 + 저변동성 시 10% 추가 증가
         else:
             # 방어 모드에서의 추가 조정
-            if market_condition == MarketCondition.BEAR_MARKET:
+            if market_condition == MarketCondition.BEAR:
                 leverage *= 0.9  # 하락장에서 추가 10% 감소
                 
         # 7. 최소/최대 레버리지 제한
@@ -163,9 +164,9 @@ class DynamicLeverageManager:
         reasons = []
         
         # 시장 국면
-        if market_condition == MarketCondition.BULL_MARKET:
+        if market_condition == MarketCondition.BULL:
             reasons.append("상승장")
-        elif market_condition == MarketCondition.BEAR_MARKET:
+        elif market_condition == MarketCondition.BEAR:
             reasons.append("하락장")
         elif market_condition == MarketCondition.HIGH_VOLATILITY:
             reasons.append("고변동성")
@@ -284,28 +285,28 @@ class DynamicLeverageManager:
         """Phase별 레버리지 가이드라인 반환"""
         
         return {
-            'phase1_aggressive': {
+            'phase1': {
                 'base_leverage': 3.0,
                 'max_leverage': 7.0,
                 'min_leverage': 1.5,
                 'market_conditions': {
-                    'bull_market': '3.9x (기본 3.0 x 1.3)',
-                    'bear_market': '1.8x (기본 3.0 x 0.6)',
-                    'high_volatility': '1.5x (기본 3.0 x 0.5)',
-                    'low_volatility': '3.6x (기본 3.0 x 1.2)',
-                    'sideways': '3.0x (기본값)'
+                    'bull': '2.0x (기본 1.0 x 2.0)',
+                    'bear': '0.5x (기본 1.0 x 0.5)',
+                    'high_volatility': '1.5x (기본 1.5 x 1.0)',
+                    'low_volatility': '3.6x (기본 1.5 x 2.4)',
+                    'sideways': '1.0x (기본값)'
                 }
             },
-            'phase2_defensive': {
+            'phase2': {
                 'base_leverage': 1.5,
                 'max_leverage': 5.0,
                 'min_leverage': 1.0,
                 'market_conditions': {
-                    'bull_market': '2.1x (기본 1.5 x 1.4)',
-                    'bear_market': '1.05x (기본 1.5 x 0.7)',
-                    'high_volatility': '0.9x (기본 1.5 x 0.6)',
-                    'low_volatility': '1.95x (기본 1.5 x 1.3)',
-                    'sideways': '1.5x (기본값)'
+                    'bull': '2.8x (기본 1.5 x 1.87)',
+                    'bear': '0.7x (기본 1.5 x 0.47)',
+                    'high_volatility': '0.6x (기본 1.5 x 0.4)',
+                    'low_volatility': '1.3x (기본 1.5 x 0.87)',
+                    'sideways': '1.0x (기본값)'
                 }
             }
         }
@@ -320,3 +321,11 @@ class DynamicLeverageManager:
         self.leverage_history = []
         self.adjustment_reasons = []
         self.logger.info("레버리지 초기화 완료") 
+
+    def get_leverage(self, market_condition):
+        if market_condition == MarketCondition.BULL:
+            return self.base_leverage * 2
+        elif market_condition == MarketCondition.BEAR:
+            return self.base_leverage * 0.5
+        else:
+            return self.base_leverage 
