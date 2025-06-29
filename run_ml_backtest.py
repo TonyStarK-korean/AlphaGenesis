@@ -115,7 +115,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
     logger.info("ML 모델 훈련 완료")
     
     # 백테스트 실행
-    for i, (idx, row) in enumerate(tqdm(test_data.iterrows(), total=len(test_data), desc='백테스트 진행중', ncols=80)):
+    for i in tqdm(range(len(test_data)), desc='백테스트 진행중', ncols=80, dynamic_ncols=True, file=sys.stdout):
+        idx, row = test_data.iloc[i].name, test_data.iloc[i]
         try:
             # 현재 시장 상황 분석
             market_condition = analyze_market_condition(row)
