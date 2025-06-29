@@ -150,183 +150,138 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     indicators = TechnicalIndicators()
     df_with_indicators = indicators.add_all_indicators(df.copy())
 
-    results = {
-        'timestamp': [],
-        'capital': [],
-        'leverage': [],
-        'position': [],
-        'prediction': [],
-        'actual_return': [],
-        'cumulative_return': []
-    }
+    # 실전형 다중 포지션 구조
+    current_capital = initial_capital  # 현금성 자본
+    positions = {}  # {(symbol, direction): {...}}
+    trade_history = []  # 모든 진입/청산 기록
+    realized_pnl = 0  # 실현손익
+    unrealized_pnl = 0  # 미실현손익
+    total_capital = initial_capital
 
-    current_capital = initial_capital
-    peak_capital = initial_capital
-    position = 0
-    consecutive_wins = 0
-    consecutive_losses = 0
-    last_trade_win = None
-
+    # 테스트용: 단일 종목(BNB/USDT)만 사용, 확장 시 symbol 컬럼 활용
+    symbols = df_with_indicators['symbol'].unique() if 'symbol' in df_with_indicators else ['BNB/USDT']
     train_size = int(len(df_with_indicators) * 0.7)
     train_data = df_with_indicators.iloc[:train_size]
     test_data = df_with_indicators.iloc[train_size:]
 
     logger.info(f"훈련 데이터: {len(train_data)} 개, 테스트 데이터: {len(test_data)} 개")
 
-    entry_idx = None
-    entry_price = None
-    entry_leverage = None
-    entry_signal = None
-    entry_pred = None
-    entry_capital = None
-    entry_strategy = None
-    entry_time = None
-    trade_history = []
+    results = {
+        'timestamp': [],
+        'total_capital': [],
+        'current_capital': [],
+        'realized_pnl': [],
+        'unrealized_pnl': [],
+        'open_positions': [],
+        'trade_log': []
+    }
 
     for i in range(len(test_data)):
         idx, row = test_data.iloc[i].name, test_data.iloc[i]
         try:
             if pd.isna(row['close']) or row['close'] <= 0:
                 continue
+            symbol = row['symbol'] if 'symbol' in row else 'BNB/USDT'
+            timestamp = row['timestamp'] if 'timestamp' in row else idx
 
-            # 시장 상황 분석
+            # 시장 상황 분석 및 레버리지 계산
             market_condition = analyze_market_condition(row)
             volatility = row.get('volatility_20', 0.05)
-            if pd.isna(volatility) or volatility < 0:
-                volatility = 0.05
             rsi = row.get('rsi_14', 50)
-            if pd.isna(rsi) or rsi < 0 or rsi > 100:
-                rsi = 50
-
-            # 급락/급등 감지
-            price_change_pct = 0
-            if i > 0:
-                prev_close = test_data.iloc[i-1]['close']
-                if prev_close > 0:
-                    price_change_pct = (row['close'] - prev_close) / prev_close * 100
-            drop_rise_str = ""
-            if price_change_pct <= -10:
-                drop_rise_str = f"급락({price_change_pct:.1f}%)"
-            elif price_change_pct >= 10:
-                drop_rise_str = f"급등({price_change_pct:+.1f}%)"
-
-            # 레버리지 조정 (실제 데이터 timestamp 사용, 불필요한 텍스트 제거)
             current_leverage = leverage_manager.update_leverage(
                 phase=PhaseType.PHASE1_AGGRESSIVE,
                 market_condition=market_condition,
                 current_capital=current_capital,
-                peak_capital=peak_capital,
-                consecutive_wins=consecutive_wins,
-                consecutive_losses=consecutive_losses,
+                peak_capital=initial_capital,  # peak_capital은 추후 개선
+                consecutive_wins=0,
+                consecutive_losses=0,
                 volatility=volatility,
                 rsi=rsi
             )
-            lev_log = f"{row['timestamp']} - 레버리지 조정: {position} → {current_leverage:.2f} {drop_rise_str}".strip()
-            logger.info(lev_log)
 
             # ML 예측
             prediction_data = df_with_indicators.iloc[:train_size + i + 1]
             if len(prediction_data) > 60:
-                prediction = ml_model.predict(prediction_data)
-                predicted_return = prediction[-1] if len(prediction) > 0 and not pd.isna(prediction[-1]) else 0
+                predicted_return = ml_model.predict(prediction_data)[-1]
             else:
                 predicted_return = 0
 
             # 거래 신호 생성
             signal, strategy_desc = generate_trading_signal(predicted_return, row, current_leverage)
+            direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
 
-            # 진입
-            if signal == 1 and position <= 0:
-                position = 1
-                entry_idx = idx
-                entry_price = row['close']
-                entry_leverage = current_leverage
-                entry_signal = '롱'
-                entry_pred = predicted_return
-                entry_capital = current_capital
-                entry_strategy = strategy_desc
-                entry_time = row['timestamp']
-                log_msg = f"{entry_time} - 롱 진입 | 전략: {entry_strategy} | 진입가: {entry_price:,.0f}원 | 레버리지: {entry_leverage:.1f} | 총자산: {current_capital:,.0f}원"
+            # 진입: 해당 종목/방향 포지션이 없고, 신호가 있으면 진입
+            if direction and (symbol, direction) not in positions:
+                # 자본 배분(예: 전체 자본의 10%씩 분산)
+                entry_amount = current_capital * 0.1
+                if entry_amount < 1:  # 최소 진입금액 제한
+                    continue
+                current_capital -= entry_amount
+                positions[(symbol, direction)] = {
+                    'entry_price': row['close'],
+                    'entry_time': timestamp,
+                    'leverage': current_leverage,
+                    'amount': entry_amount,
+                    'status': 'OPEN',
+                    'strategy': strategy_desc
+                }
+                log_msg = f"{timestamp} - {symbol} {direction} 진입 | 전략: {strategy_desc} | 진입가: {row['close']:.2f} | 레버리지: {current_leverage:.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f}"
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
-            elif signal == -1 and position >= 0:
-                position = -1
-                entry_idx = idx
-                entry_price = row['close']
-                entry_leverage = current_leverage
-                entry_signal = '숏'
-                entry_pred = predicted_return
-                entry_capital = current_capital
-                entry_strategy = strategy_desc
-                entry_time = row['timestamp']
-                log_msg = f"{entry_time} - 숏 진입 | 전략: {entry_strategy} | 진입가: {entry_price:,.0f}원 | 레버리지: {entry_leverage:.1f} | 총자산: {current_capital:,.0f}원"
-                logger.info(log_msg)
-                send_log_to_dashboard(log_msg)
-            # 청산
-            elif signal == 0 and position != 0:
-                exit_idx = idx
-                exit_price = row['close']
-                exit_time = row['timestamp']
-                if entry_price is not None and entry_leverage is not None and entry_capital is not None:
-                    if position == 1:
-                        pnl_rate = (exit_price - entry_price) / entry_price * entry_leverage
-                    elif position == -1:
-                        pnl_rate = (entry_price - exit_price) / entry_price * entry_leverage
-                    else:
-                        pnl_rate = 0
-                    profit = entry_capital * pnl_rate
-                    current_capital += profit  # 진입-청산 시점에만 반영
-                    if profit > 0:
-                        profit_text = f"수익: +{profit:,.0f}원 (+{pnl_rate*100:.2f}%)"
-                        last_trade_win = True
-                    else:
-                        profit_text = f"손실: {profit:,.0f}원 ({pnl_rate*100:.2f}%)"
-                        last_trade_win = False
-                    # 연속 승/패 카운트 (청산 시점에만) 및 로그 한 줄로 출력
-                    streak_msg = ""
-                    if last_trade_win and consecutive_wins+1 > 1:
-                        streak_msg = f" | 연속 승리 {consecutive_wins+1}회!"
-                    elif last_trade_win is False and consecutive_losses+1 > 1:
-                        streak_msg = f" | 연속 손실 {consecutive_losses+1}회!"
-                    log_msg = f"{exit_time} - {entry_signal} 청산 | 전략: {entry_strategy} | 진입가: {entry_price:,.0f}원 | 청산가: {exit_price:,.0f}원 | 레버리지: {entry_leverage:.1f} | {profit_text} | 총자산: {current_capital:,.0f}원{streak_msg}"
-                    logger.info(log_msg)
-                    send_log_to_dashboard(log_msg)
-                    trade_history.append({
-                        'entry_idx': entry_idx,
-                        'exit_idx': exit_idx,
-                        'profit': profit,
-                        'pnl_rate': pnl_rate,
-                        'capital': current_capital
-                    })
-                    # 연속 승/패 카운트 (진입-청산 시점에만)
-                    if last_trade_win:
-                        consecutive_wins += 1
-                        consecutive_losses = 0
-                    elif last_trade_win is False:
-                        consecutive_losses += 1
-                        consecutive_wins = 0
+                results['trade_log'].append(log_msg)
+
+            # 청산: 해당 종목/방향 포지션이 있고, 신호가 0이면 청산
+            if direction is None:
+                for pos_key in list(positions.keys()):
+                    if positions[pos_key]['status'] == 'OPEN':
+                        entry = positions[pos_key]
+                        entry_price = entry['entry_price']
+                        entry_amount = entry['amount']
+                        lev = entry['leverage']
+                        pos_dir = pos_key[1]
+                        # 롱/숏별 손익 계산
+                        if pos_dir == 'LONG':
+                            pnl_rate = (row['close'] - entry_price) / entry_price * lev
+                        else:
+                            pnl_rate = (entry_price - row['close']) / entry_price * lev
+                        profit = entry_amount * pnl_rate
+                        current_capital += entry_amount + profit
+                        realized_pnl += profit
+                        entry['status'] = 'CLOSED'
+                        entry['exit_price'] = row['close']
+                        entry['exit_time'] = timestamp
+                        entry['profit'] = profit
+                        entry['pnl_rate'] = pnl_rate
+                        log_msg = f"{timestamp} - {pos_key[0]} {pos_dir} 청산 | 진입가: {entry_price:.2f} | 청산가: {row['close']:.2f} | 레버리지: {lev:.2f} | 수익: {profit:,.0f} | 총자산: {current_capital:,.0f}"
+                        logger.info(log_msg)
+                        send_log_to_dashboard(log_msg)
+                        results['trade_log'].append(log_msg)
+                        trade_history.append({**entry, 'symbol': pos_key[0], 'direction': pos_dir})
+                        del positions[pos_key]
+
+            # 미실현손익 계산 (모든 오픈 포지션 평가)
+            unrealized_pnl = 0
+            for pos_key, entry in positions.items():
+                entry_price = entry['entry_price']
+                entry_amount = entry['amount']
+                lev = entry['leverage']
+                pos_dir = pos_key[1]
+                if pos_dir == 'LONG':
+                    pnl_rate = (row['close'] - entry_price) / entry_price * lev
                 else:
-                    log_msg = f"{exit_time} - 청산 | 정보 부족 (진입 정보 없음)"
-                    logger.info(log_msg)
-                    send_log_to_dashboard(log_msg)
-                position = 0
-                entry_idx = None
-                entry_price = None
-                entry_leverage = None
-                entry_signal = None
-                entry_pred = None
-                entry_capital = None
-                entry_strategy = None
-                entry_time = None
+                    pnl_rate = (entry_price - row['close']) / entry_price * lev
+                unrealized_pnl += entry_amount * pnl_rate
 
-            # 결과 저장 (진입/청산 시점에만 자본 반영)
-            results['timestamp'].append(row['timestamp'])
-            results['capital'].append(current_capital)
-            results['leverage'].append(current_leverage)
-            results['position'].append(position)
-            results['prediction'].append(predicted_return)
-            results['actual_return'].append(0)
-            results['cumulative_return'].append((current_capital - initial_capital) / initial_capital)
+            # 총자산 = 현금성 자본 + 미실현손익 포함 오픈포지션 평가금액
+            total_capital = current_capital + sum([entry['amount'] for entry in positions.values()]) + unrealized_pnl
+
+            # 결과 저장
+            results['timestamp'].append(timestamp)
+            results['total_capital'].append(total_capital)
+            results['current_capital'].append(current_capital)
+            results['realized_pnl'].append(realized_pnl)
+            results['unrealized_pnl'].append(unrealized_pnl)
+            results['open_positions'].append(len(positions))
 
         except Exception as e:
             import traceback
@@ -335,6 +290,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             logger.error(f"[{idx}] 상세 오류 정보: {error_details}")
             continue
 
+    # 결과 분석 및 리포트
     analyze_backtest_results(results, initial_capital)
     return results
 
@@ -388,18 +344,18 @@ def analyze_backtest_results(results: dict, initial_capital: float):
     """백테스트 결과 분석"""
     logger = logging.getLogger(__name__)
     df_results = pd.DataFrame(results)
-    if df_results.empty or len(df_results['capital']) == 0:
+    if df_results.empty or len(df_results['total_capital']) == 0:
         logger.error("백테스트 결과 데이터가 비어 있습니다. (루프 내 예외/데이터 없음 등 원인)")
         return
     
     # 전체 성과
-    final_capital = df_results['capital'].iloc[-1]
+    final_capital = df_results['total_capital'].iloc[-1]
     total_return = (final_capital - initial_capital) / initial_capital * 100
     profit = final_capital - initial_capital
-    peak_capital = df_results['capital'].max()
-    max_drawdown = (peak_capital - df_results['capital'].min()) / peak_capital * 100
-    profitable_trades = len(df_results[df_results['actual_return'] > 0])
-    total_trades = len(df_results[df_results['position'] != 0])
+    peak_capital = df_results['total_capital'].max()
+    max_drawdown = (peak_capital - df_results['total_capital'].min()) / peak_capital * 100
+    profitable_trades = len(df_results[df_results['realized_pnl'] > 0])
+    total_trades = len(df_results[df_results['direction'] != None])
     win_rate = profitable_trades / total_trades * 100 if total_trades > 0 else 0
 
     # 백테스트 기간 정보
@@ -419,13 +375,13 @@ def analyze_backtest_results(results: dict, initial_capital: float):
     if 'symbol' in df_results:
         logger.info("--- 종목별 성과 ---")
         for symbol, group in df_results.groupby('symbol'):
-            sym_final = group['capital'].iloc[-1]
+            sym_final = group['total_capital'].iloc[-1]
             sym_return = (sym_final - initial_capital) / initial_capital * 100
             sym_profit = sym_final - initial_capital
-            sym_peak = group['capital'].max()
-            sym_mdd = (sym_peak - group['capital'].min()) / sym_peak * 100
-            sym_trades = len(group[group['position'] != 0])
-            sym_win = len(group[group['actual_return'] > 0])
+            sym_peak = group['total_capital'].max()
+            sym_mdd = (sym_peak - group['total_capital'].min()) / sym_peak * 100
+            sym_trades = len(group[group['direction'] != None])
+            sym_win = len(group[group['realized_pnl'] > 0])
             sym_winrate = sym_win / sym_trades * 100 if sym_trades > 0 else 0
             sym_start = group['timestamp'].iloc[0] if len(group['timestamp']) > 0 else "N/A"
             sym_end = group['timestamp'].iloc[-1] if len(group['timestamp']) > 0 else "N/A"
@@ -435,13 +391,13 @@ def analyze_backtest_results(results: dict, initial_capital: float):
     if 'phase' in df_results:
         logger.info("--- 전략(phase)별 성과 ---")
         for phase, group in df_results.groupby('phase'):
-            ph_final = group['capital'].iloc[-1]
+            ph_final = group['total_capital'].iloc[-1]
             ph_return = (ph_final - initial_capital) / initial_capital * 100
             ph_profit = ph_final - initial_capital
-            ph_peak = group['capital'].max()
-            ph_mdd = (ph_peak - group['capital'].min()) / ph_peak * 100
-            ph_trades = len(group[group['position'] != 0])
-            ph_win = len(group[group['actual_return'] > 0])
+            ph_peak = group['total_capital'].max()
+            ph_mdd = (ph_peak - group['total_capital'].min()) / ph_peak * 100
+            ph_trades = len(group[group['direction'] != None])
+            ph_win = len(group[group['realized_pnl'] > 0])
             ph_winrate = ph_win / ph_trades * 100 if ph_trades > 0 else 0
             ph_start = group['timestamp'].iloc[0] if len(group['timestamp']) > 0 else "N/A"
             ph_end = group['timestamp'].iloc[-1] if len(group['timestamp']) > 0 else "N/A"
@@ -458,13 +414,13 @@ def analyze_backtest_results(results: dict, initial_capital: float):
     symbol_report = {}
     if 'symbol' in df_results:
         for symbol, group in df_results.groupby('symbol'):
-            sym_final = group['capital'].iloc[-1]
+            sym_final = group['total_capital'].iloc[-1]
             sym_return = (sym_final - initial_capital) / initial_capital * 100
             sym_profit = sym_final - initial_capital
-            sym_peak = group['capital'].max()
-            sym_mdd = (sym_peak - group['capital'].min()) / sym_peak * 100
-            sym_trades = len(group[group['position'] != 0])
-            sym_win = len(group[group['actual_return'] > 0])
+            sym_peak = group['total_capital'].max()
+            sym_mdd = (sym_peak - group['total_capital'].min()) / sym_peak * 100
+            sym_trades = len(group[group['direction'] != None])
+            sym_win = len(group[group['realized_pnl'] > 0])
             sym_winrate = sym_win / sym_trades * 100 if sym_trades > 0 else 0
             symbol_report[symbol] = {
                 'final_capital': sym_final,
@@ -477,13 +433,13 @@ def analyze_backtest_results(results: dict, initial_capital: float):
     phase_report = {}
     if 'phase' in df_results:
         for phase, group in df_results.groupby('phase'):
-            ph_final = group['capital'].iloc[-1]
+            ph_final = group['total_capital'].iloc[-1]
             ph_return = (ph_final - initial_capital) / initial_capital * 100
             ph_profit = ph_final - initial_capital
-            ph_peak = group['capital'].max()
-            ph_mdd = (ph_peak - group['capital'].min()) / ph_peak * 100
-            ph_trades = len(group[group['position'] != 0])
-            ph_win = len(group[group['actual_return'] > 0])
+            ph_peak = group['total_capital'].max()
+            ph_mdd = (ph_peak - group['total_capital'].min()) / ph_peak * 100
+            ph_trades = len(group[group['direction'] != None])
+            ph_win = len(group[group['realized_pnl'] > 0])
             ph_winrate = ph_win / ph_trades * 100 if ph_trades > 0 else 0
             phase_report[phase] = {
                 'final_capital': ph_final,
