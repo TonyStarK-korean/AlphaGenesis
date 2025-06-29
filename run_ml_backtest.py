@@ -174,7 +174,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     logger.info(f"훈련 데이터: {len(train_data)} 개, 테스트 데이터: {len(test_data)} 개")
     
     # 초기 ML 모델 훈련 (충분한 데이터가 있는 경우)
-    if len(train_data) >= 100:
+    if len(train_data) >= 50:  # 최소 요구사항을 낮춤
         logger.info("초기 ML 모델 훈련 시작...")
         initial_training_success = ml_model.fit(train_data)
         if initial_training_success:
