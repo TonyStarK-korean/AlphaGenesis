@@ -73,13 +73,16 @@ def generate_historical_data(years: int = 3) -> pd.DataFrame:
     # 데이터 생성 후 바로 아래 코드 추가
     return df
 
-def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
+def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=None):
     """ML 모델 백테스트 실행"""
     logger = logging.getLogger(__name__)
     logger.info("ML 모델 백테스트 시작")
     
     # ML 모델 초기화
-    ml_model = PricePredictionModel()
+    if model is None:
+        ml_model = PricePredictionModel()
+    else:
+        ml_model = model
     
     # 동적 레버리지 관리자 초기화
     leverage_manager = DynamicLeverageManager()
@@ -313,16 +316,25 @@ def main():
     """메인 함수"""
     logger = setup_logging()
     logger.info("ML 모델 백테스트 시스템 시작")
-    
     try:
         # 3년치 데이터 생성
         df = generate_historical_data(years=3)
-        
+
+        # 저장된 모델이 있으면 불러오기, 없으면 새로 훈련
+        model_path = 'trained_model.pkl'
+        if os.path.exists(model_path):
+            from ml.models.price_prediction_model import PricePredictionModel
+            ml_model = PricePredictionModel.load_model(model_path)
+            logger.info(f"저장된 모델({model_path})을 불러와서 백테스트를 진행합니다.")
+        else:
+            ml_model = PricePredictionModel()
+            ml_model.fit(df)
+            ml_model.save_model(model_path)
+            logger.info(f"모델을 새로 훈련하고 저장({model_path}) 후 백테스트를 진행합니다.")
+
         # ML 백테스트 실행
-        results = run_ml_backtest(df, initial_capital=10000000)
-        
+        results = run_ml_backtest(df, initial_capital=10000000, model=ml_model)
         logger.info("ML 백테스트 완료")
-        
     except Exception as e:
         logger.error(f"시스템 실행 중 오류 발생: {e}")
         raise
