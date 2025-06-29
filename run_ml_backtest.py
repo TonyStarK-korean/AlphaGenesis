@@ -919,9 +919,9 @@ def check_pyramiding(positions, symbol, direction, current_profit_rate):
     
     # 수익률에 따른 피라미딩 조건
     if current_profit_rate >= 0.05:  # 5% 수익 시
-        return True, current_amount * 0.3  # 30% 추가
+        return True, entry_amount * 0.3  # 30% 추가
     elif current_profit_rate >= 0.02:  # 2% 수익 시
-        return True, current_amount * 0.5  # 50% 추가
+        return True, entry_amount * 0.5  # 50% 추가
     
     return False, 0
 
