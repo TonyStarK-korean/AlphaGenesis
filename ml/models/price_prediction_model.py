@@ -124,14 +124,49 @@ class PricePredictionModel:
             print(f"[CV리포트] {name}: RMSE={np.mean(fold_rmse):.4f}, MAE={np.mean(fold_mae):.4f}, R2={np.mean(fold_r2):.4f}")
 
     def predict(self, df):
-        target_col = 'close'
-        df_feat = make_features(df)
-        # 학습 때와 동일한 feature만 사용
-        X = df_feat[self.feature_names].values
-        preds = []
-        for name, model in self.models.items():
-            preds.append(model.predict(X))
-        return np.mean(preds, axis=0)
+        try:
+            target_col = 'close'
+            df_feat = make_features(df)
+            
+            # feature_names가 None인 경우 처리
+            if self.feature_names is None:
+                print("[ML 모델] feature_names가 None입니다. 모델을 다시 훈련해야 합니다.")
+                return np.zeros(len(df_feat))
+            
+            # 필요한 컬럼이 없는 경우 처리
+            missing_features = [col for col in self.feature_names if col not in df_feat.columns]
+            if missing_features:
+                print(f"[ML 모델] 누락된 피처: {missing_features}")
+                return np.zeros(len(df_feat))
+            
+            # 학습 때와 동일한 feature만 사용
+            X = df_feat[self.feature_names].values
+            
+            # NaN 값 처리
+            if np.isnan(X).any():
+                print("[ML 모델] NaN 값이 발견되어 0으로 대체합니다.")
+                X = np.nan_to_num(X, nan=0.0)
+            
+            preds = []
+            for name, model in self.models.items():
+                try:
+                    pred = model.predict(X)
+                    preds.append(pred)
+                except Exception as e:
+                    print(f"[ML 모델] {name} 모델 예측 실패: {e}")
+                    # 예측 실패 시 0으로 대체
+                    preds.append(np.zeros(len(X)))
+            
+            if not preds:
+                print("[ML 모델] 모든 모델 예측 실패")
+                return np.zeros(len(df_feat))
+            
+            return np.mean(preds, axis=0)
+            
+        except Exception as e:
+            print(f"[ML 모델] 예측 중 오류 발생: {e}")
+            # 오류 발생 시 0으로 반환
+            return np.zeros(len(df) if hasattr(df, '__len__') else 1)
 
     def backtest(self, df, initial_capital=1000000, fee=0.0005, horizon=1):
         df_feat = make_features(df)
