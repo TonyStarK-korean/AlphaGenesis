@@ -187,6 +187,14 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     peak_capital = initial_capital
     max_drawdown = 0
 
+    # 리스크 추적 변수
+    daily_pnl = 0
+    weekly_pnl = 0
+    monthly_pnl = 0
+    last_daily_reset = None
+    last_weekly_reset = None
+    last_monthly_reset = None
+
     # 크로노스 스위칭 신호 생성 함수 (통합 고수익 전략)
     def generate_chronos_signal(row, ml_pred):
         # 상위 프레임(4H) 추세 필터 - 더 엄격한 조건
@@ -902,14 +910,6 @@ def check_risk_limits(current_capital, initial_capital, daily_loss=0, weekly_los
         return False, "월간 손실 한도 초과"
     
     return True, "리스크 한도 내"
-
-# 리스크 추적 변수
-daily_pnl = 0
-weekly_pnl = 0
-monthly_pnl = 0
-last_daily_reset = None
-last_weekly_reset = None
-last_monthly_reset = None
 
 def print_summary(result, label):
     """실전형 한글 요약 출력"""
