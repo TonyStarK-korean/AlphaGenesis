@@ -52,8 +52,6 @@ def generate_historical_data(years: int = 3) -> pd.DataFrame:
     
     logger.info(f"데이터 생성 완료: {len(df)} 개 데이터 포인트")
     # 데이터 생성 후 바로 아래 코드 추가
-    print("생성된 데이터프레임 컬럼:", df.columns)
-    print("생성된 데이터프레임 샘플:", df.head())
     return df
 
 def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
