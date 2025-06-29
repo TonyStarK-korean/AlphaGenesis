@@ -207,7 +207,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 print(f"진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s", flush=True)
                 
         except Exception as e:
-            logger.error(f"백테스트 중 오류 발생: {e} | idx: {idx}, row: {row.to_dict() if hasattr(row, 'to_dict') else row}")
+            logger.error(f"백테스트 중 오류 발생: {e} | phase: {locals().get('phase', None)}, idx: {idx}, row: {row.to_dict() if hasattr(row, 'to_dict') else row}")
             continue
     
     # 결과 분석
@@ -274,31 +274,22 @@ def analyze_backtest_results(results: dict, initial_capital: float):
         logger.error("백테스트 결과 데이터가 비어 있습니다. (루프 내 예외/데이터 없음 등 원인)")
         return
     
-    # 기본 통계
     final_capital = df_results['capital'].iloc[-1]
     total_return = (final_capital - initial_capital) / initial_capital * 100
-    
-    # 최대 낙폭
+    profit = final_capital - initial_capital
     peak_capital = df_results['capital'].max()
     max_drawdown = (peak_capital - df_results['capital'].min()) / peak_capital * 100
-    
-    # 승률
     profitable_trades = len(df_results[df_results['actual_return'] > 0])
     total_trades = len(df_results[df_results['position'] != 0])
     win_rate = profitable_trades / total_trades * 100 if total_trades > 0 else 0
-    
-    # 평균 레버리지
-    avg_leverage = df_results['leverage'].mean()
-    
-    # 결과 출력
-    logger.info("=== ML 백테스트 결과 ===")
-    logger.info(f"초기 자본: {initial_capital:,.0f}원")
+
+    logger.info("=== 백테스트 성과 요약 ===")
     logger.info(f"최종 자본: {final_capital:,.0f}원")
     logger.info(f"총 수익률: {total_return:.2f}%")
+    logger.info(f"총 수익금(손실금): {profit:,.0f}원")
     logger.info(f"최대 낙폭: {max_drawdown:.2f}%")
-    logger.info(f"승률: {win_rate:.1f}%")
-    logger.info(f"평균 레버리지: {avg_leverage:.2f}x")
     logger.info(f"총 거래 횟수: {total_trades}")
+    logger.info(f"승률: {win_rate:.1f}%")
     
     # 결과 저장
     df_results.to_csv('data/backtest_data/ml_backtest_results.csv', index=False)
