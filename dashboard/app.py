@@ -1,3 +1,6 @@
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from flask_cors import CORS
 import pandas as pd
@@ -6,7 +9,6 @@ from datetime import datetime, timedelta
 import json
 import threading
 import time
-import os
 from pathlib import Path
 from typing import Dict, List, Optional
 import glob
@@ -14,8 +16,6 @@ import plotly.graph_objs as go
 from plotly.utils import PlotlyJSONEncoder
 
 # 시스템 모듈 임포트
-import sys
-sys.path.append('../../')
 from config.backtest_config import backtest_config
 from src.data.market_data_downloader import MarketDataDownloader
 from src.core.trading_engine.adaptive_phase_manager import AdaptivePhaseManager
