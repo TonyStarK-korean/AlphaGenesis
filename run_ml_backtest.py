@@ -145,7 +145,12 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     logger = logging.getLogger(__name__)
     logger.info("ML 모델 백테스트 시작")
 
+    # ML 모델 초기화 및 검증
     ml_model = model if model is not None else PricePredictionModel()
+    if not hasattr(ml_model, 'models') or not ml_model.models:
+        logger.info("ML 모델 초기화 중...")
+        ml_model = PricePredictionModel()
+    
     leverage_manager = DynamicLeverageManager()
     indicators = TechnicalIndicators()
     df_with_indicators = indicators.add_all_indicators(df.copy())
@@ -167,6 +172,17 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     test_data = df_with_indicators.iloc[train_size:]
 
     logger.info(f"훈련 데이터: {len(train_data)} 개, 테스트 데이터: {len(test_data)} 개")
+    
+    # 초기 ML 모델 훈련 (충분한 데이터가 있는 경우)
+    if len(train_data) >= 100:
+        logger.info("초기 ML 모델 훈련 시작...")
+        initial_training_success = ml_model.fit(train_data)
+        if initial_training_success:
+            logger.info("초기 ML 모델 훈련 완료")
+        else:
+            logger.warning("초기 ML 모델 훈련 실패 - 데이터 부족")
+    else:
+        logger.warning(f"초기 훈련 데이터 부족 ({len(train_data)}개) - 백테스트 중 훈련 예정")
 
     results = {
         'timestamp': [],
@@ -368,6 +384,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 if positions[pos_key]['status'] == 'OPEN':
                     entry = positions[pos_key]
                     entry_price = entry['entry_price']
+                    entry_amount = entry['amount']
                     current_price = row['close']
                     
                     # 수익률 계산
@@ -898,7 +915,7 @@ def check_pyramiding(positions, symbol, direction, current_profit_rate):
     
     position = positions[(symbol, direction)]
     entry_price = position['entry_price']
-    current_amount = position['amount']
+    entry_amount = position['amount']
     
     # 수익률에 따른 피라미딩 조건
     if current_profit_rate >= 0.05:  # 5% 수익 시
