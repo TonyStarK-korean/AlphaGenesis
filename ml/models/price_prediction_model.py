@@ -59,7 +59,7 @@ class PricePredictionModel:
                 for train_idx, val_idx in tscv.split(X):
                     model.fit(X[train_idx], y[train_idx])
                     preds = model.predict(X[val_idx])
-                    score = mean_squared_error(y[val_idx], preds, squared=False)
+                    score = np.sqrt(mean_squared_error(y[val_idx], preds))
                     scores.append(score)
                 return np.mean(scores)
             study = optuna.create_study(direction='minimize')
