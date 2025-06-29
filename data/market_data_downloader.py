@@ -12,6 +12,7 @@ import logging
 from typing import Dict, List, Optional
 import os
 from pathlib import Path
+from tqdm import tqdm
 
 # 설정 파일 임포트
 import sys
@@ -149,7 +150,7 @@ class MarketDataDownloader:
         
         self.logger.info(f"데이터 다운로드 시작: {len(symbols)}개 심볼, {timeframe} 시간프레임")
         
-        for symbol in symbols:
+        for symbol in tqdm(symbols, desc='데이터 다운로드 진행중', ncols=80):
             try:
                 self.logger.info(f"{symbol} 데이터 다운로드 중...")
                 
