@@ -33,7 +33,7 @@ from utils.indicators.technical_indicators import TechnicalIndicators
 
 def setup_logging():
     """
-    로그 설정 (한국시간, asctime 제거)
+    로그 설정 (한국시간, 초기화 시에만 __main__ 표시)
     """
     seoul_tz = pytz.timezone('Asia/Seoul')
     class SeoulFormatter(logging.Formatter):
@@ -44,11 +44,23 @@ def setup_logging():
             else:
                 s = dt.strftime("%Y-%m-%d %H:%M:%S")
             return s
-    # asctime(날짜-시간) 제거
-    formatter = SeoulFormatter('%(name)s - %(levelname)s - %(message)s')
+    
+    # 초기화 시에만 __main__ 표시, 백테스트 중에는 간단한 로그
+    class CustomFormatter(logging.Formatter):
+        def format(self, record):
+            dt = datetime.fromtimestamp(record.created, seoul_tz)
+            time_str = dt.strftime("%Y-%m-%d %H:%M:%S")
+            
+            # 초기화 관련 로그만 __main__ 표시
+            if '시스템 시작' in record.getMessage() or '데이터 생성' in record.getMessage() or '모델 불러오기' in record.getMessage() or '백테스트 시작' in record.getMessage():
+                return f"{time_str} - __main__ - INFO - {record.getMessage()}"
+            else:
+                return f"{time_str} - {record.getMessage()}"
+    
+    formatter = CustomFormatter()
     logging.basicConfig(
         level=logging.INFO,
-        format='%(message)s',  # 메시지만 출력
+        format='%(message)s',
         handlers=[
             logging.FileHandler('logs/ml_backtest.log'),
             logging.StreamHandler()
