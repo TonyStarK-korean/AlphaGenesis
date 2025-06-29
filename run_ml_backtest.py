@@ -119,17 +119,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
     
     # 백테스트 실행
     start_time = time.time()
-    for i in tqdm(
-        range(len(test_data)),
-        desc='백테스트 진행중',
-        ncols=80,
-        dynamic_ncols=True,
-        file=sys.stdout,
-        leave=True,
-        mininterval=0.1,
-        ascii=True,
-        disable=False
-    ):
+    for i in range(len(test_data)):
         idx, row = test_data.iloc[i].name, test_data.iloc[i]
         try:
             # 현재 시장 상황 분석
