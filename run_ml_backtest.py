@@ -346,16 +346,16 @@ def translate_optuna_log(msg):
     return msg
 
 # Optuna 로그를 한글로 출력하도록 stdout/stderr 후킹
-class KoreanOptunaLogger(optuna.logging.DefaultHandler):
+class KoreanOptunaLogger(logging.Handler):
     def emit(self, record):
         msg = self.format(record)
         msg = translate_optuna_log(msg)
         print(msg)
 
+optuna_logger = optuna.logging.get_logger("optuna")
+optuna_logger.handlers = []
+optuna_logger.addHandler(KoreanOptunaLogger())
 optuna.logging.set_verbosity(optuna.logging.INFO)
-for handler in list(optuna.logging.get_logger().handlers):
-    optuna.logging.get_logger().removeHandler(handler)
-optuna.logging.get_logger().addHandler(KoreanOptunaLogger())
 
 if __name__ == "__main__":
     main() 
