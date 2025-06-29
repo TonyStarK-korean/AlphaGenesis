@@ -502,7 +502,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             monthly_performance[current_month]['realized_pnl'] = realized_pnl
             monthly_performance[current_month]['unrealized_pnl'] = unrealized_pnl
             monthly_performance[current_month]['open_positions'] = len(positions)
-            monthly_performance[current_month]['trade_log'].append(log_msg)
+            if 'log_msg' in locals():
+                monthly_performance[current_month]['trade_log'].append(log_msg)
 
             # 월별 성과 분석
             if last_monthly_report is None:
