@@ -251,32 +251,18 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
 
     for idx, row in test_data.iterrows():
         try:
-            timestamp = row.name if hasattr(row, 'name') else row.get('timestamp', idx)
             # timestamp를 적절한 형식으로 변환
-            if isinstance(timestamp, (int, float)):
-                # 인덱스 번호인 경우 실제 날짜로 변환
-                if 'timestamp' in row:
-                    timestamp = row['timestamp']
-                else:
-                    # 인덱스 기반 날짜 생성 (테스트 데이터용)
-                    start_date = datetime(2023, 1, 1)
-                    timestamp = start_date + timedelta(hours=idx)
-            elif isinstance(timestamp, str):
+            if 'timestamp' in row and pd.notnull(row['timestamp']):
                 try:
-                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
-                except:
-                    timestamp = datetime.now()
-            
-            # timestamp가 datetime 객체인지 확인하고 한국시간으로 변환
-            if isinstance(timestamp, datetime):
-                if timestamp.tzinfo is None:
-                    timestamp = pytz.timezone('Asia/Seoul').localize(timestamp)
-                else:
-                    timestamp = timestamp.astimezone(pytz.timezone('Asia/Seoul'))
+                    timestamp = pd.to_datetime(row['timestamp'])
+                except Exception:
+                    timestamp = row['timestamp']
+            elif isinstance(row.name, (pd.Timestamp, datetime)):
+                timestamp = row.name
             else:
-                # 문자열인 경우 기본 datetime으로 변환
-                timestamp = datetime.now(pytz.timezone('Asia/Seoul'))
-            
+                # 인덱스 기반 날짜 생성 (테스트 데이터용)
+                start_date = datetime(2023, 1, 1)
+                timestamp = start_date + timedelta(hours=idx)
             timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M")
             current_month = timestamp.strftime("%Y-%m")
             # 시장국면 판별
