@@ -36,12 +36,14 @@ class MarketDataGenerator:
             volume = np.random.randint(100, 1000, n)
             # 반드시 'close'와 'volume' 컬럼명으로 생성!
             df = pd.DataFrame({'close': price, 'volume': volume}, index=dates)
+            df['symbol'] = symbol
             data[symbol] = df
 
         # 단일 심볼이면 바로 DataFrame 반환
         if len(symbols) == 1:
             return data[symbols[0]]
-        return data
+        else:
+            return pd.concat(data.values(), axis=0)        
     
 # 사용 예시
 if __name__ == "__main__":
