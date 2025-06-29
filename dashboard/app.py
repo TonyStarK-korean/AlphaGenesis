@@ -9,6 +9,9 @@ import time
 import os
 from pathlib import Path
 from typing import Dict, List, Optional
+import glob
+import plotly.graph_objs as go
+from plotly.utils import PlotlyJSONEncoder
 
 # 시스템 모듈 임포트
 import sys
@@ -21,6 +24,9 @@ from src.core.trading_engine.compound_trading_engine import CompoundTradingEngin
 app = Flask(__name__)
 CORS(app)  # 외부 접속 허용
 app.config['SECRET_KEY'] = 'your-secret-key-here'
+
+RESULTS_DIR = 'dashboard/results'
+os.makedirs(RESULTS_DIR, exist_ok=True)
 
 class DashboardManager:
     """대시보드 관리자"""
@@ -273,6 +279,36 @@ def get_real_time_data():
         return jsonify(dashboard_manager.real_time_data)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/upload_results', methods=['POST'])
+def upload_results():
+    data = request.get_json()
+    symbol = data.get('symbol', 'unknown')
+    out_path = os.path.join(RESULTS_DIR, f"results_{symbol.replace('/', '_')}.json")
+    with open(out_path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2)
+    return jsonify({'status': 'ok', 'file': out_path})
+
+@app.route('/dashboard')
+def dashboard():
+    files = glob.glob(os.path.join(RESULTS_DIR, 'results_*.json'))
+    all_results = []
+    for file in files:
+        with open(file, encoding='utf-8') as f:
+            res = json.load(f)
+            symbol = os.path.basename(file).replace('results_', '').replace('.json', '').replace('_', '/')
+            res['symbol'] = symbol
+            all_results.append(res)
+    df = pd.DataFrame(all_results)
+    # 표와 그래프 생성
+    table_html = df.to_html(classes='table table-striped', index=False)
+    # 예시: 최종 자본 그래프
+    fig = go.Figure()
+    for _, row in df.iterrows():
+        if 'capital' in row and isinstance(row['capital'], list):
+            fig.add_trace(go.Scatter(y=row['capital'], name=row['symbol']))
+    graph_json = json.dumps(fig, cls=PlotlyJSONEncoder)
+    return render_template('dashboard.html', table_html=table_html, graph_json=graph_json)
 
 if __name__ == '__main__':
     # 외부 접속을 위해 host를 0.0.0.0으로 설정
