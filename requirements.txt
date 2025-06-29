@@ -25,7 +25,6 @@ yfinance>=0.1.70
 
 # 알림 시스템
 python-telegram-bot>=20.0
-smtplib2>=0.2.1
 
 # 거래소 API
 ccxt>=2.0.0

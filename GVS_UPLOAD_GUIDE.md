@@ -268,7 +268,7 @@ if ($status) {
 ```powershell
 # realtime_git_sync.ps1 생성
 $projectPath = "C:\Project\AlphaGenesis"
-$syncScript = "C:\Project\AlphaGenesis\auto_sync.ps1"
+$syncScript = "$projectPath\auto_sync.ps1"
 
 Write-Host "실시간 Git 동기화 시작: $(Get-Date)"
 Write-Host "프로젝트 경로: $projectPath"
@@ -297,9 +297,6 @@ Register-ObjectEvent $watcher "Changed" -Action {
 }
 
 Write-Host "실시간 감시 중... (종료하려면 Ctrl+C)"
-Write-Host "변경된 파일이 자동으로 GitHub에 푸시되고 GVS 서버에 반영됩니다."
-
-# 무한 대기
 try {
     while ($true) {
         Start-Sleep -Seconds 1
