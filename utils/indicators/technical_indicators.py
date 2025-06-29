@@ -24,7 +24,7 @@ class TechnicalIndicators:
         ema_fast = series.ewm(span=fast, adjust=False).mean()
         ema_slow = series.ewm(span=slow, adjust=False).mean()
         macd = ema_fast - ema_slow
-        macd_signal = macd.ewm(span=signal, adjust=False).mean()
+        macd_signal = macd.ewm(span=max(1, signal), adjust=False).mean()
         return macd, macd_signal
 
     @staticmethod
