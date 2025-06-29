@@ -187,21 +187,40 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     peak_capital = initial_capital
     max_drawdown = 0
 
-    # 크로노스 스위칭 신호 생성 함수
+    # 크로노스 스위칭 신호 생성 함수 (통합 고수익 전략)
     def generate_chronos_signal(row, ml_pred):
-        # 상위 프레임(4H) 추세 필터
-        if not (row.get('ema_20_4h',0) > row.get('ema_50_4h',0) > row.get('ema_120_4h',0) and row.get('rsi_14_4h',0) > 50 and row.get('macd_4h',0) > row.get('macd_signal_4h',0)):
+        # 상위 프레임(4H) 추세 필터 - 더 엄격한 조건
+        ema_trend = (row.get('ema_20_4h',0) > row.get('ema_50_4h',0) > row.get('ema_120_4h',0))
+        rsi_bull = row.get('rsi_14_4h',50) > 50 and row.get('rsi_14_4h',100) < 80
+        macd_bull = row.get('macd_4h',0) > row.get('macd_signal_4h',0) and row.get('macd_4h',0) > 0
+        
+        if not (ema_trend and rsi_bull and macd_bull):
             return 0, "상위 프레임 상승 신호 불일치"
-        # 중간 프레임(1H) 지지/저항, VWAP, 볼린저밴드 등
-        if not (row.get('close',0) > row.get('vwap_1h',0) and row.get('close',0) > row.get('bb_lower_1h',0)):
+        
+        # 중간 프레임(1H) 지지/저항, VWAP, 볼린저밴드 등 - 더 정교한 조건
+        vwap_support = row.get('close',0) > row.get('vwap_1h',0) * 1.001  # VWAP 0.1% 이상 상승
+        bb_support = row.get('close',0) > row.get('bb_lower_1h',0) * 1.002  # 볼린저 하단 0.2% 이상
+        volume_support = row.get('volume',0) > row.get('volume_ma_5',0) * 1.2  # 거래량 20% 이상 증가
+        
+        if not (vwap_support and bb_support and volume_support):
             return 0, "중간 프레임 진입 조건 불충족"
-        # 하위 프레임(5m) 트리거
-        if not (row.get('stoch_k_5m',100) < 20 and row.get('stoch_d_5m',100) < 20 and row.get('stoch_k_5m',0) > row.get('stoch_d_5m',0)):
+        
+        # 하위 프레임(5m) 트리거 - 더 민감한 조건
+        stoch_oversold = row.get('stoch_k_5m',100) < 25 and row.get('stoch_d_5m',100) < 25
+        stoch_bullish = row.get('stoch_k_5m',0) > row.get('stoch_d_5m',0) and row.get('stoch_k_5m',0) > 20
+        rsi_5m_bull = row.get('rsi_14_5m',50) > 40 and row.get('rsi_14_5m',100) < 70
+        
+        if not (stoch_oversold and stoch_bullish and rsi_5m_bull):
             return 0, "하위 프레임 트리거 없음"
-        # ML 예측수익률까지 양수(매수)일 때만 진입
-        if ml_pred > 0:
+        
+        # ML 예측수익률 기반 신호 강도 판단
+        if ml_pred > 0.01:  # 강한 매수 신호
+            return 2, "크로노스 스위칭 강한 매수 신호"
+        elif ml_pred > 0.005:  # 중간 매수 신호
             return 1, "크로노스 스위칭 매수 신호"
-        elif ml_pred < 0:
+        elif ml_pred < -0.01:  # 강한 매도 신호
+            return -2, "크로노스 스위칭 강한 매도 신호"
+        elif ml_pred < -0.005:  # 중간 매도 신호
             return -1, "크로노스 스위칭 매도 신호"
         else:
             return 0, "신호 없음"
@@ -269,21 +288,12 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
             # 진단용 로그 추가
             logger.info(f"[{timestamp_str}] 신호: {signal}, 방향: {direction}, 포지션존재: {positions.get((symbol, direction))}, 예측수익률: {predicted_return:.5f}, RSI: {row.get('rsi_14', 50):.2f}, 변동성: {row.get('volatility_20', 0.05):.4f}")
-            # 동적 레버리지 계산
-            current_leverage = leverage_manager.update_leverage(
-                phase=PhaseType.PHASE1_AGGRESSIVE,
-                market_condition=analyze_market_condition(row),
-                current_capital=current_capital,
-                peak_capital=initial_capital,
-                consecutive_wins=0,
-                consecutive_losses=0,
-                volatility=row.get('volatility_20', 0.05),
-                rsi=row.get('rsi_14', 50)
-            )
+            # 동적 레버리지 계산 (시장국면별)
+            current_leverage = get_dynamic_leverage(regime, predicted_return, row.get('volatility_20', 0.05))
             # 비중 결정
             base_ratio = 0.1
             if use_dynamic_position:
-                position_ratio = get_dynamic_position_size(base_ratio, regime, predicted_return)
+                position_ratio = get_dynamic_position_size(predicted_return, signal)
             else:
                 position_ratio = base_ratio
             # 진입
@@ -664,21 +674,129 @@ REGIME_STRATEGY_MAP = {
     '급락':   ('btc_short_only',    ['BTC']),
 }
 
-# === 동적 비중 함수 ===
-def get_dynamic_position_size(base_ratio, market_condition, predicted_return):
-    # 시장국면별 조정
-    if market_condition in ['급등', '상승']:
-        base_ratio *= 1.5
-    elif market_condition in ['하락', '급락']:
-        base_ratio *= 0.5
-    # 예측수익률에 따라 추가 조정
-    if abs(predicted_return) > 0.01:
-        base_ratio *= 1.3
-    elif abs(predicted_return) < 0.002:
-        base_ratio *= 0.7
-    # 최대/최소 비중 제한
-    base_ratio = min(max(base_ratio, 0.03), 0.3)  # 3%~30%
-    return base_ratio
+# === 동적 레버리지 계산 (시장국면별)
+def get_dynamic_leverage(regime, ml_pred, volatility):
+    base_leverage = 1.0
+    if regime == "급등":
+        base_leverage = 2.5
+    elif regime == "상승":
+        base_leverage = 2.0
+    elif regime == "횡보":
+        base_leverage = 1.5
+    elif regime == "하락":
+        base_leverage = 1.0
+    elif regime == "급락":
+        base_leverage = 0.8
+    
+    # ML 예측수익률에 따른 조정
+    if abs(ml_pred) > 0.01:
+        base_leverage *= 1.2
+    elif abs(ml_pred) < 0.002:
+        base_leverage *= 0.8
+    
+    # 변동성에 따른 조정
+    if volatility > 0.15:
+        base_leverage *= 0.7
+    elif volatility < 0.05:
+        base_leverage *= 1.1
+    
+    return min(max(base_leverage, 0.5), 3.0)  # 0.5~3.0배 범위
+
+# === 동적 비중 계산 (ML 예측수익률 기반)
+def get_dynamic_position_size(ml_pred, signal_strength):
+    base_size = 0.05  # 기본 5%
+    
+    if signal_strength == 2:  # 강한 신호
+        if ml_pred > 0.01:
+            return 0.15  # 15%
+        elif ml_pred > 0.005:
+            return 0.12  # 12%
+    elif signal_strength == 1:  # 중간 신호
+        if ml_pred > 0.005:
+            return 0.10  # 10%
+        else:
+            return 0.08  # 8%
+    
+    return base_size
+
+# 실전형 손절/익절 계산 (레버리지 반영)
+def get_risk_management(leverage, ml_pred):
+    # 레버리지 반영 손절/익절
+    stop_loss = 0.02 / leverage  # 레버리지가 높을수록 손절폭 좁아짐
+    take_profit = 0.05 * leverage  # 레버리지가 높을수록 익절폭 넓어짐
+    
+    # ML 예측수익률에 따른 조정
+    if abs(ml_pred) > 0.01:
+        take_profit *= 1.3  # 강한 신호 시 익절폭 확대
+    elif abs(ml_pred) < 0.002:
+        stop_loss *= 0.8  # 약한 신호 시 손절폭 축소
+    
+    return stop_loss, take_profit
+
+# 피라미딩 전략
+def check_pyramiding(positions, symbol, direction, current_profit_rate):
+    if (symbol, direction) not in positions:
+        return False, 0
+    
+    position = positions[(symbol, direction)]
+    entry_price = position['entry_price']
+    current_amount = position['amount']
+    
+    # 수익률에 따른 피라미딩 조건
+    if current_profit_rate >= 0.05:  # 5% 수익 시
+        return True, current_amount * 0.3  # 30% 추가
+    elif current_profit_rate >= 0.02:  # 2% 수익 시
+        return True, current_amount * 0.5  # 50% 추가
+    
+    return False, 0
+
+# 트레일링 스탑
+def check_trailing_stop(positions, symbol, direction, current_price, trailing_distance=0.015):
+    if (symbol, direction) not in positions:
+        return False
+    
+    position = positions[(symbol, direction)]
+    if 'peak_price' not in position:
+        position['peak_price'] = position['entry_price']
+    
+    # 고점 업데이트
+    if current_price > position['peak_price']:
+        position['peak_price'] = current_price
+    
+    # 트레일링 스탑 조건 (3% 이상 수익 시 활성화)
+    profit_rate = (current_price - position['entry_price']) / position['entry_price']
+    if profit_rate >= 0.03:
+        # 고점 대비 1.5% 하락 시 청산
+        if current_price < position['peak_price'] * (1 - trailing_distance):
+            return True
+    
+    return False
+
+# 실전형 리스크 관리
+def check_risk_limits(current_capital, initial_capital, daily_loss=0, weekly_loss=0, monthly_loss=0):
+    total_return = (current_capital - initial_capital) / initial_capital
+    
+    # 일일 손실 한도: 3%
+    if daily_loss < -0.03:
+        return False, "일일 손실 한도 초과"
+    
+    # 주간 손실 한도: 8%
+    if weekly_loss < -0.08:
+        return False, "주간 손실 한도 초과"
+    
+    # 월간 손실 한도: 15%
+    if monthly_loss < -0.15:
+        return False, "월간 손실 한도 초과"
+    
+    return True, "리스크 한도 내"
+
+# 리스크 추적 변수
+daily_pnl = 0
+weekly_pnl = 0
+monthly_pnl = 0
+last_daily_reset = None
+last_weekly_reset = None
+last_monthly_reset = None
 
 def print_summary(result, label):
     """실전형 한글 요약 출력"""
