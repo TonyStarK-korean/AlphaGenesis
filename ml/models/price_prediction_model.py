@@ -9,6 +9,7 @@ import lightgbm as lgb
 import optuna
 import time
 import joblib
+from sklearn.metrics import mean_absolute_error, r2_score
 
 def make_features(df):
     # 실전에서 많이 쓰는 피처 예시
@@ -33,15 +34,21 @@ class PricePredictionModel:
         self.n_splits = n_splits
         self.models = {}
         self.best_params = {}
+        self.cv_report = {}
 
     def save_model(self, path):
-        joblib.dump(self, path)
-        print(f"[모델저장] 모델이 {path}에 저장되었습니다.")
+        joblib.dump({'model': self, 'cv_report': self.cv_report}, path)
+        print(f"[모델저장] 모델이 {path}에 저장되었습니다. (CV리포트 포함)")
 
     @staticmethod
     def load_model(path):
         print(f"[모델불러오기] {path}에서 모델을 불러옵니다.")
-        return joblib.load(path)
+        obj = joblib.load(path)
+        if isinstance(obj, dict) and 'model' in obj:
+            model = obj['model']
+            model.cv_report = obj.get('cv_report', {})
+            return model
+        return obj
 
     def fit(self, df, target_col='close', horizon=1, tune=False):
         df_feat = make_features(df)
@@ -67,29 +74,36 @@ class PricePredictionModel:
                 model = RandomForestRegressor(**params)
                 tscv = TimeSeriesSplit(n_splits=self.n_splits)
                 scores = []
-                t_start = time.time()
                 for i, (train_idx, val_idx) in enumerate(tscv.split(X)):
                     model.fit(X[train_idx], y[train_idx])
                     preds = model.predict(X[val_idx])
                     score = np.sqrt(mean_squared_error(y[val_idx], preds))
                     scores.append(score)
-                    # 진행률/ETA 출력
-                    elapsed = time.time() - t_start
-                    eta = elapsed / (i+1) * (self.n_splits - (i+1)) if (i+1) > 0 else 0
-                    print(f"[Optuna] Fold {i+1}/{self.n_splits} | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s", flush=True)
-                return np.mean(scores)
+                mean_score = np.mean(scores)
+                print(f"[Optuna 튜닝] trial={trial.number}, RMSE={mean_score:.4f}")
+                return mean_score
             study = optuna.create_study(direction='minimize')
             study.optimize(objective, n_trials=20)
             self.best_params['rf'] = study.best_params
             self.models['rf'] = RandomForestRegressor(**study.best_params)
+            print(f"[Optuna 최적화] best_params: {self.best_params['rf']}")
 
-        # 각 모델 학습
-        t_start = time.time()
-        for i, (name, model) in enumerate(self.models.items()):
-            model.fit(X, y)
-            elapsed = time.time() - t_start
-            eta = elapsed / (i+1) * (len(self.models) - (i+1)) if (i+1) > 0 else 0
-            print(f"[ML학습] {i+1}/{len(self.models)} ({name}) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s", flush=True)
+        # 각 모델 학습 및 성능 리포트
+        tscv = TimeSeriesSplit(n_splits=self.n_splits)
+        for name, model in self.models.items():
+            fold_rmse, fold_mae, fold_r2 = [], [], []
+            for train_idx, val_idx in tscv.split(X):
+                model.fit(X[train_idx], y[train_idx])
+                preds = model.predict(X[val_idx])
+                fold_rmse.append(np.sqrt(mean_squared_error(y[val_idx], preds)))
+                fold_mae.append(mean_absolute_error(y[val_idx], preds))
+                fold_r2.append(r2_score(y[val_idx], preds))
+            self.cv_report[name] = {
+                'RMSE': np.mean(fold_rmse),
+                'MAE': np.mean(fold_mae),
+                'R2': np.mean(fold_r2)
+            }
+            print(f"[CV리포트] {name}: RMSE={np.mean(fold_rmse):.4f}, MAE={np.mean(fold_mae):.4f}, R2={np.mean(fold_r2):.4f}")
 
     def predict(self, df):
         df_feat = make_features(df)
