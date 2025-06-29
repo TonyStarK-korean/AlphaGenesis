@@ -431,6 +431,21 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                             trade_history.append({**entry, 'symbol': pos_key[0], 'direction': pos_dir})
                             
                             # 월별 성과 업데이트 (청산 시)
+                            if current_month not in monthly_performance:
+                                monthly_performance[current_month] = {
+                                    'total_capital': total_capital,
+                                    'current_capital': current_capital,
+                                    'realized_pnl': realized_pnl,
+                                    'unrealized_pnl': unrealized_pnl,
+                                    'open_positions': len(positions),
+                                    'trade_log': []
+                                }
+                            monthly_performance[current_month]['total_capital'] = total_capital
+                            monthly_performance[current_month]['current_capital'] = current_capital
+                            monthly_performance[current_month]['realized_pnl'] = realized_pnl
+                            monthly_performance[current_month]['unrealized_pnl'] = unrealized_pnl
+                            monthly_performance[current_month]['open_positions'] = len(positions)
+                            if 'log_msg' in locals():
                             if current_month in monthly_performance:
                                 monthly_performance[current_month]['trade_log'].append(log_msg)
                             del positions[pos_key]
