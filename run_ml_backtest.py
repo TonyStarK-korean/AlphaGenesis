@@ -166,6 +166,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 rsi = 50
             
             # 동적 레버리지 계산
+            logger.info(f"[{idx}] update_leverage 호출: phase={PhaseType.PHASE1_AGGRESSIVE}, type={type(PhaseType.PHASE1_AGGRESSIVE)}")
             current_leverage = leverage_manager.update_leverage(
                 phase=PhaseType.PHASE1_AGGRESSIVE,
                 market_condition=market_condition,
@@ -259,6 +260,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             import traceback
             error_details = traceback.format_exc()
             logger.error(f"[{idx}] 백테스트 중 오류 발생: {e}")
+            logger.error(f"[{idx}] phase 값: {locals().get('phase', 'N/A')}, type: {type(locals().get('phase', 'N/A'))}")
             logger.error(f"[{idx}] 상세 오류 정보: {error_details}")
             logger.error(f"[{idx}] row 데이터: {row.to_dict() if hasattr(row, 'to_dict') else row}")
             print(f"[{idx}] 상세 오류 정보: {error_details}")
