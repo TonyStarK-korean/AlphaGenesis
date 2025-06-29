@@ -298,6 +298,15 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 position_ratio = base_ratio
             # 진입
             if direction and (symbol, direction) not in positions:
+                # 리스크 한도 체크
+                risk_ok, risk_msg = check_risk_limits(current_capital, initial_capital, daily_pnl, weekly_pnl, monthly_pnl)
+                if not risk_ok:
+                    logger.info(f"[{timestamp_str}] | 리스크 한도 초과: {risk_msg} | 거래 중단")
+                    continue
+                
+                # 실전형 손절/익절 계산
+                stop_loss, take_profit = get_risk_management(current_leverage, predicted_return)
+                
                 entry_amount = current_capital * position_ratio
                 if entry_amount < 1:
                     continue
@@ -311,15 +320,48 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     'strategy': strategy_name,
                     'regime': regime,
                     'reason': reason,
-                    'position_ratio': position_ratio
+                    'position_ratio': position_ratio,
+                    'stop_loss': stop_loss,
+                    'take_profit': take_profit,
+                    'peak_price': row['close'],  # 트레일링 스탑용
+                    'pyramiding_count': 0  # 피라미딩 횟수
                 }
                 log_msg = (
-                    f"[{timestamp_str}] | 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {current_leverage:.2f}배 | 비중: {position_ratio*100:.1f}% | 진입: {'매수' if direction=='LONG' else '매도'} | 종목: {symbol} | 진입가: {row['close']:,.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f} | 신호근거: {reason}"
+                    f"[{timestamp_str}] | 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {current_leverage:.2f}배 | 비중: {position_ratio*100:.1f}% | 진입: {'매수' if direction=='LONG' else '매도'} | 종목: {symbol} | 진입가: {row['close']:,.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f} | 신호근거: {reason} | 손절: {stop_loss*100:.1f}% | 익절: {take_profit*100:.1f}%"
                 )
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
                 results['trade_log'].append(log_msg)
-            # 청산
+            
+            # 피라미딩 체크 (기존 포지션에 추가 진입)
+            for pos_key in list(positions.keys()):
+                if positions[pos_key]['status'] == 'OPEN':
+                    entry = positions[pos_key]
+                    entry_price = entry['entry_price']
+                    current_price = row['close']
+                    
+                    # 수익률 계산
+                    if pos_key[1] == 'LONG':
+                        profit_rate = (current_price - entry_price) / entry_price
+                    else:
+                        profit_rate = (entry_price - current_price) / entry_price
+                    
+                    # 피라미딩 조건 체크
+                    should_pyramid, additional_amount = check_pyramiding(positions, pos_key[0], pos_key[1], profit_rate)
+                    if should_pyramid and additional_amount > 0 and current_capital >= additional_amount:
+                        current_capital -= additional_amount
+                        entry['amount'] += additional_amount
+                        entry['pyramiding_count'] += 1
+                        entry['peak_price'] = max(entry['peak_price'], current_price)
+                        
+                        pyramid_log = (
+                            f"[{timestamp_str}] | 피라미딩: {pos_key[0]} | 수익률: {profit_rate*100:+.2f}% | 추가금액: {additional_amount:,.0f} | 총금액: {entry['amount']:,.0f} | 피라미딩횟수: {entry['pyramiding_count']}"
+                        )
+                        logger.info(pyramid_log)
+                        send_log_to_dashboard(pyramid_log)
+                        results['trade_log'].append(pyramid_log)
+            
+            # 청산 조건 체크 (신호 없음, 손절, 익절, 트레일링 스탑)
             if direction is None:
                 for pos_key in list(positions.keys()):
                     if positions[pos_key]['status'] == 'OPEN':
@@ -328,30 +370,76 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         entry_amount = entry['amount']
                         lev = entry['leverage']
                         pos_dir = pos_key[1]
+                        current_price = row['close']
+                        
                         # 손익 계산
                         if pos_dir == 'LONG':
-                            pnl_rate = (row['close'] - entry_price) / entry_price * lev
+                            pnl_rate = (current_price - entry_price) / entry_price * lev
                         else:
-                            pnl_rate = (entry_price - row['close']) / entry_price * lev
-                        profit = entry_amount * pnl_rate
-                        current_capital += entry_amount + profit
-                        realized_pnl += profit
-                        entry['status'] = 'CLOSED'
-                        entry['exit_price'] = row['close']
-                        entry['exit_time'] = timestamp_str
-                        entry['profit'] = profit
-                        entry['pnl_rate'] = pnl_rate
-                        log_msg = (
-                            f"[{timestamp_str}] | 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {lev:.2f}배 | 비중: {entry['position_ratio']*100:.1f}% | 청산: {'매수' if pos_dir=='LONG' else '매도'} | 종목: {pos_key[0]} | 진입가: {entry_price:,.2f} | 청산가: {row['close']:,.2f} | 수익률: {pnl_rate*100:+.2f}% | 수익금: {profit:+,.0f} | 총자산: {current_capital:,.0f} | 신호근거: {entry['reason']}"
-                        )
-                        logger.info(log_msg)
-                        send_log_to_dashboard(log_msg)
-                        results['trade_log'].append(log_msg)
-                        trade_history.append({**entry, 'symbol': pos_key[0], 'direction': pos_dir})
-                        # 월별 성과 업데이트 (청산 시)
-                        if current_month in monthly_performance:
-                            monthly_performance[current_month]['trade_log'].append(log_msg)
-                        del positions[pos_key]
+                            pnl_rate = (entry_price - current_price) / entry_price * lev
+                        
+                        # 청산 조건 체크
+                        should_close = False
+                        close_reason = ""
+                        
+                        # 손절 체크
+                        if pnl_rate <= -entry['stop_loss']:
+                            should_close = True
+                            close_reason = "손절"
+                        
+                        # 익절 체크
+                        elif pnl_rate >= entry['take_profit']:
+                            should_close = True
+                            close_reason = "익절"
+                        
+                        # 트레일링 스탑 체크
+                        elif check_trailing_stop(positions, pos_key[0], pos_dir, current_price):
+                            should_close = True
+                            close_reason = "트레일링 스탑"
+                        
+                        if should_close:
+                            profit = entry_amount * pnl_rate
+                            current_capital += entry_amount + profit
+                            realized_pnl += profit
+                            
+                            # 리스크 추적 업데이트
+                            daily_pnl += profit
+                            weekly_pnl += profit
+                            monthly_pnl += profit
+                            
+                            entry['status'] = 'CLOSED'
+                            entry['exit_price'] = current_price
+                            entry['exit_time'] = timestamp_str
+                            entry['profit'] = profit
+                            entry['pnl_rate'] = pnl_rate
+                            entry['close_reason'] = close_reason
+                            
+                            log_msg = (
+                                f"[{timestamp_str}] | 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {lev:.2f}배 | 비중: {entry['position_ratio']*100:.1f}% | 청산: {'매수' if pos_dir=='LONG' else '매도'} | 종목: {pos_key[0]} | 진입가: {entry_price:,.2f} | 청산가: {current_price:,.2f} | 수익률: {pnl_rate*100:+.2f}% | 수익금: {profit:+,.0f} | 총자산: {current_capital:,.0f} | 청산사유: {close_reason} | 피라미딩: {entry['pyramiding_count']}회 | 신호근거: {entry['reason']}"
+                            )
+                            logger.info(log_msg)
+                            send_log_to_dashboard(log_msg)
+                            results['trade_log'].append(log_msg)
+                            trade_history.append({**entry, 'symbol': pos_key[0], 'direction': pos_dir})
+                            
+                            # 월별 성과 업데이트 (청산 시)
+                            if current_month in monthly_performance:
+                                monthly_performance[current_month]['trade_log'].append(log_msg)
+                            del positions[pos_key]
+            
+            # 리스크 추적 리셋 (일/주/월)
+            current_date = timestamp.date()
+            if last_daily_reset != current_date:
+                daily_pnl = 0
+                last_daily_reset = current_date
+            
+            if last_weekly_reset is None or (current_date - last_weekly_reset).days >= 7:
+                weekly_pnl = 0
+                last_weekly_reset = current_date
+            
+            if last_monthly_reset is None or (current_date - last_monthly_reset).days >= 30:
+                monthly_pnl = 0
+                last_monthly_reset = current_date
 
             # 미실현손익 계산 (모든 오픈 포지션 평가)
             unrealized_pnl = 0
