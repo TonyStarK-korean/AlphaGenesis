@@ -446,7 +446,6 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                             monthly_performance[current_month]['unrealized_pnl'] = unrealized_pnl
                             monthly_performance[current_month]['open_positions'] = len(positions)
                             if 'log_msg' in locals():
-                            if current_month in monthly_performance:
                                 monthly_performance[current_month]['trade_log'].append(log_msg)
                             del positions[pos_key]
             
