@@ -7,6 +7,7 @@ from sklearn.metrics import mean_squared_error
 import xgboost as xgb
 import lightgbm as lgb
 import optuna
+import time
 
 def make_features(df):
     # 실전에서 많이 쓰는 피처 예시
@@ -56,11 +57,16 @@ class PricePredictionModel:
                 model = RandomForestRegressor(**params)
                 tscv = TimeSeriesSplit(n_splits=self.n_splits)
                 scores = []
-                for train_idx, val_idx in tscv.split(X):
+                t_start = time.time()
+                for i, (train_idx, val_idx) in enumerate(tscv.split(X)):
                     model.fit(X[train_idx], y[train_idx])
                     preds = model.predict(X[val_idx])
                     score = np.sqrt(mean_squared_error(y[val_idx], preds))
                     scores.append(score)
+                    # 진행률/ETA 출력
+                    elapsed = time.time() - t_start
+                    eta = elapsed / (i+1) * (self.n_splits - (i+1)) if (i+1) > 0 else 0
+                    print(f"[Optuna] Fold {i+1}/{self.n_splits} | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s", flush=True)
                 return np.mean(scores)
             study = optuna.create_study(direction='minimize')
             study.optimize(objective, n_trials=20)
@@ -68,8 +74,12 @@ class PricePredictionModel:
             self.models['rf'] = RandomForestRegressor(**study.best_params)
 
         # 각 모델 학습
-        for name, model in self.models.items():
+        t_start = time.time()
+        for i, (name, model) in enumerate(self.models.items()):
             model.fit(X, y)
+            elapsed = time.time() - t_start
+            eta = elapsed / (i+1) * (len(self.models) - (i+1)) if (i+1) > 0 else 0
+            print(f"[ML학습] {i+1}/{len(self.models)} ({name}) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s", flush=True)
 
     def predict(self, df):
         df_feat = make_features(df)
