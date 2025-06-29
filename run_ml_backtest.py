@@ -469,6 +469,14 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                             results['trade_log'].append(log_msg)
                             trade_history.append({**entry, 'symbol': pos_key[0], 'direction': pos_dir})
                             
+                            # 거래 통계 업데이트 (청산 시에만)
+                            trade_count += 1
+                            if profit > 0:
+                                winning_trades += 1
+                            total_profit += profit
+                            peak_capital = max(peak_capital, total_capital)
+                            max_drawdown = max(max_drawdown, (peak_capital - total_capital) / peak_capital * 100) if peak_capital > 0 else 0
+                            
                             # 월별 성과 업데이트 (청산 시)
                             if current_month not in monthly_performance:
                                 monthly_performance[current_month] = {
@@ -576,14 +584,14 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     peak_capital = total_capital
                     max_drawdown = 0
                 
-                # 거래 통계 업데이트 (청산 시에만)
-                if 'should_close' in locals() and should_close:
-                    trade_count += 1
-                    if profit > 0:
-                        winning_trades += 1
-                    total_profit += profit
-                    peak_capital = max(peak_capital, total_capital)
-                    max_drawdown = max(max_drawdown, (peak_capital - total_capital) / peak_capital * 100) if peak_capital > 0 else 0
+                    # 거래 통계 업데이트 (청산 시에만)
+                    if 'should_close' in locals() and should_close:
+                        trade_count += 1
+                        if profit > 0:
+                            winning_trades += 1
+                        total_profit += profit
+                        peak_capital = max(peak_capital, total_capital)
+                        max_drawdown = max(max_drawdown, (peak_capital - total_capital) / peak_capital * 100) if peak_capital > 0 else 0
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
