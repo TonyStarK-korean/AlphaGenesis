@@ -260,7 +260,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             # 총자산 = 현금성 자본 + 미실현손익 포함 오픈포지션 평가금액
             total_capital = current_capital + sum([entry['amount'] for entry in positions.values()]) + unrealized_pnl
 
-            # 결과 저장
+            # 결과 저장 (항상 모든 key에 추가)
             results['timestamp'].append(timestamp)
             results['total_capital'].append(total_capital)
             results['current_capital'].append(current_capital)
@@ -280,6 +280,10 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             results['unrealized_pnl'].append(None)
             results['open_positions'].append(None)
             continue
+    # 루프 종료 후, 모든 리스트 길이 맞추기(가장 짧은 길이에 맞춰 자르기)
+    min_len = min(len(v) for v in results.values())
+    for k in results:
+        results[k] = results[k][:min_len]
 
     # 결과 분석 및 리포트
     analyze_backtest_results(results, initial_capital)
