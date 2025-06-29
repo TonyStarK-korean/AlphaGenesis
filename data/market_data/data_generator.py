@@ -49,4 +49,7 @@ class MarketDataGenerator:
 if __name__ == "__main__":
     gen = MarketDataGenerator()
     df = gen.generate(500)
-    print(df.head()) 
+    print(df.head())
+    df = gen.generate_historical_data(years=3)
+    df.to_csv('data/market_data/sample_train_data.csv')
+    print("샘플 훈련 데이터가 data/market_data/sample_train_data.csv에 저장되었습니다.") 
