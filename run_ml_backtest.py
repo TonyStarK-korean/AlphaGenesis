@@ -295,14 +295,12 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     try:
                         # 모델이 훈련되지 않은 경우 훈련
                         if not hasattr(ml_model, 'feature_names') or ml_model.feature_names is None:
-                            logger.info(f"[{timestamp_str}] ML 모델 훈련 시작... (데이터: {len(prediction_data)}개)")
+                            logger.info(f"[{timestamp_str}] ML 모델 훈련 중...")
                             training_success = ml_model.fit(prediction_data)
                             if training_success:
                                 logger.info(f"[{timestamp_str}] ML 모델 훈련 완료")
                             else:
-                                logger.warning(f"[{timestamp_str}] ML 모델 훈련 실패 - 데이터 부족")
                                 predicted_return = 0
-                                # 다음 반복으로 넘어감
                                 continue
                         
                         # 모델 훈련 상태 재확인
@@ -310,18 +308,14 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                             pred = ml_model.predict(prediction_data)
                             if pred is not None and len(pred) > 0:
                                 predicted_return = pred[-1]
-                                logger.info(f"[{timestamp_str}] ml_model.predict() 결과: {pred[-5:] if len(pred) >= 5 else pred}")
                             else:
-                                logger.warning(f"[{timestamp_str}] ml_model.predict() 결과가 None 또는 빈 배열")
                                 predicted_return = 0
                         else:
-                            logger.warning(f"[{timestamp_str}] ML 모델이 훈련되지 않았습니다.")
                             predicted_return = 0
                     except Exception as e:
-                        logger.error(f"[{timestamp_str}] ml_model.predict() 예외: {e}")
                         predicted_return = 0
                 else:
-                    logger.info(f"[{timestamp_str}] 예측데이터 부족 ({len(prediction_data)}개), predicted_return=0")
+                    predicted_return = 0
             # 크로노스 스위칭 신호 생성
             chrono_signal, chrono_reason = generate_chronos_signal(row, predicted_return)
             # 기존 신호와 결합(AND)
