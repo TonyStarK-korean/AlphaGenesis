@@ -176,45 +176,31 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
         'trade_log': []
     }
 
-    for i in range(len(test_data)):
-        idx, row = test_data.iloc[i].name, test_data.iloc[i]
+    for idx, row in test_data.iterrows():
         try:
-            if pd.isna(row['close']) or row['close'] <= 0:
-                continue
-            symbol = row['symbol'] if 'symbol' in row else 'BNB/USDT'
-            timestamp = row['timestamp'] if 'timestamp' in row else idx
-
-            # 시장 상황 분석 및 레버리지 계산
-            market_condition = analyze_market_condition(row)
-            volatility = row.get('volatility_20', 0.05)
+            timestamp = row.name if hasattr(row, 'name') else row.get('timestamp', idx)
+            # 시장국면 판별
+            regime = detect_market_regime(row)
+            strategy_name, candidate_symbols = REGIME_STRATEGY_MAP.get(regime, ('mean_reversion', ['BTC']))
+            # 종목군 중 실제 데이터에 있는 종목만 필터링
+            symbol = row.get('symbol', candidate_symbols[0])
+            if symbol not in candidate_symbols:
+                symbol = candidate_symbols[0]
+            # 전략별 상세 근거 생성
+            regime_desc = f"시장국면: {regime}"
+            strategy_desc = f"전략: {strategy_name}"
+            # 예측/지표 근거
+            predicted_return = row.get('predicted_return', 0)
             rsi = row.get('rsi_14', 50)
-            current_leverage = leverage_manager.update_leverage(
-                phase=PhaseType.PHASE1_AGGRESSIVE,
-                market_condition=market_condition,
-                current_capital=current_capital,
-                peak_capital=initial_capital,  # peak_capital은 추후 개선
-                consecutive_wins=0,
-                consecutive_losses=0,
-                volatility=volatility,
-                rsi=rsi
-            )
-
-            # ML 예측
-            prediction_data = df_with_indicators.iloc[:train_size + i + 1]
-            if len(prediction_data) > 60:
-                predicted_return = ml_model.predict(prediction_data)[-1]
-            else:
-                predicted_return = 0
-
-            # 거래 신호 생성
-            signal, strategy_desc = generate_trading_signal(predicted_return, row, current_leverage)
+            vol = row.get('volatility_20', 0.05)
+            reason = f"예측수익률: {predicted_return:.2%}, RSI: {rsi:.1f}, 변동성: {vol:.2%}"
+            # 신호 생성
+            signal, signal_desc = generate_trading_signal(predicted_return, row, current_leverage)
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
-
-            # 진입: 해당 종목/방향 포지션이 없고, 신호가 있으면 진입
+            # 진입
             if direction and (symbol, direction) not in positions:
-                # 자본 배분(예: 전체 자본의 10%씩 분산)
                 entry_amount = current_capital * 0.1
-                if entry_amount < 1:  # 최소 진입금액 제한
+                if entry_amount < 1:
                     continue
                 current_capital -= entry_amount
                 positions[(symbol, direction)] = {
@@ -223,14 +209,15 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     'leverage': current_leverage,
                     'amount': entry_amount,
                     'status': 'OPEN',
-                    'strategy': strategy_desc
+                    'strategy': strategy_name,
+                    'regime': regime,
+                    'reason': reason
                 }
-                log_msg = f"{timestamp} - {symbol} {direction} 진입 | 전략: {strategy_desc} | 진입가: {row['close']:.2f} | 레버리지: {current_leverage:.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f}"
+                log_msg = f"[{timestamp}] {regime_desc} | {strategy_desc} | 진입: {direction} | 종목: {symbol} | 근거: {reason} | 진입가: {row['close']:.2f} | 레버리지: {current_leverage:.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f}"
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
                 results['trade_log'].append(log_msg)
-
-            # 청산: 해당 종목/방향 포지션이 있고, 신호가 0이면 청산
+            # 청산
             if direction is None:
                 for pos_key in list(positions.keys()):
                     if positions[pos_key]['status'] == 'OPEN':
@@ -239,7 +226,6 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         entry_amount = entry['amount']
                         lev = entry['leverage']
                         pos_dir = pos_key[1]
-                        # 롱/숏별 손익 계산
                         if pos_dir == 'LONG':
                             pnl_rate = (row['close'] - entry_price) / entry_price * lev
                         else:
@@ -252,7 +238,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         entry['exit_time'] = timestamp
                         entry['profit'] = profit
                         entry['pnl_rate'] = pnl_rate
-                        log_msg = f"{timestamp} - {pos_key[0]} {pos_dir} 청산 | 진입가: {entry_price:.2f} | 청산가: {row['close']:.2f} | 레버리지: {lev:.2f} | 수익: {profit:,.0f} | 총자산: {current_capital:,.0f}"
+                        log_msg = f"[{timestamp}] {regime_desc} | {strategy_desc} | 청산: {pos_dir} | 종목: {pos_key[0]} | 근거: {reason} | 진입가: {entry_price:.2f} | 청산가: {row['close']:.2f} | 레버리지: {lev:.2f} | 수익: {profit:,.0f} | 총자산: {current_capital:,.0f}"
                         logger.info(log_msg)
                         send_log_to_dashboard(log_msg)
                         results['trade_log'].append(log_msg)
@@ -513,6 +499,32 @@ optuna_logger = optuna.logging.get_logger("optuna")
 optuna_logger.handlers = []
 optuna_logger.addHandler(KoreanOptunaLogger())
 optuna.logging.set_verbosity(optuna.logging.INFO)
+
+# === 시장국면 5단계 분류 함수 ===
+def detect_market_regime(row: pd.Series) -> str:
+    """가격 변화율, 변동성 등으로 시장국면 5단계(급등/상승/횡보/하락/급락) 분류"""
+    pct = row.get('return_1d', 0)
+    vol = row.get('volatility_20', 0.05)
+    # 기준값은 실전 데이터에 맞게 조정 가능
+    if pct > 0.04 and vol > 0.10:
+        return '급등'
+    elif pct > 0.01:
+        return '상승'
+    elif pct < -0.04 and vol > 0.10:
+        return '급락'
+    elif pct < -0.01:
+        return '하락'
+    else:
+        return '횡보'
+
+# === 시장국면별 전략/종목군 매핑 ===
+REGIME_STRATEGY_MAP = {
+    '급등':   ('momentum_breakout', ['BNB', 'SOL', 'ETH']),
+    '상승':   ('trend_following',   ['BTC', 'ETH', 'SOL']),
+    '횡보':   ('mean_reversion',    ['USDT', 'BTC', 'ETH']),
+    '하락':   ('short_momentum',    ['BTC', 'XRP', 'ADA']),
+    '급락':   ('btc_short_only',    ['BTC']),
+}
 
 if __name__ == "__main__":
     main() 
