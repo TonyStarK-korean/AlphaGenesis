@@ -281,6 +281,27 @@ def get_real_time_data():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/realtime_log', methods=['POST'])
+def receive_realtime_log():
+    """실시간 로그 수신 API"""
+    try:
+        data = request.get_json()
+        log_msg = data.get('log', '')
+        print(f"[실시간 로그] {log_msg}")
+        return jsonify({'status': 'received'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/report', methods=['POST'])
+def receive_report():
+    """백테스트 리포트 수신 API"""
+    try:
+        data = request.get_json()
+        print(f"[백테스트 리포트] {data}")
+        return jsonify({'status': 'received'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/upload_results', methods=['POST'])
 def upload_results():
     data = request.get_json()
