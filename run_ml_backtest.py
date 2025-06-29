@@ -504,7 +504,12 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 unrealized_pnl += entry_amount * pnl_rate
 
             # 총자산 = 현금성 자본 + 미실현손익 포함 오픈포지션 평가금액
-            total_capital = current_capital + sum([entry['amount'] for entry in positions.values()]) + unrealized_pnl
+            current_position_value = sum([
+                (row['close'] - entry['entry_price']) * entry['amount'] if entry['status']=='OPEN' and entry['direction']=='LONG' else
+                (entry['entry_price'] - row['close']) * entry['amount'] if entry['status']=='OPEN' and entry['direction']=='SHORT' else 0
+                for entry in positions.values()
+            ])
+            total_capital = current_capital + current_position_value + unrealized_pnl
 
             # 결과 저장 (항상 모든 key에 추가)
             results['timestamp'].append(timestamp_str)
