@@ -477,6 +477,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                                     'realized_pnl': realized_pnl,
                                     'unrealized_pnl': unrealized_pnl,
                                     'open_positions': len(positions),
+                                    'trade_count': 0,
+                                    'winning_trades': 0,
                                     'trade_log': []
                                 }
                             monthly_performance[current_month]['total_capital'] = total_capital
@@ -534,6 +536,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     'realized_pnl': realized_pnl,
                     'unrealized_pnl': unrealized_pnl,
                     'open_positions': len(positions),
+                    'trade_count': 0,
+                    'winning_trades': 0,
                     'trade_log': []
                 }
             monthly_performance[current_month]['total_capital'] = total_capital
@@ -547,31 +551,39 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             # 월별 성과 분석
             if last_monthly_report is None:
                 last_monthly_report = current_month
-                trade_count = 1
-                winning_trades = 1 if realized_pnl > 0 else 0
-                total_profit = realized_pnl
+                trade_count = 0
+                winning_trades = 0
+                total_profit = 0
                 peak_capital = total_capital
-                max_drawdown = 0 if realized_pnl > 0 else (peak_capital - total_capital) / peak_capital * 100
+                max_drawdown = 0
             else:
                 if current_month != last_monthly_report:
-                    # 월별 성과 보고
-                    report_msg = f"[월간 리포트] {last_monthly_report} | 트레이드 수: {trade_count} | 최종 자산: {total_capital:,.0f}원 | 총 수익률: {(total_capital - monthly_performance[last_monthly_report]['total_capital']) / monthly_performance[last_monthly_report]['total_capital'] * 100:+.2f}% | 총 수익금: {(total_capital - monthly_performance[last_monthly_report]['total_capital']) - (monthly_performance[last_monthly_report]['realized_pnl'] + monthly_performance[last_monthly_report]['unrealized_pnl']):+,.0f}원 | 최대 낙폭: {max_drawdown:+.2f}%"
+                    # 월별 성과 보고 (승률 포함)
+                    win_rate = (winning_trades / trade_count * 100) if trade_count > 0 else 0
+                    monthly_return = ((total_capital - monthly_performance[last_monthly_report]['total_capital']) / monthly_performance[last_monthly_report]['total_capital'] * 100) if monthly_performance[last_monthly_report]['total_capital'] > 0 else 0
+                    monthly_profit = (total_capital - monthly_performance[last_monthly_report]['total_capital']) - (monthly_performance[last_monthly_report]['realized_pnl'] + monthly_performance[last_monthly_report]['unrealized_pnl'])
+                    
+                    report_msg = f"[월간 리포트] {last_monthly_report} | 거래수: {trade_count} | 승률: {win_rate:.1f}% | 최종자산: {total_capital:,.0f}원 | 수익률: {monthly_return:+.2f}% | 수익금: {monthly_profit:+,.0f}원 | 최대낙폭: {max_drawdown:+.2f}%"
                     logger.info(report_msg)
                     send_log_to_dashboard(report_msg)
                     results['trade_log'].append(report_msg)
+                    
                     # 월별 성과 초기화
                     last_monthly_report = current_month
-                    trade_count = 1
-                    winning_trades = 1 if realized_pnl > 0 else 0
-                    total_profit = realized_pnl
+                    trade_count = 0
+                    winning_trades = 0
+                    total_profit = 0
                     peak_capital = total_capital
-                    max_drawdown = 0 if realized_pnl > 0 else (peak_capital - total_capital) / peak_capital * 100
-                else:
+                    max_drawdown = 0
+                
+                # 거래 통계 업데이트 (청산 시에만)
+                if 'should_close' in locals() and should_close:
                     trade_count += 1
-                    winning_trades += 1 if realized_pnl > 0 else 0
-                    total_profit += realized_pnl
+                    if profit > 0:
+                        winning_trades += 1
+                    total_profit += profit
                     peak_capital = max(peak_capital, total_capital)
-                    max_drawdown = max(max_drawdown, (peak_capital - total_capital) / peak_capital * 100)
+                    max_drawdown = max(max_drawdown, (peak_capital - total_capital) / peak_capital * 100) if peak_capital > 0 else 0
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
