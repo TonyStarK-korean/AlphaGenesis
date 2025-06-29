@@ -27,6 +27,8 @@ class PhaseType(Enum):
     """Phase 타입"""
     PHASE1 = 1
     PHASE2 = 2
+    PHASE1_AGGRESSIVE = 1
+    PHASE2_DEFENSIVE = 2
 
 class DynamicLeverageManager:
     """동적 레버리지 관리자"""
