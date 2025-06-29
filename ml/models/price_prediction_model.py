@@ -1,5 +1,6 @@
 import numpy as np
 import pandas as pd
+import warnings
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.linear_model import Ridge
 from sklearn.model_selection import TimeSeriesSplit
@@ -10,6 +11,10 @@ import optuna
 import time
 import joblib
 from sklearn.metrics import mean_absolute_error, r2_score
+
+# 경고 메시지 필터링
+warnings.filterwarnings("ignore", message="X does not have valid feature names, but.*")
+warnings.filterwarnings("ignore", category=UserWarning)
 
 def make_features(df):
     # 실전에서 많이 쓰는 피처 예시
