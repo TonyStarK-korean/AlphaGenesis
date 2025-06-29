@@ -141,7 +141,7 @@ def send_report_to_dashboard(report_dict):
     except Exception as e:
         pass
 
-def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=None):
+def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=None, use_dynamic_position=False):
     logger = logging.getLogger(__name__)
     logger.info("ML 모델 백테스트 시작")
 
@@ -213,9 +213,26 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
             # 진단용 로그 추가
             logger.info(f"[{timestamp}] 신호: {signal}, 방향: {direction}, 포지션존재: {positions.get((symbol, direction))}, 예측수익률: {predicted_return:.5f}, RSI: {rsi:.2f}, 변동성: {vol:.4f}")
+            # 동적 레버리지 계산
+            current_leverage = leverage_manager.update_leverage(
+                phase=PhaseType.PHASE1_AGGRESSIVE,
+                market_condition=analyze_market_condition(row),
+                current_capital=current_capital,
+                peak_capital=initial_capital,
+                consecutive_wins=0,
+                consecutive_losses=0,
+                volatility=row.get('volatility_20', 0.05),
+                rsi=row.get('rsi_14', 50)
+            )
+            # 비중 결정
+            base_ratio = 0.1
+            if use_dynamic_position:
+                position_ratio = get_dynamic_position_size(base_ratio, regime, predicted_return)
+            else:
+                position_ratio = base_ratio
             # 진입
             if direction and (symbol, direction) not in positions:
-                entry_amount = current_capital * 0.1
+                entry_amount = current_capital * position_ratio
                 if entry_amount < 1:
                     continue
                 current_capital -= entry_amount
@@ -227,9 +244,10 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     'status': 'OPEN',
                     'strategy': strategy_name,
                     'regime': regime,
-                    'reason': reason
+                    'reason': reason,
+                    'position_ratio': position_ratio
                 }
-                log_msg = f"[{timestamp}] {regime_desc} | {strategy_desc} | 진입: {direction} | 종목: {symbol} | 근거: {reason} | 진입가: {row['close']:.2f} | 레버리지: {current_leverage:.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f}"
+                log_msg = f"[{timestamp}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {current_leverage:.2f} | 비중: {position_ratio*100:.1f}% | 진입: {direction} | 종목: {symbol} | 진입가: {row['close']:.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f}"
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
                 results['trade_log'].append(log_msg)
@@ -242,6 +260,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         entry_amount = entry['amount']
                         lev = entry['leverage']
                         pos_dir = pos_key[1]
+                        # 손익 계산
                         if pos_dir == 'LONG':
                             pnl_rate = (row['close'] - entry_price) / entry_price * lev
                         else:
@@ -254,7 +273,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         entry['exit_time'] = timestamp
                         entry['profit'] = profit
                         entry['pnl_rate'] = pnl_rate
-                        log_msg = f"[{timestamp}] {regime_desc} | {strategy_desc} | 청산: {pos_dir} | 종목: {pos_key[0]} | 근거: {reason} | 진입가: {entry_price:.2f} | 청산가: {row['close']:.2f} | 레버리지: {lev:.2f} | 수익: {profit:,.0f} | 총자산: {current_capital:,.0f}"
+                        log_msg = f"[{timestamp}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {lev:.2f} | 비중: {entry['position_ratio']*100:.1f}% | 청산: {pos_dir} | 종목: {pos_key[0]} | 진입가: {entry_price:.2f} | 청산가: {row['close']:.2f} | 수익률: {pnl_rate*100:.2f}% | 수익금: {profit:,.0f} | 총평가금액: {current_capital:,.0f}"
                         logger.info(log_msg)
                         send_log_to_dashboard(log_msg)
                         results['trade_log'].append(log_msg)
@@ -551,6 +570,22 @@ REGIME_STRATEGY_MAP = {
     '하락':   ('short_momentum',    ['BTC', 'XRP', 'ADA']),
     '급락':   ('btc_short_only',    ['BTC']),
 }
+
+# === 동적 비중 함수 ===
+def get_dynamic_position_size(base_ratio, market_condition, predicted_return):
+    # 시장국면별 조정
+    if market_condition in ['급등', '상승']:
+        base_ratio *= 1.5
+    elif market_condition in ['하락', '급락']:
+        base_ratio *= 0.5
+    # 예측수익률에 따라 추가 조정
+    if abs(predicted_return) > 0.01:
+        base_ratio *= 1.3
+    elif abs(predicted_return) < 0.002:
+        base_ratio *= 0.7
+    # 최대/최소 비중 제한
+    base_ratio = min(max(base_ratio, 0.03), 0.3)  # 3%~30%
+    return base_ratio
 
 if __name__ == "__main__":
     main() 
