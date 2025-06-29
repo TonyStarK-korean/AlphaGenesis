@@ -261,6 +261,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             logger.error(f"[{idx}] 백테스트 중 오류 발생: {e}")
             logger.error(f"[{idx}] 상세 오류 정보: {error_details}")
             logger.error(f"[{idx}] row 데이터: {row.to_dict() if hasattr(row, 'to_dict') else row}")
+            print(f"[{idx}] 상세 오류 정보: {error_details}")
             # 에러 발생 시에도 기본값으로 결과 저장
             results['timestamp'].append(idx)
             results['capital'].append(current_capital)
