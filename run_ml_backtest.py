@@ -132,7 +132,7 @@ def send_log_to_dashboard(log_msg):
         dashboard_url = 'http://34.47.77.230:5000/api/realtime_log'
         requests.post(dashboard_url, json={'log': log_msg}, timeout=2)
     except Exception as e:
-        pass
+        logging.getLogger(__name__).warning(f"[대시보드 전송 실패] {e} | 로그: {log_msg}")
 
 def send_report_to_dashboard(report_dict):
     try:
@@ -208,9 +208,9 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             if price_change_pct <= -10:
                 drop_rise_str = f"급락({price_change_pct:.1f}%)"
             elif price_change_pct >= 10:
-                drop_rise_str = f"급등(+{price_change_pct:.1f}%)"
+                drop_rise_str = f"급등({price_change_pct:+.1f}%)"
 
-            # 레버리지 조정 (실제 데이터 timestamp 사용)
+            # 레버리지 조정 (실제 데이터 timestamp 사용, 불필요한 텍스트 제거)
             current_leverage = leverage_manager.update_leverage(
                 phase=PhaseType.PHASE1_AGGRESSIVE,
                 market_condition=market_condition,
@@ -221,7 +221,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 volatility=volatility,
                 rsi=rsi
             )
-            lev_log = f"{row['timestamp']} - 레버리지 조정: {position} → {current_leverage:.2f} ({drop_rise_str or '기본/조건'})"
+            lev_log = f"{row['timestamp']} - 레버리지 조정: {position} → {current_leverage:.2f} {drop_rise_str}".strip()
             logger.info(lev_log)
 
             # ML 예측
@@ -282,7 +282,13 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     else:
                         profit_text = f"손실: {profit:,.0f}원 ({pnl_rate*100:.2f}%)"
                         last_trade_win = False
-                    log_msg = f"{exit_time} - {entry_signal} 청산 | 전략: {entry_strategy} | 진입가: {entry_price:,.0f}원 | 청산가: {exit_price:,.0f}원 | 레버리지: {entry_leverage:.1f} | {profit_text} | 총자산: {current_capital:,.0f}원"
+                    # 연속 승/패 카운트 (청산 시점에만) 및 로그 한 줄로 출력
+                    streak_msg = ""
+                    if last_trade_win and consecutive_wins+1 > 1:
+                        streak_msg = f" | 연속 승리 {consecutive_wins+1}회!"
+                    elif last_trade_win is False and consecutive_losses+1 > 1:
+                        streak_msg = f" | 연속 손실 {consecutive_losses+1}회!"
+                    log_msg = f"{exit_time} - {entry_signal} 청산 | 전략: {entry_strategy} | 진입가: {entry_price:,.0f}원 | 청산가: {exit_price:,.0f}원 | 레버리지: {entry_leverage:.1f} | {profit_text} | 총자산: {current_capital:,.0f}원{streak_msg}"
                     logger.info(log_msg)
                     send_log_to_dashboard(log_msg)
                     trade_history.append({
@@ -296,13 +302,9 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     if last_trade_win:
                         consecutive_wins += 1
                         consecutive_losses = 0
-                        if consecutive_wins > 1:
-                            logger.info(f"{exit_time} - 연속 승리 {consecutive_wins}회!")
                     elif last_trade_win is False:
                         consecutive_losses += 1
                         consecutive_wins = 0
-                        if consecutive_losses > 1:
-                            logger.info(f"{exit_time} - 연속 손실 {consecutive_losses}회!")
                 else:
                     log_msg = f"{exit_time} - 청산 | 정보 부족 (진입 정보 없음)"
                     logger.info(log_msg)
@@ -323,10 +325,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             results['leverage'].append(current_leverage)
             results['position'].append(position)
             results['prediction'].append(predicted_return)
-            results['actual_return'].append(0)  # 실제 수익률은 별도 집계 가능
+            results['actual_return'].append(0)
             results['cumulative_return'].append((current_capital - initial_capital) / initial_capital)
-
-            # 월별/누적 보고서 전송 등은 기존대로 유지
 
         except Exception as e:
             import traceback
