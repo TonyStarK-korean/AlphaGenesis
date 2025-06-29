@@ -210,7 +210,6 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 rsi = 50
             
             # 동적 레버리지 계산
-            logger.info(f"[{idx}] update_leverage 호출: phase={PhaseType.PHASE1_AGGRESSIVE}, type={type(PhaseType.PHASE1_AGGRESSIVE)}")
             current_leverage = leverage_manager.update_leverage(
                 phase=PhaseType.PHASE1_AGGRESSIVE,
                 market_condition=market_condition,
@@ -225,7 +224,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             # ML 예측
             prediction_data = df_with_indicators.iloc[:train_size + i + 1]
             if len(prediction_data) > 60:  # 최소 데이터 필요
-                prediction = ml_model.predict(prediction_data, model_type='ensemble')
+                prediction = ml_model.predict(prediction_data)
                 if len(prediction) > 0:
                     predicted_return = prediction[-1]
                     if pd.isna(predicted_return):
@@ -244,11 +243,11 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 entry_idx = idx
                 entry_price = row['close']
                 entry_leverage = current_leverage
-                entry_signal = 'LONG'
+                entry_signal = '롱'
                 entry_pred = predicted_return
                 entry_capital = current_capital
                 entry_strategy = strategy_desc
-                log_msg = f"[진입] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 총자산: {current_capital:,.0f}원"
+                log_msg = f"롱 진입 | 전략: {entry_strategy} | 진입가: {entry_price:,.0f}원 | 레버리지: {entry_leverage:.1f} | 총자산: {current_capital:,.0f}원"
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
             elif signal == -1 and position >= 0:  # 숏 진입
@@ -256,11 +255,11 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 entry_idx = idx
                 entry_price = row['close']
                 entry_leverage = current_leverage
-                entry_signal = 'SHORT'
+                entry_signal = '숏'
                 entry_pred = predicted_return
                 entry_capital = current_capital
                 entry_strategy = strategy_desc
-                log_msg = f"[진입] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 총자산: {current_capital:,.0f}원"
+                log_msg = f"숏 진입 | 전략: {entry_strategy} | 진입가: {entry_price:,.0f}원 | 레버리지: {entry_leverage:.1f} | 총자산: {current_capital:,.0f}원"
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
             elif signal == 0 and position != 0:  # 청산
@@ -274,9 +273,18 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     else:
                         pnl_rate = 0
                     profit = entry_capital * pnl_rate
-                    log_msg = f"[청산] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 청산시점: {exit_idx} | 진입가: {entry_price:.2f} | 청산가: {exit_price:.2f} | 레버리지: {entry_leverage:.2f} | 수익률: {pnl_rate*100:.2f}% | 수익금: {profit:,.0f}원 | 총자산: {current_capital:,.0f}원"
+                    current_capital += profit  # 수익/손실 반영
+                    
+                    # 수익/손실 표시
+                    if profit > 0:
+                        profit_text = f"수익: +{profit:,.0f}원 (+{pnl_rate*100:.2f}%)"
+                    else:
+                        profit_text = f"손실: {profit:,.0f}원 ({pnl_rate*100:.2f}%)"
+                    
+                    log_msg = f"{entry_signal} 청산 | 전략: {entry_strategy} | 진입가: {entry_price:,.0f}원 | 청산가: {exit_price:,.0f}원 | 레버리지: {entry_leverage:.1f} | {profit_text} | 총자산: {current_capital:,.0f}원"
                     logger.info(log_msg)
                     send_log_to_dashboard(log_msg)
+                    
                     # 월별 집계용 기록
                     trade_history.append({
                         'entry_idx': entry_idx,
@@ -285,8 +293,16 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         'pnl_rate': pnl_rate,
                         'capital': current_capital
                     })
+                    
+                    # 연속 승/패 업데이트
+                    if profit > 0:
+                        consecutive_wins += 1
+                        consecutive_losses = 0
+                    elif profit < 0:
+                        consecutive_losses += 1
+                        consecutive_wins = 0
                 else:
-                    log_msg = f"[청산] 정보 부족 (진입 정보 없음)"
+                    log_msg = f"청산 | 정보 부족 (진입 정보 없음)"
                     logger.info(log_msg)
                     send_log_to_dashboard(log_msg)
                 position = 0
