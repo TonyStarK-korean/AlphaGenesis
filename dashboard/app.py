@@ -18,7 +18,7 @@ from plotly.utils import PlotlyJSONEncoder
 
 # 시스템 모듈 임포트
 from config.backtest_config import backtest_config
-from src.data.market_data_downloader import MarketDataDownloader
+from data.market_data_downloader import MarketDataDownloader
 from src.core.trading_engine.adaptive_phase_manager import AdaptivePhaseManager
 from src.core.trading_engine.compound_trading_engine import CompoundTradingEngine, CompoundMode
 
