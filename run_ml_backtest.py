@@ -256,7 +256,11 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 print(f"[{current_idx}] 진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s", flush=True)
                 
         except Exception as e:
-            logger.error(f"[{idx}] 백테스트 중 오류 발생: {e} | row: {row.to_dict() if hasattr(row, 'to_dict') else row}")
+            import traceback
+            error_details = traceback.format_exc()
+            logger.error(f"[{idx}] 백테스트 중 오류 발생: {e}")
+            logger.error(f"[{idx}] 상세 오류 정보: {error_details}")
+            logger.error(f"[{idx}] row 데이터: {row.to_dict() if hasattr(row, 'to_dict') else row}")
             # 에러 발생 시에도 기본값으로 결과 저장
             results['timestamp'].append(idx)
             results['capital'].append(current_capital)
