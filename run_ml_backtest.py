@@ -179,6 +179,28 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     for idx, row in test_data.iterrows():
         try:
             timestamp = row.name if hasattr(row, 'name') else row.get('timestamp', idx)
+            # timestamp를 적절한 형식으로 변환
+            if isinstance(timestamp, (int, float)):
+                # 인덱스 번호인 경우 실제 날짜로 변환
+                if 'timestamp' in row:
+                    timestamp = row['timestamp']
+                else:
+                    # 인덱스 기반 날짜 생성 (테스트 데이터용)
+                    start_date = datetime(2023, 1, 1)
+                    timestamp = start_date + timedelta(hours=idx)
+            elif isinstance(timestamp, str):
+                try:
+                    timestamp = datetime.fromisoformat(timestamp.replace('Z', '+00:00'))
+                except:
+                    timestamp = datetime.now()
+            
+            # 한국시간으로 변환
+            if timestamp.tzinfo is None:
+                timestamp = pytz.timezone('Asia/Seoul').localize(timestamp)
+            else:
+                timestamp = timestamp.astimezone(pytz.timezone('Asia/Seoul'))
+            
+            timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M")
             # 시장국면 판별
             regime = detect_market_regime(row)
             strategy_name, candidate_symbols = REGIME_STRATEGY_MAP.get(regime, ('mean_reversion', ['BTC']))
@@ -194,15 +216,15 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 if len(prediction_data) > 60:
                     try:
                         pred = ml_model.predict(prediction_data)
-                        logger.info(f"[{timestamp}] ml_model.predict() 결과: {pred[-5:] if hasattr(pred, '__getitem__') else pred}")
+                        logger.info(f"[{timestamp_str}] ml_model.predict() 결과: {pred[-5:] if hasattr(pred, '__getitem__') else pred}")
                         predicted_return = pred[-1]
                     except Exception as e:
-                        logger.error(f"[{timestamp}] ml_model.predict() 예외: {e}")
+                        logger.error(f"[{timestamp_str}] ml_model.predict() 예외: {e}")
                 else:
-                    logger.info(f"[{timestamp}] 예측데이터 부족, predicted_return=0")
+                    logger.info(f"[{timestamp_str}] 예측데이터 부족, predicted_return=0")
             # 임시: 예측수익률에 랜덤값 할당
             predicted_return = np.random.uniform(-0.01, 0.01)
-            logger.info(f"[{timestamp}] (임시) 랜덤 예측수익률: {predicted_return}")
+            logger.info(f"[{timestamp_str}] (임시) 랜덤 예측수익률: {predicted_return}")
             rsi = row.get('rsi_14', 50)
             vol = row.get('volatility_20', 0.05)
             reason = f"예측수익률: {predicted_return:.2%}, RSI: {rsi:.1f}, 변동성: {vol:.2%}"
@@ -212,7 +234,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             signal, signal_desc = generate_trading_signal(predicted_return, row, current_leverage)
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
             # 진단용 로그 추가
-            logger.info(f"[{timestamp}] 신호: {signal}, 방향: {direction}, 포지션존재: {positions.get((symbol, direction))}, 예측수익률: {predicted_return:.5f}, RSI: {rsi:.2f}, 변동성: {vol:.4f}")
+            logger.info(f"[{timestamp_str}] 신호: {signal}, 방향: {direction}, 포지션존재: {positions.get((symbol, direction))}, 예측수익률: {predicted_return:.5f}, RSI: {rsi:.2f}, 변동성: {vol:.4f}")
             # 동적 레버리지 계산
             current_leverage = leverage_manager.update_leverage(
                 phase=PhaseType.PHASE1_AGGRESSIVE,
@@ -247,7 +269,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     'reason': reason,
                     'position_ratio': position_ratio
                 }
-                log_msg = f"[{timestamp}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {current_leverage:.2f} | 비중: {position_ratio*100:.1f}% | 진입: {direction} | 종목: {symbol} | 진입가: {row['close']:.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f}"
+                log_msg = f"[{timestamp_str}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {current_leverage:.2f} | 비중: {position_ratio*100:.1f}% | 진입: {direction} | 종목: {symbol} | 진입가: {row['close']:.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f}"
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
                 results['trade_log'].append(log_msg)
@@ -273,7 +295,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         entry['exit_time'] = timestamp
                         entry['profit'] = profit
                         entry['pnl_rate'] = pnl_rate
-                        log_msg = f"[{timestamp}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {lev:.2f} | 비중: {entry['position_ratio']*100:.1f}% | 청산: {pos_dir} | 종목: {pos_key[0]} | 진입가: {entry_price:.2f} | 청산가: {row['close']:.2f} | 수익률: {pnl_rate*100:.2f}% | 수익금: {profit:,.0f} | 총평가금액: {current_capital:,.0f}"
+                        log_msg = f"[{timestamp_str}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {lev:.2f} | 비중: {entry['position_ratio']*100:.1f}% | 청산: {pos_dir} | 종목: {pos_key[0]} | 진입가: {entry_price:.2f} | 청산가: {row['close']:.2f} | 수익률: {pnl_rate*100:.2f}% | 수익금: {profit:,.0f} | 총평가금액: {current_capital:,.0f}"
                         logger.info(log_msg)
                         send_log_to_dashboard(log_msg)
                         results['trade_log'].append(log_msg)
@@ -297,7 +319,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             total_capital = current_capital + sum([entry['amount'] for entry in positions.values()]) + unrealized_pnl
 
             # 결과 저장 (항상 모든 key에 추가)
-            results['timestamp'].append(timestamp)
+            results['timestamp'].append(timestamp_str)
             results['total_capital'].append(total_capital)
             results['current_capital'].append(current_capital)
             results['realized_pnl'].append(realized_pnl)
@@ -309,7 +331,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             logger.error(f"[{idx}] 백테스트 중 오류 발생: {e}")
             logger.error(f"[{idx}] 상세 오류 정보: {error_details}")
             # 예외 발생 시에도 각 리스트에 None 등으로 추가
-            results['timestamp'].append(timestamp if 'timestamp' in locals() else None)
+            results['timestamp'].append(timestamp_str if 'timestamp_str' in locals() else None)
             results['total_capital'].append(None)
             results['current_capital'].append(None)
             results['realized_pnl'].append(None)
