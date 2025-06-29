@@ -74,12 +74,17 @@ def generate_historical_data(years: int = 3) -> pd.DataFrame:
         # 거래량
         volume = max(int(np.random.normal(1000, 500)), 100)  # 최소 100개 보장
         
+        open_p = abs(base_price * (1 + np.random.normal(0, 0.005)))
+        high_p = abs(base_price * (1 + abs(np.random.normal(0, 0.01))))
+        low_p = abs(base_price * (1 - abs(np.random.normal(0, 0.01))))
+        close_p = abs(base_price)
+        
         data.append({
             'timestamp': current_date,
-            'open': base_price * (1 + np.random.normal(0, 0.005)),
-            'high': base_price * (1 + abs(np.random.normal(0, 0.01))),
-            'low': base_price * (1 - abs(np.random.normal(0, 0.01))),
-            'close': base_price,
+            'open': open_p,
+            'high': high_p,
+            'low': low_p,
+            'close': close_p,
             'volume': volume,
             'symbol': 'BNB/USDT'
         })
