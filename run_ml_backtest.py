@@ -16,6 +16,7 @@ import time
 import re
 import optuna
 import json, requests
+import calendar
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -104,6 +105,20 @@ def generate_historical_data(years: int = 3) -> pd.DataFrame:
     logger.info(f"히스토리컬 데이터 생성 완료: {len(df)} 개 데이터")
     return df
 
+def send_log_to_dashboard(log_msg):
+    try:
+        dashboard_url = 'http://34.47.77.230:5000/api/realtime_log'
+        requests.post(dashboard_url, json={'log': log_msg}, timeout=2)
+    except Exception as e:
+        pass
+
+def send_report_to_dashboard(report_dict):
+    try:
+        dashboard_url = 'http://34.47.77.230:5000/api/report'
+        requests.post(dashboard_url, json=report_dict, timeout=2)
+    except Exception as e:
+        pass
+
 def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=None):
     """ML 모델 백테스트 실행"""
     logger = logging.getLogger(__name__)
@@ -152,6 +167,9 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     entry_pred = None
     entry_capital = None
     entry_strategy = None
+
+    # 월별 집계용 리스트
+    trade_history = []
 
     for i in range(len(test_data)):
         idx, row = test_data.iloc[i].name, test_data.iloc[i]
@@ -213,7 +231,9 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 entry_pred = predicted_return
                 entry_capital = current_capital
                 entry_strategy = strategy_desc
-                logger.info(f"[진입] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 총자산: {current_capital:,.0f}원")
+                log_msg = f"[진입] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 총자산: {current_capital:,.0f}원"
+                logger.info(log_msg)
+                send_log_to_dashboard(log_msg)
             elif signal == -1 and position >= 0:  # 숏 진입
                 position = -1
                 entry_idx = idx
@@ -223,7 +243,9 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 entry_pred = predicted_return
                 entry_capital = current_capital
                 entry_strategy = strategy_desc
-                logger.info(f"[진입] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 총자산: {current_capital:,.0f}원")
+                log_msg = f"[진입] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 총자산: {current_capital:,.0f}원"
+                logger.info(log_msg)
+                send_log_to_dashboard(log_msg)
             elif signal == 0 and position != 0:  # 청산
                 exit_idx = idx
                 exit_price = row['close']
@@ -235,9 +257,21 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     else:
                         pnl_rate = 0
                     profit = entry_capital * pnl_rate
-                    logger.info(f"[청산] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 청산시점: {exit_idx} | 진입가: {entry_price:.2f} | 청산가: {exit_price:.2f} | 레버리지: {entry_leverage:.2f} | 수익률: {pnl_rate*100:.2f}% | 수익금: {profit:,.0f}원 | 총자산: {current_capital:,.0f}원")
+                    log_msg = f"[청산] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 청산시점: {exit_idx} | 진입가: {entry_price:.2f} | 청산가: {exit_price:.2f} | 레버리지: {entry_leverage:.2f} | 수익률: {pnl_rate*100:.2f}% | 수익금: {profit:,.0f}원 | 총자산: {current_capital:,.0f}원"
+                    logger.info(log_msg)
+                    send_log_to_dashboard(log_msg)
+                    # 월별 집계용 기록
+                    trade_history.append({
+                        'entry_idx': entry_idx,
+                        'exit_idx': exit_idx,
+                        'profit': profit,
+                        'pnl_rate': pnl_rate,
+                        'capital': current_capital
+                    })
                 else:
-                    logger.info(f"[청산] 정보 부족 (진입 정보 없음)")
+                    log_msg = f"[청산] 정보 부족 (진입 정보 없음)"
+                    logger.info(log_msg)
+                    send_log_to_dashboard(log_msg)
                 position = 0
                 entry_idx = None
                 entry_price = None
@@ -290,8 +324,24 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             results['actual_return'].append(actual_return)
             results['cumulative_return'].append((current_capital - initial_capital) / initial_capital)
             
-            # 진행상황 로그 (1000개마다)
+            # 일정 주기마다 월별/누적 보고서 전송
             if (i + 1) % 1000 == 0 or i == len(test_data) - 1:
+                # 누적 수익
+                total_profit = current_capital - initial_capital
+                # 월별 집계
+                df_trades = pd.DataFrame(trade_history)
+                if not df_trades.empty:
+                    df_trades['entry_month'] = pd.to_datetime(df_trades['entry_idx']).dt.to_period('M')
+                    monthly_report = df_trades.groupby('entry_month').agg({'profit': 'sum', 'capital': 'last'}).reset_index()
+                    monthly_report['entry_month'] = monthly_report['entry_month'].astype(str)
+                    report_dict = {
+                        'total_profit': total_profit,
+                        'current_capital': current_capital,
+                        'monthly_report': monthly_report.to_dict(orient='records')
+                    }
+                    send_report_to_dashboard(report_dict)
+                
+                # 진행상황 로그 (1000개마다)
                 elapsed = time.time() - start_time
                 eta = elapsed / (i + 1) * (len(test_data) - (i + 1)) if (i + 1) > 0 else 0
                 current_idx = test_data.iloc[i].name if i < len(test_data) else "완료"
