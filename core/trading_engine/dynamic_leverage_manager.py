@@ -83,7 +83,7 @@ class DynamicLeverageManager:
         """동적 레버리지 계산"""
         
         # 기본 설정 가져오기
-        phase_config = self.leverage_config['phase1'] if phase == PhaseType.PHASE1 else self.leverage_config['phase2']
+        phase_config = self.leverage_config['phase1'] if phase.value == 1 else self.leverage_config['phase2']
         
         # 기본 레버리지
         leverage = phase_config['base_leverage']
@@ -136,14 +136,12 @@ class DynamicLeverageManager:
             leverage *= 1.1  # 10% 증가
             
         # 6. Phase별 특별 조정
-        if phase == PhaseType.PHASE1:
-            # 공격 모드에서의 추가 조정
+        if phase.value == 1:
             if market_condition == MarketCondition.BULL:
-                leverage *= 1.1  # 상승장 + 저변동성 시 10% 추가 증가
+                leverage *= 1.1
         else:
-            # 방어 모드에서의 추가 조정
             if market_condition == MarketCondition.BEAR:
-                leverage *= 0.9  # 하락장에서 추가 10% 감소
+                leverage *= 0.9
                 
         # 7. 최소/최대 레버리지 제한
         leverage = max(phase_config['min_leverage'], min(leverage, phase_config['max_leverage']))
