@@ -27,7 +27,7 @@ from utils.indicators.technical_indicators import TechnicalIndicators
 
 def setup_logging():
     """
-    로그 설정 (한국시간)
+    로그 설정 (한국시간, asctime 제거)
     """
     seoul_tz = pytz.timezone('Asia/Seoul')
     class SeoulFormatter(logging.Formatter):
@@ -38,10 +38,11 @@ def setup_logging():
             else:
                 s = dt.strftime("%Y-%m-%d %H:%M:%S")
             return s
-    formatter = SeoulFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # asctime(날짜-시간) 제거
+    formatter = SeoulFormatter('%(name)s - %(levelname)s - %(message)s')
     logging.basicConfig(
         level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        format='%(name)s - %(levelname)s - %(message)s',
         handlers=[
             logging.FileHandler('logs/ml_backtest.log'),
             logging.StreamHandler()
@@ -458,26 +459,16 @@ def main():
     logger = setup_logging()
     logger.info("ML 모델 백테스트 시스템 시작")
     try:
-        # 3년치 데이터 생성
-        logger.info("히스토리컬 데이터 생성 중...")
+        logger.info("3년치 과거 데이터 생성 시작")
         df = generate_historical_data(years=3)
-        logger.info(f"데이터 생성 완료: {len(df)} 개 데이터, 기간: {df.index[0]} ~ {df.index[-1]}")
+        logger.info(f"데이터 생성 완료: {len(df)} 개 데이터 포인트")
 
-        # 저장된 모델이 있으면 불러오기, 없으면 새로 훈련
-        model_path = 'trained_model.pkl'
-        if os.path.exists(model_path):
-            from ml.models.price_prediction_model import PricePredictionModel
-            ml_model = PricePredictionModel.load_model(model_path)
-            logger.info(f"저장된 모델({model_path})을 불러와서 백테스트를 진행합니다.")
-        else:
-            logger.info("새로운 모델 훈련을 시작합니다...")
-            ml_model = PricePredictionModel()
-            ml_model.fit(df)
-            ml_model.save_model(model_path)
-            logger.info(f"모델 훈련 완료 및 저장({model_path}) 후 백테스트를 진행합니다.")
+        # 항상 새로 모델 학습
+        ml_model = PricePredictionModel()
+        ml_model.fit(df)
+        logger.info(f"모델을 새로 훈련 후 백테스트를 진행합니다.")
 
         # ML 백테스트 실행
-        logger.info("ML 백테스트 실행을 시작합니다...")
         results = run_ml_backtest(df, initial_capital=10000000, model=ml_model)
         logger.info("ML 백테스트 완료")
     except Exception as e:
