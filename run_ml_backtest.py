@@ -447,7 +447,9 @@ def main():
     logger.info("ML 모델 백테스트 시스템 시작")
     try:
         # 3년치 데이터 생성
+        logger.info("히스토리컬 데이터 생성 중...")
         df = generate_historical_data(years=3)
+        logger.info(f"데이터 생성 완료: {len(df)} 개 데이터, 기간: {df.index[0]} ~ {df.index[-1]}")
 
         # 저장된 모델이 있으면 불러오기, 없으면 새로 훈련
         model_path = 'trained_model.pkl'
@@ -456,16 +458,20 @@ def main():
             ml_model = PricePredictionModel.load_model(model_path)
             logger.info(f"저장된 모델({model_path})을 불러와서 백테스트를 진행합니다.")
         else:
+            logger.info("새로운 모델 훈련을 시작합니다...")
             ml_model = PricePredictionModel()
             ml_model.fit(df)
             ml_model.save_model(model_path)
-            logger.info(f"모델을 새로 훈련하고 저장({model_path}) 후 백테스트를 진행합니다.")
+            logger.info(f"모델 훈련 완료 및 저장({model_path}) 후 백테스트를 진행합니다.")
 
         # ML 백테스트 실행
+        logger.info("ML 백테스트 실행을 시작합니다...")
         results = run_ml_backtest(df, initial_capital=10000000, model=ml_model)
         logger.info("ML 백테스트 완료")
     except Exception as e:
         logger.error(f"시스템 실행 중 오류 발생: {e}")
+        import traceback
+        logger.error(f"상세 오류 정보: {traceback.format_exc()}")
         raise
 
 # Optuna 로그 한글화 함수
