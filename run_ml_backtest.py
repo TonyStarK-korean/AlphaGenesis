@@ -149,6 +149,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     leverage_manager = DynamicLeverageManager()
     indicators = TechnicalIndicators()
     df_with_indicators = indicators.add_all_indicators(df.copy())
+    # 멀티타임프레임 지표 생성 (1h, 4h, 5m)
+    df_with_indicators = indicators.add_multi_timeframe_indicators(df_with_indicators, timeframes=[('1h',1),('4h',4),('5m',1/12)])
 
     # 실전형 다중 포지션 구조
     current_capital = initial_capital  # 현금성 자본
@@ -184,6 +186,25 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     total_profit = 0
     peak_capital = initial_capital
     max_drawdown = 0
+
+    # 크로노스 스위칭 신호 생성 함수
+    def generate_chronos_signal(row, ml_pred):
+        # 상위 프레임(4H) 추세 필터
+        if not (row.get('ema_20_4h',0) > row.get('ema_50_4h',0) > row.get('ema_120_4h',0) and row.get('rsi_14_4h',0) > 50 and row.get('macd_4h',0) > row.get('macd_signal_4h',0)):
+            return 0, "상위 프레임 상승 신호 불일치"
+        # 중간 프레임(1H) 지지/저항, VWAP, 볼린저밴드 등
+        if not (row.get('close',0) > row.get('vwap_1h',0) and row.get('close',0) > row.get('bb_lower_1h',0)):
+            return 0, "중간 프레임 진입 조건 불충족"
+        # 하위 프레임(5m) 트리거
+        if not (row.get('stoch_k_5m',100) < 20 and row.get('stoch_d_5m',100) < 20 and row.get('stoch_k_5m',0) > row.get('stoch_d_5m',0)):
+            return 0, "하위 프레임 트리거 없음"
+        # ML 예측수익률까지 양수(매수)일 때만 진입
+        if ml_pred > 0:
+            return 1, "크로노스 스위칭 매수 신호"
+        elif ml_pred < 0:
+            return -1, "크로노스 스위칭 매도 신호"
+        else:
+            return 0, "신호 없음"
 
     for idx, row in test_data.iterrows():
         try:
@@ -236,19 +257,18 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         logger.error(f"[{timestamp_str}] ml_model.predict() 예외: {e}")
                 else:
                     logger.info(f"[{timestamp_str}] 예측데이터 부족, predicted_return=0")
-            # 임시: 예측수익률에 랜덤값 할당
-            predicted_return = np.random.uniform(-0.01, 0.01)
-            logger.info(f"[{timestamp_str}] (임시) 랜덤 예측수익률: {predicted_return}")
-            rsi = row.get('rsi_14', 50)
-            vol = row.get('volatility_20', 0.05)
-            reason = f"예측수익률: {predicted_return:.2%}, RSI: {rsi:.1f}, 변동성: {vol:.2%}"
-            # === 레버리지 고정 ===
-            current_leverage = 1.0
-            # 신호 생성
-            signal, signal_desc = generate_trading_signal(predicted_return, row, current_leverage)
+            # 크로노스 스위칭 신호 생성
+            chrono_signal, chrono_reason = generate_chronos_signal(row, predicted_return)
+            # 기존 신호와 결합(AND)
+            if chrono_signal != 0:
+                signal = chrono_signal
+                reason = chrono_reason + f" | ML예측: {predicted_return:.2%}"
+            else:
+                signal, signal_desc = generate_trading_signal(predicted_return, row, 1.0)
+                reason = signal_desc + f" | ML예측: {predicted_return:.2%}"
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
             # 진단용 로그 추가
-            logger.info(f"[{timestamp_str}] 신호: {signal}, 방향: {direction}, 포지션존재: {positions.get((symbol, direction))}, 예측수익률: {predicted_return:.5f}, RSI: {rsi:.2f}, 변동성: {vol:.4f}")
+            logger.info(f"[{timestamp_str}] 신호: {signal}, 방향: {direction}, 포지션존재: {positions.get((symbol, direction))}, 예측수익률: {predicted_return:.5f}, RSI: {row.get('rsi_14', 50):.2f}, 변동성: {row.get('volatility_20', 0.05):.4f}")
             # 동적 레버리지 계산
             current_leverage = leverage_manager.update_leverage(
                 phase=PhaseType.PHASE1_AGGRESSIVE,
