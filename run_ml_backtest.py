@@ -212,7 +212,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
                 print(f"진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s", flush=True)
                 
         except Exception as e:
-            logger.error(f"백테스트 중 오류 발생: {e}")
+            logger.error(f"백테스트 중 오류 발생: {e} | idx: {idx}, row: {row.to_dict() if hasattr(row, 'to_dict') else row}")
             continue
     
     # 결과 분석
@@ -274,8 +274,10 @@ def generate_trading_signal(predicted_return: float, row: pd.Series, leverage: f
 def analyze_backtest_results(results: dict, initial_capital: float):
     """백테스트 결과 분석"""
     logger = logging.getLogger(__name__)
-    
     df_results = pd.DataFrame(results)
+    if df_results.empty or len(df_results['capital']) == 0:
+        logger.error("백테스트 결과 데이터가 비어 있습니다. (루프 내 예외/데이터 없음 등 원인)")
+        return
     
     # 기본 통계
     final_capital = df_results['capital'].iloc[-1]
