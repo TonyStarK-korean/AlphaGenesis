@@ -25,6 +25,10 @@ os.environ['PYTHONWARNINGS'] = 'ignore'
 
 # LightGBM 경고 완전 제거
 logging.getLogger('lightgbm').setLevel(logging.CRITICAL)
+os.environ['LIGHTGBM_VERBOSE'] = '0'
+
+# XGBoost 경고 제거
+logging.getLogger('xgboost').setLevel(logging.CRITICAL)
 
 def make_features(df):
     # 실전에서 많이 쓰는 피처 예시
