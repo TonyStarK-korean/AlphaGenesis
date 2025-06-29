@@ -267,12 +267,18 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             results['realized_pnl'].append(realized_pnl)
             results['unrealized_pnl'].append(unrealized_pnl)
             results['open_positions'].append(len(positions))
-
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
             logger.error(f"[{idx}] 백테스트 중 오류 발생: {e}")
             logger.error(f"[{idx}] 상세 오류 정보: {error_details}")
+            # 예외 발생 시에도 각 리스트에 None 등으로 추가
+            results['timestamp'].append(timestamp if 'timestamp' in locals() else None)
+            results['total_capital'].append(None)
+            results['current_capital'].append(None)
+            results['realized_pnl'].append(None)
+            results['unrealized_pnl'].append(None)
+            results['open_positions'].append(None)
             continue
 
     # 결과 분석 및 리포트
