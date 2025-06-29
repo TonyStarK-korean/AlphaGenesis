@@ -13,6 +13,8 @@ import numpy as np
 import pytz
 from tqdm import tqdm
 import time
+import re
+import optuna
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -332,6 +334,28 @@ def main():
     except Exception as e:
         logger.error(f"시스템 실행 중 오류 발생: {e}")
         raise
+
+# Optuna 로그 한글화 함수
+def translate_optuna_log(msg):
+    msg = re.sub(r'Trial (\d+) finished', r'트라이얼 \1 완료', msg)
+    msg = re.sub(r'parameters:', '파라미터:', msg)
+    msg = re.sub(r'Best is trial (\d+) with value:', r'최고 성능 트라이얼은 \1, 값:', msg)
+    msg = re.sub(r'value:', '값:', msg)
+    msg = re.sub(r'Trial (\d+) failed', r'트라이얼 \1 실패', msg)
+    msg = re.sub(r'A new study created in memory with name:', '새로운 스터디 생성 (메모리 내 이름):', msg)
+    return msg
+
+# Optuna 로그를 한글로 출력하도록 stdout/stderr 후킹
+class KoreanOptunaLogger(optuna.logging.DefaultHandler):
+    def emit(self, record):
+        msg = self.format(record)
+        msg = translate_optuna_log(msg)
+        print(msg)
+
+optuna.logging.set_verbosity(optuna.logging.INFO)
+for handler in list(optuna.logging.get_logger().handlers):
+    optuna.logging.get_logger().removeHandler(handler)
+optuna.logging.get_logger().addHandler(KoreanOptunaLogger())
 
 if __name__ == "__main__":
     main() 
