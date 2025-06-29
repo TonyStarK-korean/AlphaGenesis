@@ -328,6 +328,14 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
             # 진단용 로그 추가
             logger.info(f"[{timestamp_str}] 신호: {signal}, 방향: {direction}, 포지션존재: {positions.get((symbol, direction))}, 예측수익률: {predicted_return:.5f}, RSI: {row.get('rsi_14', 50):.2f}, 변동성: {row.get('volatility_20', 0.05):.4f}")
+            
+            # 매매 현황 로그 (매 100번째마다 출력)
+            if idx % 100 == 0:
+                open_positions_count = len([p for p in positions.values() if p['status'] == 'OPEN'])
+                total_pnl = realized_pnl + unrealized_pnl
+                pnl_rate = (total_pnl / initial_capital) * 100
+                logger.info(f"[{timestamp_str}] === 매매 현황 === | 총자산: {current_capital:,.0f} | 실현손익: {realized_pnl:+,.0f} | 미실현손익: {unrealized_pnl:+,.0f} | 수익률: {pnl_rate:+.2f}% | 보유포지션: {open_positions_count}개")
+            
             # 동적 레버리지 계산 (시장국면별)
             current_leverage = get_dynamic_leverage(regime, predicted_return, row.get('volatility_20', 0.05))
             # 비중 결정
