@@ -1,0 +1,15 @@
+[Unit]
+Description=AlphaGenesis Dashboard Service
+After=network.target
+
+[Service]
+Type=simple
+User=gcp_user
+WorkingDirectory=/home/gcp_user/AlphaGenesis/dashboard
+Environment=PATH=/home/gcp_user/AlphaGenesis/venv/bin
+ExecStart=/home/gcp_user/AlphaGenesis/venv/bin/python app.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target 
