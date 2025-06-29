@@ -189,13 +189,24 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             strategy_desc = f"전략: {strategy_name}"
             # === 예측수익률 항상 0으로 초기화 ===
             predicted_return = 0
+            # prediction_data 상태 로그
+            if 'prediction_data' in locals():
+                logger.info(f"[{timestamp}] prediction_data shape: {prediction_data.shape}, columns: {list(prediction_data.columns) if hasattr(prediction_data, 'columns') else 'N/A'}")
+                logger.info(f"[{timestamp}] prediction_data head: {prediction_data.head(1) if hasattr(prediction_data, 'head') else prediction_data}")
             # ML 예측수익률 계산 및 진단 로그 추가
             if 'ml_model' in locals() and ml_model is not None and 'prediction_data' in locals():
                 if len(prediction_data) > 60:
-                    predicted_return = ml_model.predict(prediction_data)[-1]
-                    logger.info(f"[{timestamp}] ML 예측값: {predicted_return}")
+                    try:
+                        pred = ml_model.predict(prediction_data)
+                        logger.info(f"[{timestamp}] ml_model.predict() 결과: {pred[-5:] if hasattr(pred, '__getitem__') else pred}")
+                        predicted_return = pred[-1]
+                    except Exception as e:
+                        logger.error(f"[{timestamp}] ml_model.predict() 예외: {e}")
                 else:
                     logger.info(f"[{timestamp}] 예측데이터 부족, predicted_return=0")
+            # 임시: 예측수익률에 랜덤값 할당
+            predicted_return = np.random.uniform(-0.01, 0.01)
+            logger.info(f"[{timestamp}] (임시) 랜덤 예측수익률: {predicted_return}")
             rsi = row.get('rsi_14', 50)
             vol = row.get('volatility_20', 0.05)
             reason = f"예측수익률: {predicted_return:.2%}, RSI: {rsi:.1f}, 변동성: {vol:.2%}"
