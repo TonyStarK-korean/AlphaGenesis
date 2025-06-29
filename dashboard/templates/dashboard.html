@@ -2,25 +2,58 @@
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
-    <title>백테스트 대시보드</title>
+    <title>AlphaGenesis 실시간 자동매매 시스템 대시보드</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
     <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            background: linear-gradient(135deg, #e0e7ff 0%, #f8fafc 100%);
+            font-family: 'Segoe UI', 'Pretendard', 'Noto Sans KR', Arial, sans-serif;
+        }
+        .dashboard-title {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #3b82f6;
+            letter-spacing: 2px;
+            margin-top: 2rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+            text-shadow: 1px 2px 8px #c7d2fe;
+        }
+        .card {
+            border-radius: 1.2rem;
+            box-shadow: 0 4px 24px rgba(59,130,246,0.08);
+            margin-bottom: 2rem;
+        }
+        .table {
+            background: #fff;
+            border-radius: 0.7rem;
+            overflow: hidden;
+        }
+        .section-title {
+            color: #6366f1;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+    </style>
 </head>
 <body>
 <div class="container mt-4">
-    <h2 class="mb-4">📊 백테스트 실시간 대시보드</h2>
-    <div class="mb-4">
-        <h5>성과 요약</h5>
+    <div class="dashboard-title">
+        🚀 AlphaGenesis 실시간 자동매매 시스템 대시보드
+    </div>
+    <div class="card p-4">
+        <h5 class="section-title">성과 요약</h5>
         {{ table_html|safe }}
     </div>
-    <div>
-        <h5>종목별 자본 변화 그래프</h5>
+    <div class="card p-4">
+        <h5 class="section-title">종목별 자본 변화 그래프</h5>
         <div id="capital-graph"></div>
     </div>
 </div>
 <script>
     var graph_json = {{ graph_json|safe }};
-    Plotly.newPlot('capital-graph', graph_json.data, graph_json.layout);
+    Plotly.newPlot('capital-graph', graph_json.data, graph_json.layout, {responsive: true});
 </script>
 </body>
 </html> 
