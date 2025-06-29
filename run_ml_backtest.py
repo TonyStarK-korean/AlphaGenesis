@@ -463,7 +463,7 @@ def main():
         df = generate_historical_data(years=3)
         logger.info(f"데이터 생성 완료: {len(df)} 개 데이터 포인트")
 
-        # 항상 새로 모델 학습
+        # 항상 새로 모델 학습 (저장된 모델 불러오기 코드 완전 제거)
         ml_model = PricePredictionModel()
         ml_model.fit(df)
         logger.info(f"모델을 새로 훈련 후 백테스트를 진행합니다.")
