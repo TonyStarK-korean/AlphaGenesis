@@ -397,8 +397,10 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         entry['pyramiding_count'] += 1
                         entry['peak_price'] = max(entry['peak_price'], current_price)
                         
+                        # 피라미딩 로그 표 형식 통일
                         pyramid_log = (
-                            f"[{timestamp_str}] | 피라미딩: {pos_key[0]} | 수익률: {profit_rate*100:+.2f}% | 추가금액: {additional_amount:,.0f} | 총금액: {entry['amount']:,.0f} | 피라미딩횟수: {entry['pyramiding_count']}"
+                            f"[{timestamp_str}] | {'피라':^4} | {regime:^4} | {STRATEGY_KOR_MAP.get(strategy_name, strategy_name):^10} | {'매수' if pos_key[1]=='LONG' else '매도':^4} | {pos_key[0]:^6} | "
+                            f"{entry_price:>8,.2f} | {'-':>8} | {profit_rate*100:+.2f}% | {additional_amount:>8,.0f} | {current_capital:>10,.0f} | {entry['position_ratio']*100:>5.1f}% | {entry['leverage']:>4.2f}배 | 피라미딩 조건충족 | - | {entry['pyramiding_count']}회"
                         )
                         logger.info(pyramid_log)
                         send_log_to_dashboard(pyramid_log)
@@ -912,21 +914,16 @@ def get_risk_management(leverage, ml_pred):
     
     return stop_loss, take_profit
 
-# 피라미딩 전략
+# 피라미딩 전략 (최대 5회, 조건 완화)
 def check_pyramiding(positions, symbol, direction, current_profit_rate):
     if (symbol, direction) not in positions:
         return False, 0
-    
     position = positions[(symbol, direction)]
-    entry_price = position['entry_price']
     entry_amount = position['amount']
-    
-    # 수익률에 따른 피라미딩 조건
-    if current_profit_rate >= 0.05:  # 5% 수익 시
-        return True, entry_amount * 0.3  # 30% 추가
-    elif current_profit_rate >= 0.02:  # 2% 수익 시
+    pyramiding_count = position.get('pyramiding_count', 0)
+    # 피라미딩 조건: 2% 이상 수익, 최대 5회
+    if pyramiding_count < 5 and current_profit_rate >= 0.02:
         return True, entry_amount * 0.5  # 50% 추가
-    
     return False, 0
 
 # 트레일링 스탑
