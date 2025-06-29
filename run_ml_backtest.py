@@ -77,13 +77,10 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     """ML 모델 백테스트 실행"""
     logger = logging.getLogger(__name__)
     logger.info("ML 모델 백테스트 시작")
-    
-    # ML 모델 초기화
-    if model is None:
-        ml_model = PricePredictionModel()
-    else:
-        ml_model = model
-    
+
+    # ML 모델은 이미 훈련된 상태로 전달됨
+    ml_model = model if model is not None else PricePredictionModel()
+
     # 동적 레버리지 관리자 초기화
     leverage_manager = DynamicLeverageManager()
     
@@ -114,11 +111,6 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     test_data = df_with_indicators.iloc[train_size:]
     
     logger.info(f"훈련 데이터: {len(train_data)} 개, 테스트 데이터: {len(test_data)} 개")
-    
-    # 모델 훈련
-    logger.info("ML 모델 훈련 시작")
-    ml_model.fit(train_data, tune=True)
-    logger.info("ML 모델 훈련 완료")
     
     # 백테스트 실행
     start_time = time.time()
