@@ -10,6 +10,7 @@ import logging
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
+import pytz
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -20,7 +21,19 @@ from data.market_data.data_generator import MarketDataGenerator
 from utils.indicators.technical_indicators import TechnicalIndicators
 
 def setup_logging():
-    """로깅 설정"""
+    """
+    로그 설정 (한국시간)
+    """
+    seoul_tz = pytz.timezone('Asia/Seoul')
+    class SeoulFormatter(logging.Formatter):
+        def formatTime(self, record, datefmt=None):
+            dt = datetime.fromtimestamp(record.created, seoul_tz)
+            if datefmt:
+                s = dt.strftime(datefmt)
+            else:
+                s = dt.strftime("%Y-%m-%d %H:%M:%S")
+            return s
+    formatter = SeoulFormatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logging.basicConfig(
         level=logging.INFO,
         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
@@ -29,6 +42,8 @@ def setup_logging():
             logging.StreamHandler()
         ]
     )
+    for handler in logging.getLogger().handlers:
+        handler.setFormatter(formatter)
     return logging.getLogger(__name__)
 
 def generate_historical_data(years: int = 3) -> pd.DataFrame:
