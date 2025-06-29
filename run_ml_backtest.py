@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
 import pytz
+from tqdm import tqdm
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -114,7 +115,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
     logger.info("ML 모델 훈련 완료")
     
     # 백테스트 실행
-    for i, (timestamp, row) in enumerate(test_data.iterrows()):
+    for i, (idx, row) in enumerate(tqdm(test_data.iterrows(), total=len(test_data), desc='백테스트 진행중', ncols=80)):
         try:
             # 현재 시장 상황 분석
             market_condition = analyze_market_condition(row)
@@ -154,13 +155,13 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
             # 포지션 업데이트
             if signal == 1 and position <= 0:  # 롱 진입
                 position = 1
-                logger.info(f"{timestamp}: 롱 진입 (예측: {predicted_return:.4f}, 레버리지: {current_leverage})")
+                logger.info(f"{idx}: 롱 진입 (예측: {predicted_return:.4f}, 레버리지: {current_leverage})")
             elif signal == -1 and position >= 0:  # 숏 진입
                 position = -1
-                logger.info(f"{timestamp}: 숏 진입 (예측: {predicted_return:.4f}, 레버리지: {current_leverage})")
+                logger.info(f"{idx}: 숏 진입 (예측: {predicted_return:.4f}, 레버리지: {current_leverage})")
             elif signal == 0 and position != 0:  # 청산
                 position = 0
-                logger.info(f"{timestamp}: 포지션 청산")
+                logger.info(f"{idx}: 포지션 청산")
             
             # 수익률 계산
             if i > 0:
@@ -190,7 +191,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
                 capital_change = 0
             
             # 결과 저장
-            results['timestamp'].append(timestamp)
+            results['timestamp'].append(idx)
             results['capital'].append(current_capital)
             results['leverage'].append(current_leverage)
             results['position'].append(position)
@@ -198,7 +199,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
             results['actual_return'].append(actual_return)
             results['cumulative_return'].append((current_capital - initial_capital) / initial_capital)
             
-            # 진행상황 출력 (1000개마다)
+            # 진행상황 로그 (1000개마다)
             if (i + 1) % 1000 == 0:
                 logger.info(f"진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%)")
                 
