@@ -307,10 +307,10 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             # 기존 신호와 결합(AND)
             if chrono_signal != 0:
                 signal = chrono_signal
-                reason = chrono_reason + f" | ML예측: {predicted_return:.2%}"
+                reason = chrono_reason + f" | ML예측: {predicted_return*100:.2f}%"
             else:
                 signal, signal_desc = generate_trading_signal(predicted_return, row, 1.0)
-                reason = signal_desc + f" | ML예측: {predicted_return:.2%}"
+                reason = signal_desc + f" | ML예측: {predicted_return*100:.2f}%"
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
             
             # 매매 현황 로그 (매 100번째마다 출력)
@@ -365,11 +365,12 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     'stop_loss': stop_loss,
                     'take_profit': take_profit,
                     'peak_price': row['close'],  # 트레일링 스탑용
-                    'pyramiding_count': 0  # 피라미딩 횟수
+                    'pyramiding_count': 0,  # 피라미딩 횟수
+                    'direction': direction
                 }
                 log_msg = (
                     f"[{timestamp_str}] | {'진입':^4} | {regime:^4} | {STRATEGY_KOR_MAP.get(strategy_name, strategy_name):^10} | {'매수' if direction=='LONG' else '매도':^4} | {symbol:^6} | "
-                    f"{row['close']:>8,.2f} | {'-':>8} | {'-':>7} | {'-':>8} | {current_capital:>10,.0f} | {position_ratio*100:>5.1f}% | {current_leverage:>4.2f}배 | {reason} | {predicted_return:.2%}"
+                    f"{row['close']:>8,.2f} | {'-':>8} | {'-':>7} | {'-':>8} | {current_capital:>10,.0f} | {position_ratio*100:>5.1f}% | {current_leverage:>4.2f}배 | {reason} | {predicted_return*100:.2f}%"
                 )
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
@@ -414,7 +415,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         entry_price = entry['entry_price']
                         entry_amount = entry['amount']
                         lev = entry['leverage']
-                        pos_dir = pos_key[1]
+                        pos_dir = entry['direction']
                         current_price = row['close']
                         
                         # 손익 계산
@@ -461,7 +462,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                             
                             log_msg = (
                                 f"[{timestamp_str}] | {'청산':^4} | {regime:^4} | {STRATEGY_KOR_MAP.get(strategy_name, strategy_name):^10} | {'매수' if pos_dir=='LONG' else '매도':^4} | {pos_key[0]:^6} | "
-                                f"{entry_price:>8,.2f} | {current_price:>8,.2f} | {pnl_rate*100:+.2f}% | {profit:+,.0f} | {current_capital:>10,.0f} | {entry['position_ratio']*100:>5.1f}% | {lev:>4.2f}배 | {close_reason} | {predicted_return:.2%}"
+                                f"{entry_price:>8,.2f} | {current_price:>8,.2f} | {pnl_rate*100:+.2f}% | {profit:+,.0f} | {current_capital:>10,.0f} | {entry['position_ratio']*100:>5.1f}% | {lev:>4.2f}배 | {close_reason} | {predicted_return*100:.2f}%"
                             )
                             logger.info(log_msg)
                             send_log_to_dashboard(log_msg)
@@ -496,7 +497,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 entry_price = entry['entry_price']
                 entry_amount = entry['amount']
                 lev = entry['leverage']
-                pos_dir = pos_key[1]
+                pos_dir = entry['direction']
                 if pos_dir == 'LONG':
                     pnl_rate = (row['close'] - entry_price) / entry_price * lev
                 else:
@@ -505,8 +506,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
 
             # 총자산 = 현금성 자본 + 미실현손익 포함 오픈포지션 평가금액
             current_position_value = sum([
-                (row['close'] - entry['entry_price']) * entry['amount'] if entry['status']=='OPEN' and entry['direction']=='LONG' else
-                (entry['entry_price'] - row['close']) * entry['amount'] if entry['status']=='OPEN' and entry['direction']=='SHORT' else 0
+                (row['close'] - entry['entry_price']) * entry['amount'] if entry.get('status')=='OPEN' and entry.get('direction')=='LONG' else
+                (entry['entry_price'] - row['close']) * entry['amount'] if entry.get('status')=='OPEN' and entry.get('direction')=='SHORT' else 0
                 for entry in positions.values()
             ])
             total_capital = current_capital + current_position_value + unrealized_pnl
