@@ -588,4 +588,18 @@ def get_dynamic_position_size(base_ratio, market_condition, predicted_return):
     return base_ratio
 
 if __name__ == "__main__":
-    main() 
+    import pandas as pd
+    # 데이터 로드 (예시)
+    df = pd.read_csv('data/your_data.csv')
+    initial_capital = 10000000
+    print("[고정비중 백테스트]")
+    result_fixed = run_ml_backtest(df, initial_capital=initial_capital, use_dynamic_position=False)
+    print("[동적비중 백테스트]")
+    result_dynamic = run_ml_backtest(df, initial_capital=initial_capital, use_dynamic_position=True)
+    # 결과 비교 출력 (예시)
+    def print_summary(result, label):
+        trades = result.get('trade_log', [])
+        final_capital = result.get('final_capital', None)
+        print(f"{label} | 트레이드 수: {len(trades)} | 최종 자산: {final_capital if final_capital else 'N/A'}")
+    print_summary(result_fixed, '고정비중')
+    print_summary(result_dynamic, '동적비중') 
