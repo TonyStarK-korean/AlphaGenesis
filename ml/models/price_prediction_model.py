@@ -12,6 +12,7 @@ import time
 import joblib
 from sklearn.metrics import mean_absolute_error, r2_score
 import os
+import logging
 
 # 경고 메시지 필터링
 warnings.filterwarnings("ignore", message="X does not have valid feature names, but.*")
@@ -21,6 +22,9 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # scikit-learn 경고 완전 제거
 os.environ['PYTHONWARNINGS'] = 'ignore'
+
+# LightGBM 경고 제거
+logging.getLogger('lightgbm').setLevel(logging.ERROR)
 
 def make_features(df):
     # 실전에서 많이 쓰는 피처 예시
