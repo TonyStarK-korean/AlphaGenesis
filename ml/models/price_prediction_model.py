@@ -67,13 +67,11 @@ class PricePredictionModel:
         return obj
 
     def fit(self, df, target_col='close', horizon=1, tune=False):
-        print("[DEBUG] fit 진입, feature_names 존재 여부:", hasattr(self, 'feature_names'))
         df_feat = make_features(df)
         X = df_feat.drop([target_col, 'symbol', 'timestamp'], axis=1, errors='ignore')
         y = df_feat[target_col].shift(-horizon).dropna().values
         X = X[:len(y)]  # y와 길이 맞추기
         self.feature_names = X.columns.tolist()
-        print("[DEBUG] fit 종료, feature_names:", self.feature_names)
         X = X.values
 
         # 앙상블 모델 정의
