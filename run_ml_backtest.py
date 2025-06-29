@@ -310,6 +310,9 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         send_log_to_dashboard(log_msg)
                         results['trade_log'].append(log_msg)
                         trade_history.append({**entry, 'symbol': pos_key[0], 'direction': pos_dir})
+                        # 월별 성과 업데이트 (청산 시)
+                        if current_month in monthly_performance:
+                            monthly_performance[current_month]['trade_log'].append(log_msg)
                         del positions[pos_key]
 
             # 미실현손익 계산 (모든 오픈 포지션 평가)
@@ -401,6 +404,20 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
 
     # 결과 분석 및 리포트
     analyze_backtest_results(results, initial_capital)
+    
+    # 마지막 월 성과보고서 출력
+    if last_monthly_report and last_monthly_report in monthly_performance:
+        final_report_msg = f"=== {last_monthly_report} 최종 성과보고서 ==="
+        logger.info(final_report_msg)
+        send_log_to_dashboard(final_report_msg)
+        results['trade_log'].append(final_report_msg)
+        
+        win_rate = (winning_trades / trade_count * 100) if trade_count > 0 else 0
+        final_report_detail = f"{last_monthly_report} | 총 트레이드: {trade_count} | 승률: {win_rate:.1f}% | 최종 자산: {total_capital:,.0f}원 | 총 수익금: {total_profit:,.0f}원 | 최대 낙폭: {max_drawdown:.2f}%"
+        logger.info(final_report_detail)
+        send_log_to_dashboard(final_report_detail)
+        results['trade_log'].append(final_report_detail)
+    
     # 최종 자본을 results에 추가
     try:
         df_results = pd.DataFrame(results)
