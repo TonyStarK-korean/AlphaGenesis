@@ -196,6 +196,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             # 신호 생성
             signal, signal_desc = generate_trading_signal(predicted_return, row, current_leverage)
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
+            # 진단용 로그 추가
+            logger.info(f"[{timestamp}] 신호: {signal}, 방향: {direction}, 포지션존재: {positions.get((symbol, direction))}, 예측수익률: {predicted_return:.5f}, RSI: {rsi:.2f}, 변동성: {vol:.4f}")
             # 진입
             if direction and (symbol, direction) not in positions:
                 entry_amount = current_capital * 0.1
