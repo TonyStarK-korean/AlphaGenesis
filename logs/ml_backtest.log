@@ -1,0 +1,12 @@
+2025-06-29 17:54:30 - __main__ - INFO - ML 모델 백테스트 시스템 시작
+2025-06-29 17:54:30 - __main__ - INFO - 히스토리컬 데이터 생성 중...
+2025-06-29 17:54:30 - __main__ - INFO - 히스토리컬 데이터 생성 완료: 26281 개 데이터
+2025-06-29 17:54:30 - __main__ - INFO - 데이터 생성 완료: 26281 개 데이터, 기간: 0 ~ 26280
+2025-06-29 17:54:30 - __main__ - INFO - 새로운 모델 훈련을 시작합니다...
+2025-06-29 17:54:30 - __main__ - ERROR - 시스템 실행 중 오류 발생: cannot access local variable 'PricePredictionModel' where it is not associated with a value
+2025-06-29 17:54:30 - __main__ - ERROR - 상세 오류 정보: Traceback (most recent call last):
+  File "C:\Project\AlphaGenesis\run_ml_backtest.py", line 471, in main
+    ml_model = PricePredictionModel()
+               ^^^^^^^^^^^^^^^^^^^^
+UnboundLocalError: cannot access local variable 'PricePredictionModel' where it is not associated with a value
+
