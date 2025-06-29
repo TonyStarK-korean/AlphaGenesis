@@ -15,6 +15,7 @@ from tqdm import tqdm
 import time
 import re
 import optuna
+import json, requests
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -274,6 +275,7 @@ def analyze_backtest_results(results: dict, initial_capital: float):
         logger.error("백테스트 결과 데이터가 비어 있습니다. (루프 내 예외/데이터 없음 등 원인)")
         return
     
+    # 전체 성과
     final_capital = df_results['capital'].iloc[-1]
     total_return = (final_capital - initial_capital) / initial_capital * 100
     profit = final_capital - initial_capital
@@ -290,10 +292,94 @@ def analyze_backtest_results(results: dict, initial_capital: float):
     logger.info(f"최대 낙폭: {max_drawdown:.2f}%")
     logger.info(f"총 거래 횟수: {total_trades}")
     logger.info(f"승률: {win_rate:.1f}%")
-    
+
+    # 종목별 성과
+    if 'symbol' in df_results:
+        logger.info("--- 종목별 성과 ---")
+        for symbol, group in df_results.groupby('symbol'):
+            sym_final = group['capital'].iloc[-1]
+            sym_return = (sym_final - initial_capital) / initial_capital * 100
+            sym_profit = sym_final - initial_capital
+            sym_peak = group['capital'].max()
+            sym_mdd = (sym_peak - group['capital'].min()) / sym_peak * 100
+            sym_trades = len(group[group['position'] != 0])
+            sym_win = len(group[group['actual_return'] > 0])
+            sym_winrate = sym_win / sym_trades * 100 if sym_trades > 0 else 0
+            logger.info(f"[{symbol}] 최종 자본: {sym_final:,.0f}원 | 수익률: {sym_return:.2f}% | 수익금: {sym_profit:,.0f}원 | 최대 낙폭: {sym_mdd:.2f}% | 거래: {sym_trades} | 승률: {sym_winrate:.1f}%")
+
+    # 전략(phase)별 성과
+    if 'phase' in df_results:
+        logger.info("--- 전략(phase)별 성과 ---")
+        for phase, group in df_results.groupby('phase'):
+            ph_final = group['capital'].iloc[-1]
+            ph_return = (ph_final - initial_capital) / initial_capital * 100
+            ph_profit = ph_final - initial_capital
+            ph_peak = group['capital'].max()
+            ph_mdd = (ph_peak - group['capital'].min()) / ph_peak * 100
+            ph_trades = len(group[group['position'] != 0])
+            ph_win = len(group[group['actual_return'] > 0])
+            ph_winrate = ph_win / ph_trades * 100 if ph_trades > 0 else 0
+            logger.info(f"[{phase}] 최종 자본: {ph_final:,.0f}원 | 수익률: {ph_return:.2f}% | 수익금: {ph_profit:,.0f}원 | 최대 낙폭: {ph_mdd:.2f}% | 거래: {ph_trades} | 승률: {ph_winrate:.1f}%")
+
     # 결과 저장
     df_results.to_csv('data/backtest_data/ml_backtest_results.csv', index=False)
     logger.info("백테스트 결과가 data/backtest_data/ml_backtest_results.csv에 저장되었습니다.")
+
+    # 대시보드 연동: 종목/전략별 리포트도 함께 전송
+    result_json = df_results.to_dict(orient='list')
+    result_json['symbol'] = results.get('symbol', 'ML백테스트')
+    # 종목별/전략별 리포트도 json에 추가
+    symbol_report = {}
+    if 'symbol' in df_results:
+        for symbol, group in df_results.groupby('symbol'):
+            sym_final = group['capital'].iloc[-1]
+            sym_return = (sym_final - initial_capital) / initial_capital * 100
+            sym_profit = sym_final - initial_capital
+            sym_peak = group['capital'].max()
+            sym_mdd = (sym_peak - group['capital'].min()) / sym_peak * 100
+            sym_trades = len(group[group['position'] != 0])
+            sym_win = len(group[group['actual_return'] > 0])
+            sym_winrate = sym_win / sym_trades * 100 if sym_trades > 0 else 0
+            symbol_report[symbol] = {
+                'final_capital': sym_final,
+                'return': sym_return,
+                'profit': sym_profit,
+                'max_drawdown': sym_mdd,
+                'trades': sym_trades,
+                'win_rate': sym_winrate
+            }
+    phase_report = {}
+    if 'phase' in df_results:
+        for phase, group in df_results.groupby('phase'):
+            ph_final = group['capital'].iloc[-1]
+            ph_return = (ph_final - initial_capital) / initial_capital * 100
+            ph_profit = ph_final - initial_capital
+            ph_peak = group['capital'].max()
+            ph_mdd = (ph_peak - group['capital'].min()) / ph_peak * 100
+            ph_trades = len(group[group['position'] != 0])
+            ph_win = len(group[group['actual_return'] > 0])
+            ph_winrate = ph_win / ph_trades * 100 if ph_trades > 0 else 0
+            phase_report[phase] = {
+                'final_capital': ph_final,
+                'return': ph_return,
+                'profit': ph_profit,
+                'max_drawdown': ph_mdd,
+                'trades': ph_trades,
+                'win_rate': ph_winrate
+            }
+    result_json['symbol_report'] = symbol_report
+    result_json['phase_report'] = phase_report
+    with open('data/backtest_data/ml_backtest_results.json', 'w', encoding='utf-8') as f:
+        json.dump(result_json, f, ensure_ascii=False, indent=2)
+    try:
+        dashboard_url = 'http://34.47.77.230:5000/api/upload_results'
+        resp = requests.post(dashboard_url, json=result_json, timeout=10)
+        if resp.status_code == 200:
+            logger.info(f"대시보드에 결과 업로드 성공: {dashboard_url}")
+        else:
+            logger.warning(f"대시보드 업로드 실패: {resp.status_code} {resp.text}")
+    except Exception as e:
+        logger.warning(f"대시보드 업로드 중 오류: {e}")
 
 def main():
     """메인 함수"""
