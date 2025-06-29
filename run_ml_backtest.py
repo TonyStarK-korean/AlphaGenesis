@@ -291,7 +291,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             prediction_data = df_with_indicators.iloc[:train_size + (idx - test_data.index[0]) + 1]
             predicted_return = 0
             if ml_model is not None and prediction_data is not None:
-                if len(prediction_data) > 100:  # 최소 데이터 요구사항 증가
+                if len(prediction_data) > 50:  # 최소 데이터 요구사항을 낮춤
                     try:
                         # 모델이 훈련되지 않은 경우 훈련
                         if not hasattr(ml_model, 'feature_names') or ml_model.feature_names is None:
