@@ -597,7 +597,7 @@ def get_dynamic_position_size(base_ratio, market_condition, predicted_return):
 if __name__ == "__main__":
     import pandas as pd
     # 데이터 로드 (예시)
-    df = pd.read_csv('data/your_data.csv')
+    df = pd.read_csv('data/market_data/BNB_USDT_1h.csv')
     initial_capital = 10000000
     print("[고정비중 백테스트]")
     result_fixed = run_ml_backtest(df, initial_capital=initial_capital, use_dynamic_position=False)
