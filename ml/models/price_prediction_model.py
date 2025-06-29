@@ -29,19 +29,72 @@ logging.getLogger('lightgbm').setLevel(logging.CRITICAL)
 def make_features(df):
     # 실전에서 많이 쓰는 피처 예시
     df = df.copy()
+    
+    # 필수 컬럼 확인
+    required_cols = ['close', 'volume']
+    missing_cols = [col for col in required_cols if col not in df.columns]
+    if missing_cols:
+        print(f"[ML 모델] 필수 컬럼 누락: {missing_cols}")
+        return df
+    
+    # 기본 피처 생성 (NaN 허용)
     df['return_1'] = df['close'].pct_change()
-    df['ma_5'] = df['close'].rolling(5).mean()
-    df['ma_20'] = df['close'].rolling(20).mean()
-    df['volatility'] = df['close'].rolling(10).std()
-    df['volume_ma_5'] = df['volume'].rolling(5).mean()
+    df['ma_5'] = df['close'].rolling(5, min_periods=1).mean()
+    df['ma_20'] = df['close'].rolling(20, min_periods=1).mean()
+    df['volatility'] = df['close'].rolling(10, min_periods=1).std()
+    df['volume_ma_5'] = df['volume'].rolling(5, min_periods=1).mean()
+    
     # RSI 계산
     delta = df['close'].diff()
     up = delta.clip(lower=0)
     down = -1 * delta.clip(upper=0)
-    ma_up = up.rolling(14).mean()
-    ma_down = down.rolling(14).mean()
+    ma_up = up.rolling(14, min_periods=1).mean()
+    ma_down = down.rolling(14, min_periods=1).mean()
     df['rsi_14'] = 100 - (100 / (1 + ma_up / (ma_down + 1e-9)))
-    df = df.dropna()
+    
+    # 기존 멀티타임프레임 지표가 있다면 유지
+    # 없으면 기본값으로 채움
+    if 'rsi_14_1h' not in df.columns:
+        df['rsi_14_1h'] = df['rsi_14']
+    if 'rsi_14_4h' not in df.columns:
+        df['rsi_14_4h'] = df['rsi_14']
+    if 'rsi_14_5m' not in df.columns:
+        df['rsi_14_5m'] = df['rsi_14']
+    
+    if 'ema_20_1h' not in df.columns:
+        df['ema_20_1h'] = df['ma_20']
+    if 'ema_50_1h' not in df.columns:
+        df['ema_50_1h'] = df['ma_20']
+    if 'ema_120_1h' not in df.columns:
+        df['ema_120_1h'] = df['ma_20']
+    
+    if 'macd_1h' not in df.columns:
+        df['macd_1h'] = 0
+    if 'macd_signal_1h' not in df.columns:
+        df['macd_signal_1h'] = 0
+    
+    if 'vwap_1h' not in df.columns:
+        df['vwap_1h'] = df['close']
+    if 'bb_upper_1h' not in df.columns:
+        df['bb_upper_1h'] = df['close'] * 1.02
+    if 'bb_lower_1h' not in df.columns:
+        df['bb_lower_1h'] = df['close'] * 0.98
+    
+    if 'stoch_k_5m' not in df.columns:
+        df['stoch_k_5m'] = 50
+    if 'stoch_d_5m' not in df.columns:
+        df['stoch_d_5m'] = 50
+    
+    # NaN 값을 적절히 처리 (앞쪽 NaN은 0으로, 뒤쪽 NaN은 forward fill)
+    numeric_cols = df.select_dtypes(include=[np.number]).columns
+    for col in numeric_cols:
+        if col in ['close', 'volume']:  # 원본 데이터는 건드리지 않음
+            continue
+        df[col] = df[col].fillna(method='ffill').fillna(0)
+    
+    # 최종적으로 완전히 NaN인 행만 제거
+    df = df.dropna(subset=['close', 'volume'])
+    
     return df
 
 class PricePredictionModel:
