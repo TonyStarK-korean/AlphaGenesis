@@ -311,6 +311,14 @@ def dashboard():
     graph_json = json.dumps(fig, cls=PlotlyJSONEncoder)
     return render_template('dashboard.html', table_html=table_html, graph_json=graph_json)
 
+# === Flask 서버 24시간 가동 안내 ===
+# 운영 시 아래 명령어로 백그라운드에서 실행하세요:
+# tmux new -s dashboard
+# python3 dashboard/app.py
+# (Ctrl+B, D로 세션 분리)
+# 또는
+# nohup python3 dashboard/app.py > dashboard.log 2>&1 &
+
 if __name__ == '__main__':
     # 외부 접속을 위해 host를 0.0.0.0으로 설정
     app.run(debug=True, host='0.0.0.0', port=5000) 
