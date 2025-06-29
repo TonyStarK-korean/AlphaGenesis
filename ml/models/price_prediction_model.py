@@ -8,6 +8,7 @@ import xgboost as xgb
 import lightgbm as lgb
 import optuna
 import time
+import joblib
 
 def make_features(df):
     # 실전에서 많이 쓰는 피처 예시
@@ -32,6 +33,15 @@ class PricePredictionModel:
         self.n_splits = n_splits
         self.models = {}
         self.best_params = {}
+
+    def save_model(self, path):
+        joblib.dump(self, path)
+        print(f"[모델저장] 모델이 {path}에 저장되었습니다.")
+
+    @staticmethod
+    def load_model(path):
+        print(f"[모델불러오기] {path}에서 모델을 불러옵니다.")
+        return joblib.load(path)
 
     def fit(self, df, target_col='close', horizon=1, tune=False):
         df_feat = make_features(df)
