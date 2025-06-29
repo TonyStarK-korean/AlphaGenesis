@@ -12,6 +12,7 @@ import pandas as pd
 import numpy as np
 import pytz
 from tqdm import tqdm
+import time
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -115,7 +116,18 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
     logger.info("ML 모델 훈련 완료")
     
     # 백테스트 실행
-    for i in tqdm(range(len(test_data)), desc='백테스트 진행중', ncols=80, dynamic_ncols=True, file=sys.stdout):
+    start_time = time.time()
+    for i in tqdm(
+        range(len(test_data)),
+        desc='백테스트 진행중',
+        ncols=80,
+        dynamic_ncols=True,
+        file=sys.stdout,
+        leave=True,
+        mininterval=0.1,
+        ascii=True,
+        disable=False
+    ):
         idx, row = test_data.iloc[i].name, test_data.iloc[i]
         try:
             # 현재 시장 상황 분석
@@ -201,8 +213,11 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
             results['cumulative_return'].append((current_capital - initial_capital) / initial_capital)
             
             # 진행상황 로그 (1000개마다)
-            if (i + 1) % 1000 == 0:
-                logger.info(f"진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%)")
+            if (i + 1) % 1000 == 0 or i == len(test_data) - 1:
+                elapsed = time.time() - start_time
+                eta = elapsed / (i + 1) * (len(test_data) - (i + 1)) if (i + 1) > 0 else 0
+                logger.info(f"진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s")
+                print(f"진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s", flush=True)
                 
         except Exception as e:
             logger.error(f"백테스트 중 오류 발생: {e}")
