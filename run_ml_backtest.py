@@ -131,8 +131,8 @@ def send_log_to_dashboard(log_msg):
     try:
         dashboard_url = 'http://34.47.77.230:5000/api/realtime_log'
         requests.post(dashboard_url, json={'log': log_msg}, timeout=2)
-    except Exception as e:
-        logging.getLogger(__name__).warning(f"[대시보드 전송 실패] {e} | 로그: {log_msg}")
+    except Exception:
+        pass  # 에러 무시, 아무 메시지도 출력하지 않음
 
 def send_report_to_dashboard(report_dict):
     try:
@@ -319,6 +319,15 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 total_pnl = realized_pnl + unrealized_pnl
                 pnl_rate = (total_pnl / initial_capital) * 100
                 logger.info(f"[{timestamp_str}] === 매매 현황 === | 총자산: {current_capital:,.0f} | 실현손익: {realized_pnl:+,.0f} | 미실현손익: {unrealized_pnl:+,.0f} | 수익률: {pnl_rate:+.2f}% | 보유포지션: {open_positions_count}개")
+                if positions:
+                    logger.info("┌────────┬─────┬────────┬────────┬────────┬────────┬────────┬────────┐")
+                    logger.info("│  종목  │ 방향 │ 진입가 │ 현재가 │ 평가손익 │ 수익률 │ 레버리지 │ 진입시각 │")
+                    logger.info("├────────┼─────┼────────┼────────┼────────┼────────┼────────┼────────┤")
+                    for pos_key, entry in positions.items():
+                        profit = (row['close'] - entry['entry_price']) * entry['amount'] if pos_key[1] == 'LONG' else (entry['entry_price'] - row['close']) * entry['amount']
+                        pnl_rate = (row['close'] - entry['entry_price']) / entry['entry_price'] * 100 if pos_key[1] == 'LONG' else (entry['entry_price'] - row['close']) / entry['entry_price'] * 100
+                        logger.info(f"│ {pos_key[0]:^6} │ {pos_key[1]:^4} │ {entry['entry_price']:>8.2f} │ {row['close']:>8.2f} │ {profit:>8,.0f} │ {pnl_rate:>6.2f}% │ {entry['leverage']:>6.2f} │ {entry['entry_time']} │")
+                    logger.info("└────────┴─────┴────────┴────────┴────────┴────────┴────────┴────────┘")
             
             # 동적 레버리지 계산 (시장국면별)
             current_leverage = get_dynamic_leverage(regime, predicted_return, row.get('volatility_20', 0.05))
@@ -359,7 +368,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     'pyramiding_count': 0  # 피라미딩 횟수
                 }
                 log_msg = (
-                    f"[{timestamp_str}] | 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {current_leverage:.2f}배 | 비중: {position_ratio*100:.1f}% | 진입: {'매수' if direction=='LONG' else '매도'} | 종목: {symbol} | 진입가: {row['close']:,.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f} | 신호근거: {reason} | 손절: {stop_loss*100:.1f}% | 익절: {take_profit*100:.1f}%"
+                    f"[{timestamp_str}] | {'진입':^4} | {regime:^4} | {STRATEGY_KOR_MAP.get(strategy_name, strategy_name):^10} | {'매수' if direction=='LONG' else '매도':^4} | {symbol:^6} | "
+                    f"{row['close']:>8,.2f} | {'-':>8} | {'-':>7} | {'-':>8} | {current_capital:>10,.0f} | {position_ratio*100:>5.1f}% | {current_leverage:>4.2f}배 | {reason} | {predicted_return:.2%}"
                 )
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
@@ -448,7 +458,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                             entry['close_reason'] = close_reason
                             
                             log_msg = (
-                                f"[{timestamp_str}] | 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {lev:.2f}배 | 비중: {entry['position_ratio']*100:.1f}% | 청산: {'매수' if pos_dir=='LONG' else '매도'} | 종목: {pos_key[0]} | 진입가: {entry_price:,.2f} | 청산가: {current_price:,.2f} | 수익률: {pnl_rate*100:+.2f}% | 수익금: {profit:+,.0f} | 총자산: {current_capital:,.0f} | 청산사유: {close_reason} | 피라미딩: {entry['pyramiding_count']}회 | 신호근거: {entry['reason']}"
+                                f"[{timestamp_str}] | {'청산':^4} | {regime:^4} | {STRATEGY_KOR_MAP.get(strategy_name, strategy_name):^10} | {'매수' if pos_dir=='LONG' else '매도':^4} | {pos_key[0]:^6} | "
+                                f"{entry_price:>8,.2f} | {current_price:>8,.2f} | {pnl_rate*100:+.2f}% | {profit:+,.0f} | {current_capital:>10,.0f} | {entry['position_ratio']*100:>5.1f}% | {lev:>4.2f}배 | {close_reason} | {predicted_return:.2%}"
                             )
                             logger.info(log_msg)
                             send_log_to_dashboard(log_msg)
@@ -961,6 +972,15 @@ def check_risk_limits(current_capital, initial_capital, daily_loss=0, weekly_los
 def print_summary(result, label):
     """실전형 한글 요약 출력"""
     print(f"[요약] {label} | 최종 자산: {result['final_capital']:,.0f}원 | 총 수익률: {result['total_return']:+.2f}% | 총 수익금: {result['final_capital']-result['initial_capital']:+,.0f}원 | 최대 낙폭: {result['max_drawdown']:+.2f}% | 거래: {result['total_trades']}회 | 승률: {result['win_rate']:.1f}%")
+
+# 전략 한글 변환 맵
+STRATEGY_KOR_MAP = {
+    'mean_reversion': '역추세',
+    'trend_following': '추세추종',
+    'momentum_breakout': '모멘텀돌파',
+    'short_momentum': '숏모멘텀',
+    'btc_short_only': '비트코인숏전략'
+}
 
 if __name__ == "__main__":
     import pandas as pd
