@@ -95,7 +95,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000):
     
     # 모델 훈련
     logger.info("ML 모델 훈련 시작")
-    ml_model.train_models(train_data)
+    ml_model.fit(train_data)
     logger.info("ML 모델 훈련 완료")
     
     # 백테스트 실행
