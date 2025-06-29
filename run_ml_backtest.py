@@ -274,7 +274,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 current_capital -= entry_amount
                 positions[(symbol, direction)] = {
                     'entry_price': row['close'],
-                    'entry_time': timestamp,
+                    'entry_time': timestamp_str,
                     'leverage': current_leverage,
                     'amount': entry_amount,
                     'status': 'OPEN',
@@ -283,7 +283,9 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     'reason': reason,
                     'position_ratio': position_ratio
                 }
-                log_msg = f"[{timestamp_str}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {current_leverage:.2f} | 비중: {position_ratio*100:.1f}% | 진입: {direction} | 종목: {symbol} | 진입가: {row['close']:.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f}"
+                log_msg = (
+                    f"[{timestamp_str}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {current_leverage:.2f}배 | 비중: {position_ratio*100:.1f}% | 진입: {'매수' if direction=='LONG' else '매도'} | 종목: {symbol} | 진입가: {row['close']:.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f}"
+                )
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
                 results['trade_log'].append(log_msg)
@@ -306,10 +308,12 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         realized_pnl += profit
                         entry['status'] = 'CLOSED'
                         entry['exit_price'] = row['close']
-                        entry['exit_time'] = timestamp
+                        entry['exit_time'] = timestamp_str
                         entry['profit'] = profit
                         entry['pnl_rate'] = pnl_rate
-                        log_msg = f"[{timestamp_str}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {lev:.2f} | 비중: {entry['position_ratio']*100:.1f}% | 청산: {pos_dir} | 종목: {pos_key[0]} | 진입가: {entry_price:.2f} | 청산가: {row['close']:.2f} | 수익률: {pnl_rate*100:.2f}% | 수익금: {profit:,.0f} | 총평가금액: {current_capital:,.0f}"
+                        log_msg = (
+                            f"[{timestamp_str}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {lev:.2f}배 | 비중: {entry['position_ratio']*100:.1f}% | 청산: {'매수' if pos_dir=='LONG' else '매도'} | 종목: {pos_key[0]} | 진입가: {entry_price:.2f} | 청산가: {row['close']:.2f} | 수익률: {pnl_rate*100:+.2f}% | 수익금: {profit:+,.0f} | 총자산: {current_capital:,.0f}"
+                        )
                         logger.info(log_msg)
                         send_log_to_dashboard(log_msg)
                         results['trade_log'].append(log_msg)
@@ -415,9 +419,12 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
         logger.info(final_report_msg)
         send_log_to_dashboard(final_report_msg)
         results['trade_log'].append(final_report_msg)
-        
         win_rate = (winning_trades / trade_count * 100) if trade_count > 0 else 0
-        final_report_detail = f"{last_monthly_report} | 총 트레이드: {trade_count} | 승률: {win_rate:.1f}% | 최종 자산: {total_capital:,.0f}원 | 총 수익금: {total_profit:,.0f}원 | 최대 낙폭: {max_drawdown:.2f}%"
+        # 최대 낙폭 부호 명확히
+        max_drawdown_str = f"{max_drawdown:+.2f}%" if max_drawdown != 0 else "0.00%"
+        final_report_detail = (
+            f"{last_monthly_report} | 총 트레이드: {trade_count} | 승률: {win_rate:.1f}% | 최종 자산: {total_capital:,.0f}원 | 총 수익금: {total_profit:+,.0f}원 | 최대 낙폭: {max_drawdown_str}"
+        )
         logger.info(final_report_detail)
         send_log_to_dashboard(final_report_detail)
         results['trade_log'].append(final_report_detail)
