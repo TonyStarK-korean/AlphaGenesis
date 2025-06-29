@@ -235,12 +235,10 @@ class PricePredictionModel:
         try:
             # 모델 훈련 상태 체크
             if not hasattr(self, 'models') or not self.models:
-                print("[ML 모델] 모델이 초기화되지 않았습니다.")
                 return np.zeros(len(df) if hasattr(df, '__len__') else 1)
             
             # feature_names 체크
             if not hasattr(self, 'feature_names') or self.feature_names is None:
-                print("[ML 모델] feature_names가 None입니다. 모델을 다시 훈련해야 합니다.")
                 return np.zeros(len(df) if hasattr(df, '__len__') else 1)
             
             target_col = 'close'
@@ -249,7 +247,6 @@ class PricePredictionModel:
             # 필요한 컬럼이 없는 경우 처리
             missing_features = [col for col in self.feature_names if col not in df_feat.columns]
             if missing_features:
-                print(f"[ML 모델] 누락된 피처: {missing_features}")
                 return np.zeros(len(df_feat))
             
             # 학습 때와 동일한 feature만 사용
@@ -257,7 +254,6 @@ class PricePredictionModel:
             
             # NaN 값 처리
             if np.isnan(X).any():
-                print("[ML 모델] NaN 값이 발견되어 0으로 대체합니다.")
                 X = np.nan_to_num(X, nan=0.0)
             
             preds = []
@@ -283,23 +279,17 @@ class PricePredictionModel:
                             preds.append(pred)
                             trained_models += 1
                         else:
-                            print(f"[ML 모델] {name} 모델이 훈련되지 않았습니다.")
                             preds.append(np.zeros(len(X)))
                     else:
-                        print(f"[ML 모델] {name} 모델이 유효하지 않습니다.")
                         preds.append(np.zeros(len(X)))
                         
                 except Exception as e:
-                    print(f"[ML 모델] {name} 모델 예측 실패: {e}")
-                    # 예측 실패 시 0으로 대체
                     preds.append(np.zeros(len(X)))
             
             if trained_models == 0:
-                print("[ML 모델] 훈련된 모델이 없습니다.")
                 return np.zeros(len(df_feat))
             
             if not preds:
-                print("[ML 모델] 모든 모델 예측 실패")
                 return np.zeros(len(df_feat))
             
             # 훈련된 모델들의 예측만 평균
@@ -310,8 +300,6 @@ class PricePredictionModel:
                 return np.zeros(len(df_feat))
             
         except Exception as e:
-            print(f"[ML 모델] 예측 중 오류 발생: {e}")
-            # 오류 발생 시 0으로 반환
             return np.zeros(len(df) if hasattr(df, '__len__') else 1)
 
     def backtest(self, df, initial_capital=1000000, fee=0.0005, horizon=1):
