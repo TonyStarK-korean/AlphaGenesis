@@ -124,7 +124,6 @@ class PricePredictionModel:
             print(f"[CV리포트] {name}: RMSE={np.mean(fold_rmse):.4f}, MAE={np.mean(fold_mae):.4f}, R2={np.mean(fold_r2):.4f}")
 
     def predict(self, df):
-        print("[DEBUG] predict 진입, feature_names:", getattr(self, 'feature_names', None))
         target_col = 'close'
         df_feat = make_features(df)
         # 학습 때와 동일한 feature만 사용
