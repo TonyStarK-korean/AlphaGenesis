@@ -67,10 +67,24 @@ class PricePredictionModel:
         return obj
 
     def fit(self, df, target_col='close', horizon=1, tune=False):
+        # 최소 데이터 요구사항 체크
+        if len(df) < 100:  # 최소 100개 데이터 포인트 필요
+            print(f"[ML 모델] 데이터 부족: {len(df)}개 (최소 100개 필요)")
+            return False
+            
         df_feat = make_features(df)
+        if len(df_feat) < 50:  # 피처 생성 후 최소 50개 필요
+            print(f"[ML 모델] 피처 생성 후 데이터 부족: {len(df_feat)}개 (최소 50개 필요)")
+            return False
+            
         X = df_feat.drop([target_col, 'symbol', 'timestamp'], axis=1, errors='ignore')
         y = df_feat[target_col].shift(-horizon).dropna().values
         X = X[:len(y)]  # y와 길이 맞추기
+        
+        if len(X) < 30:  # 최종 훈련 데이터 최소 30개 필요
+            print(f"[ML 모델] 최종 훈련 데이터 부족: {len(X)}개 (최소 30개 필요)")
+            return False
+            
         self.feature_names = X.columns.tolist()
         X = X.values
 
@@ -83,45 +97,60 @@ class PricePredictionModel:
         }
 
         # 하이퍼파라미터 튜닝 (Optuna)
-        if tune:
+        if tune and len(X) >= 50:  # 튜닝은 더 많은 데이터가 필요
             def objective(trial):
                 params = {
                     'n_estimators': trial.suggest_int('n_estimators', 100, 400),
                     'max_depth': trial.suggest_int('max_depth', 3, 12)
                 }
                 model = RandomForestRegressor(**params)
-                tscv = TimeSeriesSplit(n_splits=self.n_splits)
+                tscv = TimeSeriesSplit(n_splits=min(self.n_splits, len(X)//10))
                 scores = []
                 for i, (train_idx, val_idx) in enumerate(tscv.split(X)):
+                    if len(train_idx) < 10 or len(val_idx) < 5:  # 최소 훈련/검증 데이터 체크
+                        continue
                     model.fit(X[train_idx], y[train_idx])
                     preds = model.predict(X[val_idx])
                     score = np.sqrt(mean_squared_error(y[val_idx], preds))
                     scores.append(score)
+                if not scores:
+                    return float('inf')
                 mean_score = np.mean(scores)
                 print(f"[Optuna 튜닝] trial={trial.number}, RMSE={mean_score:.4f}")
                 return mean_score
             study = optuna.create_study(direction='minimize')
-            study.optimize(objective, n_trials=20)
-            self.best_params['rf'] = study.best_params
-            self.models['rf'] = RandomForestRegressor(**study.best_params)
-            print(f"[Optuna 최적화] best_params: {self.best_params['rf']}")
+            study.optimize(objective, n_trials=min(20, len(X)//5))
+            if study.best_params:
+                self.best_params['rf'] = study.best_params
+                self.models['rf'] = RandomForestRegressor(**study.best_params)
+                print(f"[Optuna 최적화] best_params: {self.best_params['rf']}")
 
         # 각 모델 학습 및 성능 리포트
-        tscv = TimeSeriesSplit(n_splits=self.n_splits)
+        tscv = TimeSeriesSplit(n_splits=min(self.n_splits, len(X)//10))
         for name, model in self.models.items():
             fold_rmse, fold_mae, fold_r2 = [], [], []
             for train_idx, val_idx in tscv.split(X):
+                if len(train_idx) < 10 or len(val_idx) < 5:  # 최소 훈련/검증 데이터 체크
+                    continue
                 model.fit(X[train_idx], y[train_idx])
                 preds = model.predict(X[val_idx])
                 fold_rmse.append(np.sqrt(mean_squared_error(y[val_idx], preds)))
                 fold_mae.append(mean_absolute_error(y[val_idx], preds))
                 fold_r2.append(r2_score(y[val_idx], preds))
-            self.cv_report[name] = {
-                'RMSE': np.mean(fold_rmse),
-                'MAE': np.mean(fold_mae),
-                'R2': np.mean(fold_r2)
-            }
-            print(f"[CV리포트] {name}: RMSE={np.mean(fold_rmse):.4f}, MAE={np.mean(fold_mae):.4f}, R2={np.mean(fold_r2):.4f}")
+            
+            if fold_rmse:  # 성공적으로 훈련된 경우만 리포트 저장
+                self.cv_report[name] = {
+                    'RMSE': np.mean(fold_rmse),
+                    'MAE': np.mean(fold_mae),
+                    'R2': np.mean(fold_r2)
+                }
+                print(f"[CV리포트] {name}: RMSE={np.mean(fold_rmse):.4f}, MAE={np.mean(fold_mae):.4f}, R2={np.mean(fold_r2):.4f}")
+            else:
+                print(f"[ML 모델] {name} 모델 훈련 실패 - 데이터 부족")
+                return False
+        
+        print(f"[ML 모델] 모든 모델 훈련 완료. 훈련 데이터: {len(X)}개")
+        return True
 
     def predict(self, df):
         try:
