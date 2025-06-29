@@ -35,6 +35,7 @@ class PricePredictionModel:
         self.models = {}
         self.best_params = {}
         self.cv_report = {}
+        self.feature_names = None
 
     def save_model(self, path):
         joblib.dump({'model': self, 'cv_report': self.cv_report}, path)
@@ -52,9 +53,11 @@ class PricePredictionModel:
 
     def fit(self, df, target_col='close', horizon=1, tune=False):
         df_feat = make_features(df)
-        X = df_feat.drop([target_col, 'symbol'], axis=1, errors='ignore').values
+        X = df_feat.drop([target_col, 'symbol'], axis=1, errors='ignore')
         y = df_feat[target_col].shift(-horizon).dropna().values
         X = X[:len(y)]  # y와 길이 맞추기
+        self.feature_names = X.columns.tolist()
+        X = X.values
 
         # 앙상블 모델 정의
         self.models = {
@@ -106,12 +109,13 @@ class PricePredictionModel:
             print(f"[CV리포트] {name}: RMSE={np.mean(fold_rmse):.4f}, MAE={np.mean(fold_mae):.4f}, R2={np.mean(fold_r2):.4f}")
 
     def predict(self, df):
+        target_col = 'close'
         df_feat = make_features(df)
-        X = df_feat.drop([target_col, 'symbol'], axis=1, errors='ignore').values
+        # 학습 때와 동일한 feature만 사용
+        X = df_feat[self.feature_names].values
         preds = []
         for name, model in self.models.items():
             preds.append(model.predict(X))
-        # 앙상블(평균)
         return np.mean(preds, axis=0)
 
     def backtest(self, df, initial_capital=1000000, fee=0.0005, horizon=1):
