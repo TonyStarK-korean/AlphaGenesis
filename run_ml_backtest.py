@@ -144,7 +144,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
         try:
             # 데이터 전처리 및 검증
             if pd.isna(row['close']) or row['close'] <= 0:
-                logger.warning(f"유효하지 않은 종가 데이터: {idx}, close: {row['close']}")
+                logger.warning(f"[{idx}] 유효하지 않은 종가 데이터: close={row['close']}")
                 continue
                 
             # 현재 시장 상황 분석
@@ -191,13 +191,13 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             # 포지션 업데이트
             if signal == 1 and position <= 0:  # 롱 진입
                 position = 1
-                logger.info(f"{idx}: 롱 진입 (예측: {predicted_return:.4f}, 레버리지: {current_leverage})")
+                logger.info(f"[{idx}] 롱 진입 (예측: {predicted_return:.4f}, 레버리지: {current_leverage:.2f})")
             elif signal == -1 and position >= 0:  # 숏 진입
                 position = -1
-                logger.info(f"{idx}: 숏 진입 (예측: {predicted_return:.4f}, 레버리지: {current_leverage})")
+                logger.info(f"[{idx}] 숏 진입 (예측: {predicted_return:.4f}, 레버리지: {current_leverage:.2f})")
             elif signal == 0 and position != 0:  # 청산
                 position = 0
-                logger.info(f"{idx}: 포지션 청산")
+                logger.info(f"[{idx}] 포지션 청산")
             
             # 수익률 계산 (안전한 방식)
             if i > 0:
@@ -246,11 +246,12 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             if (i + 1) % 1000 == 0 or i == len(test_data) - 1:
                 elapsed = time.time() - start_time
                 eta = elapsed / (i + 1) * (len(test_data) - (i + 1)) if (i + 1) > 0 else 0
-                logger.info(f"진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s")
-                print(f"진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s", flush=True)
+                current_idx = test_data.iloc[i].name if i < len(test_data) else "완료"
+                logger.info(f"[{current_idx}] 진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s")
+                print(f"[{current_idx}] 진행률: {i+1}/{len(test_data)} ({((i+1)/len(test_data)*100):.1f}%) | 경과: {elapsed:.1f}s | 예상 남은시간: {eta:.1f}s", flush=True)
                 
         except Exception as e:
-            logger.error(f"백테스트 중 오류 발생: {e} | phase: {locals().get('phase', None)}, idx: {idx}, row: {row.to_dict() if hasattr(row, 'to_dict') else row}")
+            logger.error(f"[{idx}] 백테스트 중 오류 발생: {e} | row: {row.to_dict() if hasattr(row, 'to_dict') else row}")
             # 에러 발생 시에도 기본값으로 결과 저장
             results['timestamp'].append(idx)
             results['capital'].append(current_capital)
