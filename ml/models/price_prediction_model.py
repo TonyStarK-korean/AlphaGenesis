@@ -154,13 +154,18 @@ class PricePredictionModel:
 
     def predict(self, df):
         try:
+            # 모델 훈련 상태 체크
+            if not hasattr(self, 'models') or not self.models:
+                print("[ML 모델] 모델이 초기화되지 않았습니다.")
+                return np.zeros(len(df) if hasattr(df, '__len__') else 1)
+            
+            # feature_names 체크
+            if not hasattr(self, 'feature_names') or self.feature_names is None:
+                print("[ML 모델] feature_names가 None입니다. 모델을 다시 훈련해야 합니다.")
+                return np.zeros(len(df) if hasattr(df, '__len__') else 1)
+            
             target_col = 'close'
             df_feat = make_features(df)
-            
-            # feature_names가 None인 경우 처리
-            if self.feature_names is None:
-                print("[ML 모델] feature_names가 None입니다. 모델을 다시 훈련해야 합니다.")
-                return np.zeros(len(df_feat))
             
             # 필요한 컬럼이 없는 경우 처리
             missing_features = [col for col in self.feature_names if col not in df_feat.columns]
@@ -177,20 +182,53 @@ class PricePredictionModel:
                 X = np.nan_to_num(X, nan=0.0)
             
             preds = []
+            trained_models = 0
+            
             for name, model in self.models.items():
                 try:
-                    pred = model.predict(X)
-                    preds.append(pred)
+                    # 모델이 훈련되었는지 체크
+                    if hasattr(model, 'predict') and hasattr(model, 'fit'):
+                        # scikit-learn 모델의 경우
+                        if hasattr(model, 'estimators_') or hasattr(model, 'coef_') or hasattr(model, 'intercept_'):
+                            pred = model.predict(X)
+                            preds.append(pred)
+                            trained_models += 1
+                        # XGBoost 모델의 경우
+                        elif hasattr(model, 'booster') and model.booster is not None:
+                            pred = model.predict(X)
+                            preds.append(pred)
+                            trained_models += 1
+                        # LightGBM 모델의 경우
+                        elif hasattr(model, 'booster_') and model.booster_ is not None:
+                            pred = model.predict(X)
+                            preds.append(pred)
+                            trained_models += 1
+                        else:
+                            print(f"[ML 모델] {name} 모델이 훈련되지 않았습니다.")
+                            preds.append(np.zeros(len(X)))
+                    else:
+                        print(f"[ML 모델] {name} 모델이 유효하지 않습니다.")
+                        preds.append(np.zeros(len(X)))
+                        
                 except Exception as e:
                     print(f"[ML 모델] {name} 모델 예측 실패: {e}")
                     # 예측 실패 시 0으로 대체
                     preds.append(np.zeros(len(X)))
             
+            if trained_models == 0:
+                print("[ML 모델] 훈련된 모델이 없습니다.")
+                return np.zeros(len(df_feat))
+            
             if not preds:
                 print("[ML 모델] 모든 모델 예측 실패")
                 return np.zeros(len(df_feat))
             
-            return np.mean(preds, axis=0)
+            # 훈련된 모델들의 예측만 평균
+            valid_preds = [pred for pred in preds if not np.all(pred == 0)]
+            if valid_preds:
+                return np.mean(valid_preds, axis=0)
+            else:
+                return np.zeros(len(df_feat))
             
         except Exception as e:
             print(f"[ML 모델] 예측 중 오류 발생: {e}")
