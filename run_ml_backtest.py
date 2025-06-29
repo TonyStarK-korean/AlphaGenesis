@@ -871,18 +871,35 @@ def get_dynamic_leverage(regime, ml_pred, volatility):
 def get_dynamic_position_size(ml_pred, signal_strength):
     base_size = 0.05  # 기본 5%
     
-    if signal_strength == 2:  # 강한 신호
-        if ml_pred > 0.01:
+    # ML 예측 신호 강도에 따른 비중 조절
+    if abs(ml_pred) > 0.02:  # 강한 신호 (2% 이상)
+        if signal_strength == 2:  # 강한 신호
+            return 0.20  # 20%
+        elif signal_strength == 1:  # 중간 신호
             return 0.15  # 15%
-        elif ml_pred > 0.005:
+        else:
             return 0.12  # 12%
-    elif signal_strength == 1:  # 중간 신호
-        if ml_pred > 0.005:
+    elif abs(ml_pred) > 0.01:  # 중간 신호 (1-2%)
+        if signal_strength == 2:
+            return 0.15  # 15%
+        elif signal_strength == 1:
+            return 0.12  # 12%
+        else:
+            return 0.10  # 10%
+    elif abs(ml_pred) > 0.005:  # 약한 신호 (0.5-1%)
+        if signal_strength == 2:
+            return 0.12  # 12%
+        elif signal_strength == 1:
             return 0.10  # 10%
         else:
             return 0.08  # 8%
-    
-    return base_size
+    else:  # 매우 약한 신호
+        if signal_strength == 2:
+            return 0.08  # 8%
+        elif signal_strength == 1:
+            return 0.06  # 6%
+        else:
+            return base_size  # 5%
 
 # 실전형 손절/익절 계산 (레버리지 반영)
 def get_risk_management(leverage, ml_pred):
