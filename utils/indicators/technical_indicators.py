@@ -17,7 +17,7 @@ class TechnicalIndicators:
 
     @staticmethod
     def ema(series, window):
-        return series.ewm(span=window, adjust=False).mean()
+        return series.ewm(span=max(1, window), adjust=False).mean()
 
     @staticmethod
     def macd(series, fast=12, slow=26, signal=9):
