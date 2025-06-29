@@ -176,6 +176,15 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
         'trade_log': []
     }
 
+    # 월별 성과 추적
+    monthly_performance = {}
+    last_monthly_report = None
+    trade_count = 0
+    winning_trades = 0
+    total_profit = 0
+    peak_capital = initial_capital
+    max_drawdown = 0
+
     for idx, row in test_data.iterrows():
         try:
             timestamp = row.name if hasattr(row, 'name') else row.get('timestamp', idx)
@@ -201,6 +210,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 timestamp = timestamp.astimezone(pytz.timezone('Asia/Seoul'))
             
             timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M")
+            current_month = timestamp.strftime("%Y-%m")
             # 시장국면 판별
             regime = detect_market_regime(row)
             strategy_name, candidate_symbols = REGIME_STRATEGY_MAP.get(regime, ('mean_reversion', ['BTC']))
@@ -325,6 +335,52 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             results['realized_pnl'].append(realized_pnl)
             results['unrealized_pnl'].append(unrealized_pnl)
             results['open_positions'].append(len(positions))
+
+            # 월별 성과 추적
+            if current_month not in monthly_performance:
+                monthly_performance[current_month] = {
+                    'total_capital': total_capital,
+                    'current_capital': current_capital,
+                    'realized_pnl': realized_pnl,
+                    'unrealized_pnl': unrealized_pnl,
+                    'open_positions': len(positions),
+                    'trade_log': []
+                }
+            monthly_performance[current_month]['total_capital'] = total_capital
+            monthly_performance[current_month]['current_capital'] = current_capital
+            monthly_performance[current_month]['realized_pnl'] = realized_pnl
+            monthly_performance[current_month]['unrealized_pnl'] = unrealized_pnl
+            monthly_performance[current_month]['open_positions'] = len(positions)
+            monthly_performance[current_month]['trade_log'].append(log_msg)
+
+            # 월별 성과 분석
+            if last_monthly_report is None:
+                last_monthly_report = current_month
+                trade_count = 1
+                winning_trades = 1 if realized_pnl > 0 else 0
+                total_profit = realized_pnl
+                peak_capital = total_capital
+                max_drawdown = 0 if realized_pnl > 0 else (peak_capital - total_capital) / peak_capital * 100
+            else:
+                if current_month != last_monthly_report:
+                    # 월별 성과 보고
+                    report_msg = f"{last_monthly_report} | 트레이드 수: {trade_count} | 최종 자산: {total_capital:,.0f}원 | 총 수익률: {(total_capital - monthly_performance[last_monthly_report]['total_capital']) / monthly_performance[last_monthly_report]['total_capital'] * 100:.2f}% | 총 수익금: {(total_capital - monthly_performance[last_monthly_report]['total_capital']) - (monthly_performance[last_monthly_report]['realized_pnl'] + monthly_performance[last_monthly_report]['unrealized_pnl']):,.0f}원 | 최대 낙폭: {max_drawdown:.2f}%"
+                    logger.info(report_msg)
+                    send_log_to_dashboard(report_msg)
+                    results['trade_log'].append(report_msg)
+                    # 월별 성과 초기화
+                    last_monthly_report = current_month
+                    trade_count = 1
+                    winning_trades = 1 if realized_pnl > 0 else 0
+                    total_profit = realized_pnl
+                    peak_capital = total_capital
+                    max_drawdown = 0 if realized_pnl > 0 else (peak_capital - total_capital) / peak_capital * 100
+                else:
+                    trade_count += 1
+                    winning_trades += 1 if realized_pnl > 0 else 0
+                    total_profit += realized_pnl
+                    peak_capital = max(peak_capital, total_capital)
+                    max_drawdown = max(max_drawdown, (peak_capital - total_capital) / peak_capital * 100)
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
