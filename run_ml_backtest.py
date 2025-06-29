@@ -151,6 +151,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     entry_signal = None
     entry_pred = None
     entry_capital = None
+    entry_strategy = None
 
     for i in range(len(test_data)):
         idx, row = test_data.iloc[i].name, test_data.iloc[i]
@@ -200,7 +201,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 predicted_return = 0
             
             # 거래 신호 생성
-            signal = generate_trading_signal(predicted_return, row, current_leverage)
+            signal, strategy_desc = generate_trading_signal(predicted_return, row, current_leverage)
             
             # 포지션 업데이트
             if signal == 1 and position <= 0:  # 롱 진입
@@ -211,7 +212,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 entry_signal = 'LONG'
                 entry_pred = predicted_return
                 entry_capital = current_capital
-                logger.info(f"[진입] {entry_signal} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 전략값: {entry_pred:.4f} | 총자산: {current_capital:,.0f}원")
+                entry_strategy = strategy_desc
+                logger.info(f"[진입] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 총자산: {current_capital:,.0f}원")
             elif signal == -1 and position >= 0:  # 숏 진입
                 position = -1
                 entry_idx = idx
@@ -220,9 +222,9 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 entry_signal = 'SHORT'
                 entry_pred = predicted_return
                 entry_capital = current_capital
-                logger.info(f"[진입] {entry_signal} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 전략값: {entry_pred:.4f} | 총자산: {current_capital:,.0f}원")
+                entry_strategy = strategy_desc
+                logger.info(f"[진입] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 총자산: {current_capital:,.0f}원")
             elif signal == 0 and position != 0:  # 청산
-                # 청산 정보 계산
                 exit_idx = idx
                 exit_price = row['close']
                 if entry_price is not None and entry_leverage is not None and entry_capital is not None:
@@ -233,7 +235,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     else:
                         pnl_rate = 0
                     profit = entry_capital * pnl_rate
-                    logger.info(f"[청산] {entry_signal} | 진입시점: {entry_idx} | 청산시점: {exit_idx} | 진입가: {entry_price:.2f} | 청산가: {exit_price:.2f} | 레버리지: {entry_leverage:.2f} | 전략값: {entry_pred:.4f} | 수익률: {pnl_rate*100:.2f}% | 수익금: {profit:,.0f}원 | 총자산: {current_capital:,.0f}원")
+                    logger.info(f"[청산] {entry_signal} | 전략: {entry_strategy} | 진입시점: {entry_idx} | 청산시점: {exit_idx} | 진입가: {entry_price:.2f} | 청산가: {exit_price:.2f} | 레버리지: {entry_leverage:.2f} | 수익률: {pnl_rate*100:.2f}% | 수익금: {profit:,.0f}원 | 총자산: {current_capital:,.0f}원")
                 else:
                     logger.info(f"[청산] 정보 부족 (진입 정보 없음)")
                 position = 0
@@ -243,6 +245,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 entry_signal = None
                 entry_pred = None
                 entry_capital = None
+                entry_strategy = None
             
             # 수익률 계산 (안전한 방식)
             if i > 0:
@@ -343,31 +346,26 @@ def analyze_market_condition(row: pd.Series) -> MarketCondition:
     else:
         return MarketCondition.SIDEWAYS
 
-def generate_trading_signal(predicted_return: float, row: pd.Series, leverage: float) -> int:
-    """거래 신호 생성"""
-    
-    # 예측 수익률 임계값
+def generate_trading_signal(predicted_return: float, row: pd.Series, leverage: float):
+    """거래 신호 생성 + 한글 전략 설명 반환"""
     threshold = 0.001  # 0.1%
-    
-    # 추가 필터링 조건
     rsi = row.get('rsi_14', 50)
     volatility = row.get('volatility_20', 0.05)
-    
     # 과매수/과매도 조건
-    if rsi > 80 or rsi < 20:
-        return 0  # 청산
-    
+    if rsi > 80:
+        return 0, "RSI 과매수 조건"
+    if rsi < 20:
+        return 0, "RSI 과매도 조건"
     # 고변동성 조건
     if volatility > 0.15:
-        return 0  # 청산
-    
+        return 0, "고변동성 조건"
     # 신호 생성
     if predicted_return > threshold:
-        return 1  # 롱
+        return 1, "예측 수익률 상승 신호"
     elif predicted_return < -threshold:
-        return -1  # 숏
+        return -1, "예측 수익률 하락 신호"
     else:
-        return 0  # 홀드
+        return 0, "기본 전략 (신호 없음)"
 
 def analyze_backtest_results(results: dict, initial_capital: float):
     """백테스트 결과 분석"""
