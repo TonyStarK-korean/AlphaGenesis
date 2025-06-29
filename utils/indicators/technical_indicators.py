@@ -11,8 +11,8 @@ class TechnicalIndicators:
         delta = series.diff()
         up = delta.clip(lower=0)
         down = -1 * delta.clip(upper=0)
-        ma_up = up.rolling(window).mean()
-        ma_down = down.rolling(window).mean()
+        ma_up = up.rolling(max(1, window)).mean()
+        ma_down = down.rolling(max(1, window)).mean()
         return 100 - (100 / (1 + ma_up / (ma_down + 1e-9))) 
 
     @staticmethod
