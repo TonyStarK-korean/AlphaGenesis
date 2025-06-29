@@ -476,27 +476,6 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                             total_profit += profit
                             peak_capital = max(peak_capital, total_capital)
                             max_drawdown = max(max_drawdown, (peak_capital - total_capital) / peak_capital * 100) if peak_capital > 0 else 0
-                            
-                            # 월별 성과 업데이트 (청산 시)
-                            if current_month not in monthly_performance:
-                                monthly_performance[current_month] = {
-                                    'total_capital': total_capital,
-                                    'current_capital': current_capital,
-                                    'realized_pnl': realized_pnl,
-                                    'unrealized_pnl': unrealized_pnl,
-                                    'open_positions': len(positions),
-                                    'trade_count': 0,
-                                    'winning_trades': 0,
-                                    'trade_log': []
-                                }
-                            monthly_performance[current_month]['total_capital'] = total_capital
-                            monthly_performance[current_month]['current_capital'] = current_capital
-                            monthly_performance[current_month]['realized_pnl'] = realized_pnl
-                            monthly_performance[current_month]['unrealized_pnl'] = unrealized_pnl
-                            monthly_performance[current_month]['open_positions'] = len(positions)
-                            if 'log_msg' in locals():
-                                monthly_performance[current_month]['trade_log'].append(log_msg)
-                            del positions[pos_key]
             
             # 리스크 추적 리셋 (일/주/월)
             current_date = timestamp.date()
@@ -583,15 +562,6 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     total_profit = 0
                     peak_capital = total_capital
                     max_drawdown = 0
-                
-                    # 거래 통계 업데이트 (청산 시에만)
-                    if 'should_close' in locals() and should_close:
-                        trade_count += 1
-                        if profit > 0:
-                            winning_trades += 1
-                        total_profit += profit
-                        peak_capital = max(peak_capital, total_capital)
-                        max_drawdown = max(max_drawdown, (peak_capital - total_capital) / peak_capital * 100) if peak_capital > 0 else 0
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
