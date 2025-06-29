@@ -307,4 +307,11 @@ class AdaptivePhaseManager:
         
     def get_market_condition_history(self) -> List[Dict]:
         """시장 국면 변화 기록 반환"""
-        return self.market_condition_history 
+        return self.market_condition_history
+
+    def update_phase(self, market_condition):
+        if market_condition == "BULL":
+            self.current_phase = PhaseType.PHASE1_AGGRESSIVE
+        else:
+            self.current_phase = PhaseType.PHASE2_DEFENSIVE
+        return self.current_phase 
