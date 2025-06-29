@@ -15,8 +15,8 @@ class MarketDataGenerator:
         df = pd.DataFrame({'close': price, 'volume': volume}, index=dates)
         return df
 
-    def generate_historical_data(self, years=3, start_date=None, end_date=None, freq='D', symbols=None):
-        """여러 심볼에 대해 랜덤 OHLCV 데이터 생성"""
+    def generate_historical_data(self, years=3, start_date=None, end_date=None, timeframe='D', symbols=None):
+        """여러 심볼에 대해 랜덤 OHLCV 데이터 생성 (timeframe 지원)"""
         import pandas as pd
         import numpy as np
 
@@ -28,7 +28,7 @@ class MarketDataGenerator:
             start_date = end_date - pd.DateOffset(years=years)
         else:
             start_date = pd.to_datetime(start_date)
-        dates = pd.date_range(start=start_date, end=end_date, freq=freq)
+        dates = pd.date_range(start=start_date, end=end_date, freq=timeframe)
         n = len(dates)
 
         if symbols is None:
@@ -41,7 +41,7 @@ class MarketDataGenerator:
             df = pd.DataFrame({'close': price, 'volume': volume}, index=dates)
             data[symbol] = df
 
-        # 만약 단일 심볼이면 바로 DataFrame 반환
+        # 단일 심볼이면 바로 DataFrame 반환
         if len(symbols) == 1:
             return data[symbols[0]]
         return data
