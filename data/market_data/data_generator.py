@@ -16,10 +16,6 @@ class MarketDataGenerator:
         return df
 
     def generate_historical_data(self, years=3, start_date=None, end_date=None, timeframe='D', symbols=None):
-        """여러 심볼에 대해 랜덤 OHLCV 데이터 생성 (timeframe 지원)"""
-        import pandas as pd
-        import numpy as np
-
         if end_date is None:
             end_date = pd.Timestamp.today()
         else:
@@ -38,6 +34,7 @@ class MarketDataGenerator:
         for symbol in symbols:
             price = np.cumsum(np.random.randn(n)) + 100
             volume = np.random.randint(100, 1000, n)
+            # 반드시 'close'와 'volume' 컬럼명으로 생성!
             df = pd.DataFrame({'close': price, 'volume': volume}, index=dates)
             data[symbol] = df
 
