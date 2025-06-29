@@ -203,11 +203,15 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 except:
                     timestamp = datetime.now()
             
-            # 한국시간으로 변환
-            if timestamp.tzinfo is None:
-                timestamp = pytz.timezone('Asia/Seoul').localize(timestamp)
+            # timestamp가 datetime 객체인지 확인하고 한국시간으로 변환
+            if isinstance(timestamp, datetime):
+                if timestamp.tzinfo is None:
+                    timestamp = pytz.timezone('Asia/Seoul').localize(timestamp)
+                else:
+                    timestamp = timestamp.astimezone(pytz.timezone('Asia/Seoul'))
             else:
-                timestamp = timestamp.astimezone(pytz.timezone('Asia/Seoul'))
+                # 문자열인 경우 기본 datetime으로 변환
+                timestamp = datetime.now(pytz.timezone('Asia/Seoul'))
             
             timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M")
             current_month = timestamp.strftime("%Y-%m")
