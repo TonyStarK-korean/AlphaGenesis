@@ -316,16 +316,16 @@ def analyze_market_condition(row: pd.Series) -> MarketCondition:
 
 def generate_trading_signal(predicted_return: float, row: pd.Series, leverage: float):
     """거래 신호 생성 + 한글 전략 설명 반환"""
-    threshold = 0.001  # 0.1%
+    threshold = 0.0002  # 기존 0.001에서 완화
     rsi = row.get('rsi_14', 50)
     volatility = row.get('volatility_20', 0.05)
-    # 과매수/과매도 조건
-    if rsi > 80:
+    # 과매수/과매도 조건 완화
+    if rsi > 85:
         return 0, "RSI 과매수 조건"
-    if rsi < 20:
+    if rsi < 15:
         return 0, "RSI 과매도 조건"
-    # 고변동성 조건
-    if volatility > 0.15:
+    # 고변동성 조건 완화
+    if volatility > 0.2:
         return 0, "고변동성 조건"
     # 신호 생성
     if predicted_return > threshold:
