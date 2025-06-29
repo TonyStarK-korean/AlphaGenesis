@@ -29,8 +29,8 @@ class TechnicalIndicators:
 
     @staticmethod
     def bollinger_bands(series, window=20, num_std=2):
-        ma = series.rolling(window).mean()
-        std = series.rolling(window).std()
+        ma = series.rolling(max(1, window)).mean()
+        std = series.rolling(max(1, window)).std()
         upper = ma + num_std * std
         lower = ma - num_std * std
         return ma, upper, lower
@@ -38,15 +38,15 @@ class TechnicalIndicators:
     @staticmethod
     def vwap(df, window=20):
         pv = df['close'] * df['volume']
-        vwap = pv.rolling(window).sum() / df['volume'].rolling(window).sum()
+        vwap = pv.rolling(max(1, window)).sum() / df['volume'].rolling(max(1, window)).sum()
         return vwap
 
     @staticmethod
     def stoch_kd(series, window_k=14, window_d=3):
-        low_min = series.rolling(window_k).min()
-        high_max = series.rolling(window_k).max()
+        low_min = series.rolling(max(1, window_k)).min()
+        high_max = series.rolling(max(1, window_k)).max()
         k = 100 * (series - low_min) / (high_max - low_min + 1e-9)
-        d = k.rolling(window_d).mean()
+        d = k.rolling(max(1, window_d)).mean()
         return k, d
 
     def add_all_indicators(self, df):
