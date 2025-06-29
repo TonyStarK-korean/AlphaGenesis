@@ -304,7 +304,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     'position_ratio': position_ratio
                 }
                 log_msg = (
-                    f"[{timestamp_str}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {current_leverage:.2f}배 | 비중: {position_ratio*100:.1f}% | 진입: {'매수' if direction=='LONG' else '매도'} | 종목: {symbol} | 진입가: {row['close']:.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f}"
+                    f"[{timestamp_str}] | 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {current_leverage:.2f}배 | 비중: {position_ratio*100:.1f}% | 진입: {'매수' if direction=='LONG' else '매도'} | 종목: {symbol} | 진입가: {row['close']:,.2f} | 진입금액: {entry_amount:,.0f} | 남은자본: {current_capital:,.0f} | 신호근거: {reason}"
                 )
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
@@ -332,7 +332,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         entry['profit'] = profit
                         entry['pnl_rate'] = pnl_rate
                         log_msg = (
-                            f"[{timestamp_str}] 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {lev:.2f}배 | 비중: {entry['position_ratio']*100:.1f}% | 청산: {'매수' if pos_dir=='LONG' else '매도'} | 종목: {pos_key[0]} | 진입가: {entry_price:.2f} | 청산가: {row['close']:.2f} | 수익률: {pnl_rate*100:+.2f}% | 수익금: {profit:+,.0f} | 총자산: {current_capital:,.0f}"
+                            f"[{timestamp_str}] | 시장국면: {regime} | 전략: {strategy_name} | 레버리지: {lev:.2f}배 | 비중: {entry['position_ratio']*100:.1f}% | 청산: {'매수' if pos_dir=='LONG' else '매도'} | 종목: {pos_key[0]} | 진입가: {entry_price:,.2f} | 청산가: {row['close']:,.2f} | 수익률: {pnl_rate*100:+.2f}% | 수익금: {profit:+,.0f} | 총자산: {current_capital:,.0f} | 신호근거: {entry['reason']}"
                         )
                         logger.info(log_msg)
                         send_log_to_dashboard(log_msg)
@@ -395,7 +395,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             else:
                 if current_month != last_monthly_report:
                     # 월별 성과 보고
-                    report_msg = f"{last_monthly_report} | 트레이드 수: {trade_count} | 최종 자산: {total_capital:,.0f}원 | 총 수익률: {(total_capital - monthly_performance[last_monthly_report]['total_capital']) / monthly_performance[last_monthly_report]['total_capital'] * 100:.2f}% | 총 수익금: {(total_capital - monthly_performance[last_monthly_report]['total_capital']) - (monthly_performance[last_monthly_report]['realized_pnl'] + monthly_performance[last_monthly_report]['unrealized_pnl']):,.0f}원 | 최대 낙폭: {max_drawdown:.2f}%"
+                    report_msg = f"[월간 리포트] {last_monthly_report} | 트레이드 수: {trade_count} | 최종 자산: {total_capital:,.0f}원 | 총 수익률: {(total_capital - monthly_performance[last_monthly_report]['total_capital']) / monthly_performance[last_monthly_report]['total_capital'] * 100:+.2f}% | 총 수익금: {(total_capital - monthly_performance[last_monthly_report]['total_capital']) - (monthly_performance[last_monthly_report]['realized_pnl'] + monthly_performance[last_monthly_report]['unrealized_pnl']):+,.0f}원 | 최대 낙폭: {max_drawdown:+.2f}%"
                     logger.info(report_msg)
                     send_log_to_dashboard(report_msg)
                     results['trade_log'].append(report_msg)
@@ -505,67 +505,27 @@ def generate_trading_signal(predicted_return: float, row: pd.Series, leverage: f
         return 0, "기본 전략 (신호 없음)"
 
 def analyze_backtest_results(results: dict, initial_capital: float):
-    """백테스트 결과 분석"""
+    """백테스트 결과 분석 (한글 실전형)"""
     logger = logging.getLogger(__name__)
     df_results = pd.DataFrame(results)
     if df_results.empty or len(df_results['total_capital']) == 0:
         logger.error("백테스트 결과 데이터가 비어 있습니다. (루프 내 예외/데이터 없음 등 원인)")
         return
-    
-    # 전체 성과
-    final_capital = df_results['total_capital'].iloc[-1]
+    final_capital = df_results['total_capital'].dropna().iloc[-1]
     total_return = (final_capital - initial_capital) / initial_capital * 100
     profit = final_capital - initial_capital
     peak_capital = df_results['total_capital'].max()
-    max_drawdown = (peak_capital - df_results['total_capital'].min()) / peak_capital * 100
-    profitable_trades = len(df_results[df_results['realized_pnl'] > 0])
-    total_trades = len(df_results[df_results['direction'] != None])
+    min_capital = df_results['total_capital'].min()
+    max_drawdown = (peak_capital - min_capital) / peak_capital * 100
+    profitable_trades = len([x for x in df_results['realized_pnl'] if x is not None and x > 0])
+    total_trades = len([x for x in df_results['realized_pnl'] if x is not None])
     win_rate = profitable_trades / total_trades * 100 if total_trades > 0 else 0
-
-    # 백테스트 기간 정보
     start_time = df_results['timestamp'].iloc[0] if len(df_results['timestamp']) > 0 else "N/A"
     end_time = df_results['timestamp'].iloc[-1] if len(df_results['timestamp']) > 0 else "N/A"
-
-    logger.info("=== 백테스트 성과 요약 ===")
-    logger.info(f"백테스트 기간: {start_time} ~ {end_time}")
-    logger.info(f"최종 자본: {final_capital:,.0f}원")
-    logger.info(f"총 수익률: {total_return:.2f}%")
-    logger.info(f"총 수익금(손실금): {profit:,.0f}원")
-    logger.info(f"최대 낙폭: {max_drawdown:.2f}%")
-    logger.info(f"총 거래 횟수: {total_trades}")
-    logger.info(f"승률: {win_rate:.1f}%")
-
-    # 종목별 성과
-    if 'symbol' in df_results:
-        logger.info("--- 종목별 성과 ---")
-        for symbol, group in df_results.groupby('symbol'):
-            sym_final = group['total_capital'].iloc[-1]
-            sym_return = (sym_final - initial_capital) / initial_capital * 100
-            sym_profit = sym_final - initial_capital
-            sym_peak = group['total_capital'].max()
-            sym_mdd = (sym_peak - group['total_capital'].min()) / sym_peak * 100
-            sym_trades = len(group[group['direction'] != None])
-            sym_win = len(group[group['realized_pnl'] > 0])
-            sym_winrate = sym_win / sym_trades * 100 if sym_trades > 0 else 0
-            sym_start = group['timestamp'].iloc[0] if len(group['timestamp']) > 0 else "N/A"
-            sym_end = group['timestamp'].iloc[-1] if len(group['timestamp']) > 0 else "N/A"
-            logger.info(f"[{symbol}] 기간: {sym_start} ~ {sym_end} | 최종 자본: {sym_final:,.0f}원 | 수익률: {sym_return:.2f}% | 수익금: {sym_profit:,.0f}원 | 최대 낙폭: {sym_mdd:.2f}% | 거래: {sym_trades} | 승률: {sym_winrate:.1f}%")
-
-    # 전략(phase)별 성과
-    if 'phase' in df_results:
-        logger.info("--- 전략(phase)별 성과 ---")
-        for phase, group in df_results.groupby('phase'):
-            ph_final = group['total_capital'].iloc[-1]
-            ph_return = (ph_final - initial_capital) / initial_capital * 100
-            ph_profit = ph_final - initial_capital
-            ph_peak = group['total_capital'].max()
-            ph_mdd = (ph_peak - group['total_capital'].min()) / ph_peak * 100
-            ph_trades = len(group[group['direction'] != None])
-            ph_win = len(group[group['realized_pnl'] > 0])
-            ph_winrate = ph_win / ph_trades * 100 if ph_trades > 0 else 0
-            ph_start = group['timestamp'].iloc[0] if len(group['timestamp']) > 0 else "N/A"
-            ph_end = group['timestamp'].iloc[-1] if len(group['timestamp']) > 0 else "N/A"
-            logger.info(f"[{phase}] 기간: {ph_start} ~ {ph_end} | 최종 자본: {ph_final:,.0f}원 | 수익률: {ph_return:.2f}% | 수익금: {ph_profit:,.0f}원 | 최대 낙폭: {ph_mdd:.2f}% | 거래: {ph_trades} | 승률: {ph_winrate:.1f}%")
+    logger.info("\n=== 백테스트 실전형 성과 요약 ===")
+    logger.info(f"기간: {start_time} ~ {end_time}")
+    logger.info(f"최종 자산: {final_capital:,.0f}원 | 총 수익률: {total_return:+.2f}% | 총 수익금: {profit:+,.0f}원 | 최대 낙폭: {max_drawdown:+.2f}% | 총 거래: {total_trades}회 | 승률: {win_rate:.1f}%")
+    # 종목별/전략별/국면별 등 추가 요약 필요시 여기에 한글 실전형 포맷으로 추가
 
     # 결과 저장
     df_results.to_csv('data/backtest_data/ml_backtest_results.csv', index=False)
@@ -720,6 +680,10 @@ def get_dynamic_position_size(base_ratio, market_condition, predicted_return):
     base_ratio = min(max(base_ratio, 0.03), 0.3)  # 3%~30%
     return base_ratio
 
+def print_summary(result, label):
+    """실전형 한글 요약 출력"""
+    print(f"[요약] {label} | 최종 자산: {result['final_capital']:,.0f}원 | 총 수익률: {result['total_return']:+.2f}% | 총 수익금: {result['final_capital']-result['initial_capital']:+,.0f}원 | 최대 낙폭: {result['max_drawdown']:+.2f}% | 거래: {result['total_trades']}회 | 승률: {result['win_rate']:.1f}%")
+
 if __name__ == "__main__":
     import pandas as pd
     # 데이터 로드 (예시)
@@ -730,9 +694,5 @@ if __name__ == "__main__":
     print("[동적비중 백테스트]")
     result_dynamic = run_ml_backtest(df, initial_capital=initial_capital, use_dynamic_position=True)
     # 결과 비교 출력 (예시)
-    def print_summary(result, label):
-        trades = result.get('trade_log', [])
-        final_capital = result.get('final_capital', None)
-        print(f"{label} | 트레이드 수: {len(trades)} | 최종 자산: {final_capital if final_capital else 'N/A'}")
     print_summary(result_fixed, '고정비중')
     print_summary(result_dynamic, '동적비중') 
