@@ -22,6 +22,11 @@ import calendar
 # 경고 메시지 필터링
 warnings.filterwarnings("ignore", message="X does not have valid feature names, but.*")
 warnings.filterwarnings("ignore", category=UserWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+
+# scikit-learn 경고 완전 제거
+os.environ['PYTHONWARNINGS'] = 'ignore'
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
