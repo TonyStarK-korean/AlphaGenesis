@@ -7,6 +7,7 @@ ML 모델 백테스트 실행 파일
 import sys
 import os
 import logging
+import warnings
 from datetime import datetime, timedelta
 import pandas as pd
 import numpy as np
@@ -17,6 +18,10 @@ import re
 import optuna
 import json, requests
 import calendar
+
+# 경고 메시지 필터링
+warnings.filterwarnings("ignore", message="X does not have valid feature names, but.*")
+warnings.filterwarnings("ignore", category=UserWarning)
 
 # 프로젝트 루트 경로 추가
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
