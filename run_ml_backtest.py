@@ -291,9 +291,9 @@ def analyze_market_condition(row: pd.Series) -> MarketCondition:
     
     # 시장 상황 판단
     if rsi > 70 and ma_20 > ma_50 and volatility < 0.08:
-        return MarketCondition.BULL_MARKET
+        return MarketCondition.BULL
     elif rsi < 30 and ma_20 < ma_50 and volatility < 0.08:
-        return MarketCondition.BEAR_MARKET
+        return MarketCondition.BEAR
     elif volatility > 0.10:
         return MarketCondition.HIGH_VOLATILITY
     elif volatility < 0.03:
