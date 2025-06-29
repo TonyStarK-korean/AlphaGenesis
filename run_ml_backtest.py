@@ -118,14 +118,23 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     for i in range(len(test_data)):
         idx, row = test_data.iloc[i].name, test_data.iloc[i]
         try:
+            # 데이터 전처리 및 검증
+            if pd.isna(row['close']) or row['close'] <= 0:
+                logger.warning(f"유효하지 않은 종가 데이터: {idx}, close: {row['close']}")
+                continue
+                
             # 현재 시장 상황 분석
             market_condition = analyze_market_condition(row)
             
             # 변동성 계산 (20일)
             volatility = row.get('volatility_20', 0.05)
+            if pd.isna(volatility) or volatility < 0:
+                volatility = 0.05
             
             # RSI
             rsi = row.get('rsi_14', 50)
+            if pd.isna(rsi) or rsi < 0 or rsi > 100:
+                rsi = 50
             
             # 동적 레버리지 계산
             current_leverage = leverage_manager.update_leverage(
@@ -145,6 +154,8 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 prediction = ml_model.predict(prediction_data, model_type='ensemble')
                 if len(prediction) > 0:
                     predicted_return = prediction[-1]
+                    if pd.isna(predicted_return):
+                        predicted_return = 0
                 else:
                     predicted_return = 0
             else:
@@ -164,29 +175,36 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 position = 0
                 logger.info(f"{idx}: 포지션 청산")
             
-            # 수익률 계산
+            # 수익률 계산 (안전한 방식)
             if i > 0:
-                actual_return = (row['close'] - test_data.iloc[i-1]['close']) / test_data.iloc[i-1]['close']
-                if position == 1:  # 롱
-                    capital_change = actual_return * current_leverage
-                elif position == -1:  # 숏
-                    capital_change = -actual_return * current_leverage
-                else:
+                prev_close = test_data.iloc[i-1]['close']
+                if pd.isna(prev_close) or prev_close <= 0:
+                    actual_return = 0
                     capital_change = 0
-                
-                current_capital *= (1 + capital_change)
-                peak_capital = max(peak_capital, current_capital)
-                
-                # 연속 승/패 업데이트
-                if capital_change > 0:
-                    consecutive_wins += 1
-                    consecutive_losses = 0
-                elif capital_change < 0:
-                    consecutive_losses += 1
-                    consecutive_wins = 0
                 else:
-                    consecutive_wins = 0
-                    consecutive_losses = 0
+                    actual_return = (row['close'] - prev_close) / prev_close
+                    if position == 1:  # 롱
+                        capital_change = actual_return * current_leverage
+                    elif position == -1:  # 숏
+                        capital_change = -actual_return * current_leverage
+                    else:
+                        capital_change = 0
+                
+                # 자본 업데이트 (안전한 방식)
+                if not pd.isna(capital_change) and abs(capital_change) < 1.0:  # 100% 이상 변동 방지
+                    current_capital *= (1 + capital_change)
+                    peak_capital = max(peak_capital, current_capital)
+                    
+                    # 연속 승/패 업데이트
+                    if capital_change > 0:
+                        consecutive_wins += 1
+                        consecutive_losses = 0
+                    elif capital_change < 0:
+                        consecutive_losses += 1
+                        consecutive_wins = 0
+                    else:
+                        consecutive_wins = 0
+                        consecutive_losses = 0
             else:
                 actual_return = 0
                 capital_change = 0
@@ -209,6 +227,14 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 
         except Exception as e:
             logger.error(f"백테스트 중 오류 발생: {e} | phase: {locals().get('phase', None)}, idx: {idx}, row: {row.to_dict() if hasattr(row, 'to_dict') else row}")
+            # 에러 발생 시에도 기본값으로 결과 저장
+            results['timestamp'].append(idx)
+            results['capital'].append(current_capital)
+            results['leverage'].append(1.0)
+            results['position'].append(0)
+            results['prediction'].append(0)
+            results['actual_return'].append(0)
+            results['cumulative_return'].append((current_capital - initial_capital) / initial_capital)
             continue
     
     # 결과 분석
