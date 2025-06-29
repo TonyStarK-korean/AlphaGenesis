@@ -277,11 +277,22 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             if ml_model is not None and prediction_data is not None:
                 if len(prediction_data) > 60:
                     try:
+                        # 모델이 훈련되지 않은 경우 훈련
+                        if not hasattr(ml_model, 'feature_names') or ml_model.feature_names is None:
+                            logger.info(f"[{timestamp_str}] ML 모델 훈련 시작...")
+                            ml_model.fit(prediction_data)
+                            logger.info(f"[{timestamp_str}] ML 모델 훈련 완료")
+                        
                         pred = ml_model.predict(prediction_data)
-                        logger.info(f"[{timestamp_str}] ml_model.predict() 결과: {pred[-5:] if hasattr(pred, '__getitem__') else pred}")
-                        predicted_return = pred[-1]
+                        if pred is not None and len(pred) > 0:
+                            predicted_return = pred[-1]
+                            logger.info(f"[{timestamp_str}] ml_model.predict() 결과: {pred[-5:] if len(pred) >= 5 else pred}")
+                        else:
+                            logger.warning(f"[{timestamp_str}] ml_model.predict() 결과가 None 또는 빈 배열")
+                            predicted_return = 0
                     except Exception as e:
                         logger.error(f"[{timestamp_str}] ml_model.predict() 예외: {e}")
+                        predicted_return = 0
                 else:
                     logger.info(f"[{timestamp_str}] 예측데이터 부족, predicted_return=0")
             # 크로노스 스위칭 신호 생성
