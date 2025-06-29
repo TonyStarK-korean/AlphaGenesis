@@ -42,7 +42,7 @@ def setup_logging():
     formatter = SeoulFormatter('%(name)s - %(levelname)s - %(message)s')
     logging.basicConfig(
         level=logging.INFO,
-        format='%(name)s - %(levelname)s - %(message)s',
+        format='%(message)s',  # 메시지만 출력
         handlers=[
             logging.FileHandler('logs/ml_backtest.log'),
             logging.StreamHandler()
@@ -145,6 +145,13 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     
     # 백테스트 실행
     start_time = time.time()
+    entry_idx = None
+    entry_price = None
+    entry_leverage = None
+    entry_signal = None
+    entry_pred = None
+    entry_capital = None
+
     for i in range(len(test_data)):
         idx, row = test_data.iloc[i].name, test_data.iloc[i]
         try:
@@ -198,13 +205,44 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             # 포지션 업데이트
             if signal == 1 and position <= 0:  # 롱 진입
                 position = 1
-                logger.info(f"[{idx}] 롱 진입 (예측: {predicted_return:.4f}, 레버리지: {current_leverage:.2f})")
+                entry_idx = idx
+                entry_price = row['close']
+                entry_leverage = current_leverage
+                entry_signal = 'LONG'
+                entry_pred = predicted_return
+                entry_capital = current_capital
+                logger.info(f"[진입] {entry_signal} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 전략값: {entry_pred:.4f} | 총자산: {current_capital:,.0f}원")
             elif signal == -1 and position >= 0:  # 숏 진입
                 position = -1
-                logger.info(f"[{idx}] 숏 진입 (예측: {predicted_return:.4f}, 레버리지: {current_leverage:.2f})")
+                entry_idx = idx
+                entry_price = row['close']
+                entry_leverage = current_leverage
+                entry_signal = 'SHORT'
+                entry_pred = predicted_return
+                entry_capital = current_capital
+                logger.info(f"[진입] {entry_signal} | 진입시점: {entry_idx} | 진입가: {entry_price:.2f} | 레버리지: {entry_leverage:.2f} | 전략값: {entry_pred:.4f} | 총자산: {current_capital:,.0f}원")
             elif signal == 0 and position != 0:  # 청산
+                # 청산 정보 계산
+                exit_idx = idx
+                exit_price = row['close']
+                if entry_price is not None and entry_leverage is not None and entry_capital is not None:
+                    if position == 1:  # 롱 청산
+                        pnl_rate = (exit_price - entry_price) / entry_price * entry_leverage
+                    elif position == -1:  # 숏 청산
+                        pnl_rate = (entry_price - exit_price) / entry_price * entry_leverage
+                    else:
+                        pnl_rate = 0
+                    profit = entry_capital * pnl_rate
+                    logger.info(f"[청산] {entry_signal} | 진입시점: {entry_idx} | 청산시점: {exit_idx} | 진입가: {entry_price:.2f} | 청산가: {exit_price:.2f} | 레버리지: {entry_leverage:.2f} | 전략값: {entry_pred:.4f} | 수익률: {pnl_rate*100:.2f}% | 수익금: {profit:,.0f}원 | 총자산: {current_capital:,.0f}원")
+                else:
+                    logger.info(f"[청산] 정보 부족 (진입 정보 없음)")
                 position = 0
-                logger.info(f"[{idx}] 포지션 청산")
+                entry_idx = None
+                entry_price = None
+                entry_leverage = None
+                entry_signal = None
+                entry_pred = None
+                entry_capital = None
             
             # 수익률 계산 (안전한 방식)
             if i > 0:
