@@ -52,26 +52,50 @@ def setup_logging():
     return logging.getLogger(__name__)
 
 def generate_historical_data(years: int = 3) -> pd.DataFrame:
-    """과거 데이터 생성 (몇 년치)"""
+    """히스토리컬 데이터 생성"""
     logger = logging.getLogger(__name__)
-    logger.info(f"{years}년치 과거 데이터 생성 시작")
     
-    # 데이터 생성기 초기화
-    data_generator = MarketDataGenerator()
+    # 기본 설정
+    start_date = datetime.now() - timedelta(days=years * 365)
+    end_date = datetime.now()
     
-    # 시작 날짜 (3년 전)
-    start_date = datetime.now() - timedelta(days=365 * years)
+    # 시간 간격 (1시간)
+    time_delta = timedelta(hours=1)
+    current_date = start_date
     
-    # 데이터 생성
-    df = data_generator.generate_historical_data(
-        start_date=start_date,
-        end_date=datetime.now(),
-        symbols=['BTC/USDT', 'ETH/USDT', 'BNB/USDT'],
-        timeframe='1h'
-    )
+    data = []
+    base_price = 50000  # 기본 가격 (항상 양수)
     
-    logger.info(f"데이터 생성 완료: {len(df)} 개 데이터 포인트")
-    # 데이터 생성 후 바로 아래 코드 추가
+    while current_date <= end_date:
+        # 가격 변동 (항상 양수 보장)
+        price_change = np.random.normal(0, 0.02)  # 2% 표준편차
+        base_price = max(base_price * (1 + price_change), 1000)  # 최소 1000원 보장
+        
+        # 거래량
+        volume = max(int(np.random.normal(1000, 500)), 100)  # 최소 100개 보장
+        
+        data.append({
+            'timestamp': current_date,
+            'open': base_price * (1 + np.random.normal(0, 0.005)),
+            'high': base_price * (1 + abs(np.random.normal(0, 0.01))),
+            'low': base_price * (1 - abs(np.random.normal(0, 0.01))),
+            'close': base_price,
+            'volume': volume,
+            'symbol': 'BNB/USDT'
+        })
+        
+        current_date += time_delta
+    
+    df = pd.DataFrame(data)
+    
+    # 데이터 검증 및 정리
+    for col in ['open', 'high', 'low', 'close']:
+        df[col] = df[col].abs()  # 절댓값으로 음수 제거
+        df[col] = df[col].fillna(df[col].mean())  # NaN 값 처리
+    
+    df['volume'] = df['volume'].abs().fillna(1000)  # 거래량도 양수 보장
+    
+    logger.info(f"히스토리컬 데이터 생성 완료: {len(df)} 개 데이터")
     return df
 
 def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=None):
