@@ -182,18 +182,17 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             # 시장국면 판별
             regime = detect_market_regime(row)
             strategy_name, candidate_symbols = REGIME_STRATEGY_MAP.get(regime, ('mean_reversion', ['BTC']))
-            # 종목군 중 실제 데이터에 있는 종목만 필터링
             symbol = row.get('symbol', candidate_symbols[0])
             if symbol not in candidate_symbols:
                 symbol = candidate_symbols[0]
-            # 전략별 상세 근거 생성
             regime_desc = f"시장국면: {regime}"
             strategy_desc = f"전략: {strategy_name}"
-            # 예측/지표 근거
             predicted_return = row.get('predicted_return', 0)
             rsi = row.get('rsi_14', 50)
             vol = row.get('volatility_20', 0.05)
             reason = f"예측수익률: {predicted_return:.2%}, RSI: {rsi:.1f}, 변동성: {vol:.2%}"
+            # 레버리지(임시 고정)
+            current_leverage = 1.0
             # 신호 생성
             signal, signal_desc = generate_trading_signal(predicted_return, row, current_leverage)
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
