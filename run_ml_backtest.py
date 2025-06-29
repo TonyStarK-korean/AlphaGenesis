@@ -336,7 +336,12 @@ def analyze_backtest_results(results: dict, initial_capital: float):
     total_trades = len(df_results[df_results['position'] != 0])
     win_rate = profitable_trades / total_trades * 100 if total_trades > 0 else 0
 
+    # 백테스트 기간 정보
+    start_time = df_results['timestamp'].iloc[0] if len(df_results['timestamp']) > 0 else "N/A"
+    end_time = df_results['timestamp'].iloc[-1] if len(df_results['timestamp']) > 0 else "N/A"
+
     logger.info("=== 백테스트 성과 요약 ===")
+    logger.info(f"백테스트 기간: {start_time} ~ {end_time}")
     logger.info(f"최종 자본: {final_capital:,.0f}원")
     logger.info(f"총 수익률: {total_return:.2f}%")
     logger.info(f"총 수익금(손실금): {profit:,.0f}원")
@@ -356,7 +361,9 @@ def analyze_backtest_results(results: dict, initial_capital: float):
             sym_trades = len(group[group['position'] != 0])
             sym_win = len(group[group['actual_return'] > 0])
             sym_winrate = sym_win / sym_trades * 100 if sym_trades > 0 else 0
-            logger.info(f"[{symbol}] 최종 자본: {sym_final:,.0f}원 | 수익률: {sym_return:.2f}% | 수익금: {sym_profit:,.0f}원 | 최대 낙폭: {sym_mdd:.2f}% | 거래: {sym_trades} | 승률: {sym_winrate:.1f}%")
+            sym_start = group['timestamp'].iloc[0] if len(group['timestamp']) > 0 else "N/A"
+            sym_end = group['timestamp'].iloc[-1] if len(group['timestamp']) > 0 else "N/A"
+            logger.info(f"[{symbol}] 기간: {sym_start} ~ {sym_end} | 최종 자본: {sym_final:,.0f}원 | 수익률: {sym_return:.2f}% | 수익금: {sym_profit:,.0f}원 | 최대 낙폭: {sym_mdd:.2f}% | 거래: {sym_trades} | 승률: {sym_winrate:.1f}%")
 
     # 전략(phase)별 성과
     if 'phase' in df_results:
@@ -370,7 +377,9 @@ def analyze_backtest_results(results: dict, initial_capital: float):
             ph_trades = len(group[group['position'] != 0])
             ph_win = len(group[group['actual_return'] > 0])
             ph_winrate = ph_win / ph_trades * 100 if ph_trades > 0 else 0
-            logger.info(f"[{phase}] 최종 자본: {ph_final:,.0f}원 | 수익률: {ph_return:.2f}% | 수익금: {ph_profit:,.0f}원 | 최대 낙폭: {ph_mdd:.2f}% | 거래: {ph_trades} | 승률: {ph_winrate:.1f}%")
+            ph_start = group['timestamp'].iloc[0] if len(group['timestamp']) > 0 else "N/A"
+            ph_end = group['timestamp'].iloc[-1] if len(group['timestamp']) > 0 else "N/A"
+            logger.info(f"[{phase}] 기간: {ph_start} ~ {ph_end} | 최종 자본: {ph_final:,.0f}원 | 수익률: {ph_return:.2f}% | 수익금: {ph_profit:,.0f}원 | 최대 낙폭: {ph_mdd:.2f}% | 거래: {ph_trades} | 승률: {ph_winrate:.1f}%")
 
     # 결과 저장
     df_results.to_csv('data/backtest_data/ml_backtest_results.csv', index=False)
