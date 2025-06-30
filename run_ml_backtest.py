@@ -127,16 +127,14 @@ def generate_historical_data(years: int = 3) -> pd.DataFrame:
     logger.info(f"히스토리컬 데이터 생성 완료: {len(df)} 개 데이터")
     return df
 
-def send_log_to_dashboard(log_msg):
-    """웹대시보드에 로그 전송 (실시간 업데이트)"""
+def send_log_to_dashboard(log_msg, timestamp_str=None):
     try:
-        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         dashboard_data = {
-            'timestamp': timestamp,
+            'timestamp': timestamp_str if timestamp_str else datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'log_message': log_msg,
             'type': 'trade_log'
         }
-        requests.post('http://34.47.77.230:5001/api/realtime_log', json={'log': log_msg}, timeout=1)
+        requests.post('http://34.47.77.230:5001/api/realtime_log', json={'log': log_msg, 'timestamp': dashboard_data['timestamp']}, timeout=1)
     except Exception as e:
         print(f"대시보드 전송 오류: {e}")
 
@@ -181,7 +179,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
         'status': '시작',
         'market_condition': market_condition
     }
-    send_backtest_status_to_dashboard(backtest_info)
+    send_backtest_status_to_dashboard(backtest_info, timestamp_str=start_str)
 
     # ML 모델 초기화 및 검증
     ml_model = model if model is not None else PricePredictionModel()
@@ -531,7 +529,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     'pnl_rate': 0,
                     'pnl': 0
                 }
-                send_trade_result_to_dashboard(trade_data)
+                send_trade_result_to_dashboard(trade_data, timestamp_str=timestamp_str)
                 
                 results['trade_log'].append(log_msg)
             
@@ -677,7 +675,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                                 'market_condition': market_condition,
                                 'pnl': profit
                             }
-                            send_trade_result_to_dashboard(close_data)
+                            send_trade_result_to_dashboard(close_data, timestamp_str=timestamp_str)
                             
                             results['trade_log'].append(log_msg)
                             trade_history.append({**entry, 'symbol': pos_key[0], 'direction': pos_dir})
@@ -799,20 +797,62 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     # 결과 분석 및 리포트
     analyze_backtest_results(results, initial_capital)
     
-    # 마지막 월 성과보고서 출력
+    # 마지막 월 성과보고서 출력 (루프 종료 후에만)
     if last_monthly_report and last_monthly_report in monthly_performance:
+        # 월별 데이터 추출
+        perf = monthly_performance[last_monthly_report]
+        start_cap = perf.get('start_capital', initial_capital)
+        end_cap = perf.get('total_capital', 0)
+        realized = perf.get('realized_pnl', 0)
+        unrealized = perf.get('unrealized_pnl', 0)
+        trades = perf.get('trade_count', 0)
+        wins = perf.get('winning_trades', 0)
+        logs = perf.get('trade_log', [])
+        # 월간 수익률/수익금
+        monthly_return = ((end_cap - start_cap) / start_cap * 100) if start_cap > 0 else 0
+        monthly_profit = end_cap - start_cap
+        # 월간 수익률 변동성(샤프지수용)
+        returns = []
+        for log in logs:
+            if '수익률:' in log:
+                try:
+                    r = float(log.split('수익률:')[1].split('%')[0].replace('+','').replace(',',''))
+                    returns.append(r)
+                except:
+                    pass
+        if len(returns) > 1:
+            mean_r = np.mean(returns)
+            std_r = np.std(returns)
+            sharpe = mean_r / std_r if std_r > 0 else 0
+        else:
+            sharpe = 0
+        # 최대 낙폭(HDD)
+        capitals = [start_cap]
+        for log in logs:
+            if '최종자산:' in log:
+                try:
+                    c = float(log.split('최종자산:')[1].split('원')[0].replace(',',''))
+                    capitals.append(c)
+                except:
+                    pass
+        hdd = 0
+        peak = start_cap
+        for c in capitals:
+            if c > peak:
+                peak = c
+            dd = (peak - c) / peak * 100 if peak > 0 else 0
+            if dd > hdd:
+                hdd = dd
+        win_rate = (wins / trades * 100) if trades > 0 else 0
         final_report_msg = f"=== {last_monthly_report} 최종 성과보고서 ==="
         logger.info(final_report_msg)
-        send_log_to_dashboard(final_report_msg)
+        send_log_to_dashboard(final_report_msg, timestamp_str=None)
         results['trade_log'].append(final_report_msg)
-        win_rate = (winning_trades / trade_count * 100) if trade_count > 0 else 0
-        # 최대 낙폭 부호 명확히
-        max_drawdown_str = f"{max_drawdown:+.2f}%" if max_drawdown != 0 else "0.00%"
         final_report_detail = (
-            f"{last_monthly_report} | 총 트레이드: {trade_count} | 승률: {win_rate:.1f}% | 최종 자산: {total_capital:,.0f}원 | 총 수익금: {total_profit:+,.0f}원 | 최대 낙폭: {max_drawdown_str}"
+            f"월: {last_monthly_report} | 총 트레이드: {trades} | 승률: {win_rate:.1f}% | 최종 자산: {end_cap:,.0f}원 | 월 수익금: {monthly_profit:+,.0f}원 | 월 수익률: {monthly_return:+.2f}% | 샤프지수: {sharpe:.2f} | 최대 낙폭(HDD): {hdd:.2f}%"
         )
         logger.info(final_report_detail)
-        send_log_to_dashboard(final_report_detail)
+        send_log_to_dashboard(final_report_detail, timestamp_str=None)
         results['trade_log'].append(final_report_detail)
     
     # 최종 자본을 results에 추가
@@ -2527,11 +2567,10 @@ def run_crypto_backtest(df: pd.DataFrame, initial_capital: float = 10000000, mod
     
     return results
 
-def send_backtest_status_to_dashboard(status_data):
-    """백테스트 상태를 웹대시보드에 전송"""
+def send_backtest_status_to_dashboard(status_data, timestamp_str=None):
     try:
         dashboard_data = {
-            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'timestamp': timestamp_str if timestamp_str else datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'type': 'backtest_status',
             'data': status_data
         }
@@ -2539,11 +2578,10 @@ def send_backtest_status_to_dashboard(status_data):
     except Exception as e:
         print(f"대시보드 상태 전송 오류: {e}")
 
-def send_trade_result_to_dashboard(trade_data):
-    """거래 결과를 웹대시보드에 전송"""
+def send_trade_result_to_dashboard(trade_data, timestamp_str=None):
     try:
         dashboard_data = {
-            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'timestamp': timestamp_str if timestamp_str else datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
             'type': 'trade_result',
             'data': trade_data
         }
