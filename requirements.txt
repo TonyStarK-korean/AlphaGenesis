@@ -31,7 +31,6 @@ ccxt>=2.0.0
 binance-connector>=3.0.0
 
 # 데이터베이스
-sqlite3
 sqlalchemy>=1.4.0
 
 # 유틸리티
@@ -52,5 +51,11 @@ pickle5>=0.0.11
 jinja2>=3.1.0
 werkzeug>=2.2.0
 
+# 하이퍼파라미터 최적화
+optuna>=3.0.0
+
+# 시간대 처리
+pytz>=2022.1
+
 # 추가 라이브러리
-tqdm 
+tqdm>=4.65.0

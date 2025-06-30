@@ -2,13 +2,14 @@ import sys
 import os
 import pandas as pd
 from multiprocessing import Pool, cpu_count
-from run_ml_backtest import run_ml_backtest
-from data.market_data.data_generator import generate_historical_data
+from run_ml_backtest import run_ml_backtest, generate_historical_data
 import json
 
 def run_single_symbol(symbol):
     print(f"{symbol} 데이터 생성 및 백테스트 시작")
-    df = generate_historical_data(years=3, symbols=[symbol])
+    # 3년치 히스토리컬 데이터 생성 (심볼 정보는 데이터에 추가)
+    df = generate_historical_data(years=3)
+    df['symbol'] = symbol  # 심볼 정보 추가
     results = run_ml_backtest(df, initial_capital=10000000)
     # 결과를 파일로 저장
     out_path = f"results_{symbol.replace('/', '_')}.json"
