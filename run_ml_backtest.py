@@ -145,7 +145,18 @@ def send_report_to_dashboard(report_dict):
     except Exception as e:
         pass
 
+def send_dashboard_reset():
+    try:
+        dashboard_data = {
+            'type': 'reset',
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+        requests.post('http://34.47.77.230:5001/api/reset', json=dashboard_data, timeout=1)
+    except Exception as e:
+        print(f"대시보드 리셋 전송 오류: {e}")
+
 def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=None, use_dynamic_position=False):
+    send_dashboard_reset()
     logger = logging.getLogger(__name__)
     logger.info("ML 모델 백테스트 시작")
 
@@ -899,19 +910,19 @@ def generate_trading_signal(predicted_return: float, row: pd.Series, leverage: f
     reason = []
     
     # 1. 숏 전략 우선 체크 (하락장/급락장에서)
-    if regime in ['하락', '급락'] or predicted_return < -0.01:
+    if regime in ['하락', '급락'] or predicted_return < -0.005:
         short_signal = generate_advanced_short_signal(row, predicted_return, regime)
-        if short_signal['signal'] == -1 and short_signal['confidence'] > 0.3:
+        if short_signal['signal'] == -1 and short_signal['confidence'] > 0.15:
             signal = -1  # 숏 신호
             reason = short_signal['reason']
             return signal, reason
     
     # 2. 기존 롱 전략 (상승장/횡보장에서)
-    if predicted_return > 0.01:  # 상승 예측
+    if predicted_return > 0.005:  # 상승 예측
         signal = 1
-        if predicted_return > 0.015:
+        if predicted_return > 0.01:
             reason.append('강한ML상승예측')
-        elif predicted_return > 0.01:
+        elif predicted_return > 0.005:
             reason.append('중간ML상승예측')
     else:
             reason.append('약한ML상승예측')
