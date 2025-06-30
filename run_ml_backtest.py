@@ -128,17 +128,17 @@ def generate_historical_data(years: int = 3) -> pd.DataFrame:
     return df
 
 def send_log_to_dashboard(log_msg):
+    """웹대시보드에 로그 전송 (실시간 업데이트)"""
     try:
-        # 로컬과 원격 대시보드에 모두 전송 (포트 5000 통일)
-        local_dashboard_url = 'http://localhost:5001/api/realtime_log'
-        remote_dashboard_url = 'http://34.47.77.230:5001/api/realtime_log'
-        
-        # 로컬 우선 시도
-        requests.post(local_dashboard_url, json={'log': log_msg}, timeout=1)
-        # 원격도 시도 (실패해도 무시)
-        requests.post(remote_dashboard_url, json={'log': log_msg}, timeout=1)
-    except Exception:
-        pass  # 에러 무시, 아무 메시지도 출력하지 않음
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        dashboard_data = {
+            'timestamp': timestamp,
+            'log_message': log_msg,
+            'type': 'trade_log'
+        }
+        requests.post('http://34.47.77.230:5001/api/realtime_log', json={'log': log_msg}, timeout=1)
+    except Exception as e:
+        print(f"대시보드 전송 오류: {e}")
 
 def send_report_to_dashboard(report_dict):
     try:
@@ -150,6 +150,24 @@ def send_report_to_dashboard(report_dict):
 def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=None, use_dynamic_position=False):
     logger = logging.getLogger(__name__)
     logger.info("ML 모델 백테스트 시작")
+
+    # 시장국면 판별
+    prices = df['close'].values if 'close' in df.columns else df.iloc[:, 0].values
+    market_condition = detect_market_condition_simple(prices)
+    
+    # 백테스트 시작 정보를 대시보드에 전송
+    period_str = f"{df.index[0].strftime('%Y-%m-%d')} ~ {df.index[-1].strftime('%Y-%m-%d')} ({market_condition} 검증)"
+    backtest_info = {
+        'symbol': df.get('symbol', 'BTC/USDT').iloc[0] if 'symbol' in df.columns else 'BTC/USDT',
+        'period': period_str,
+        'total_periods': len(df),
+        'initial_capital': initial_capital,
+        'strategy': '상위 0.01%급 양방향 레버리지 시스템',
+        'features': '다중시간매매 + CVD스캘핑 + 숏전략',
+        'status': '시작',
+        'market_condition': market_condition
+    }
+    send_backtest_status_to_dashboard(backtest_info)
 
     # ML 모델 초기화 및 검증
     ml_model = model if model is not None else PricePredictionModel()
@@ -377,6 +395,9 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 reason = chrono_reason + f" | ML예측: {predicted_return*100:.2f}%"
             else:
                 signal, signal_desc = generate_trading_signal(predicted_return, row, 1.0, regime)
+                # signal_desc가 리스트인 경우 문자열로 변환
+                if isinstance(signal_desc, list):
+                    signal_desc = ' | '.join(signal_desc)
                 reason = signal_desc + f" | ML예측: {predicted_return*100:.2f}%"
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
             
@@ -473,6 +494,26 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 )
                 logger.info(log_msg)
                 send_log_to_dashboard(log_msg)
+                
+                # 거래 상세 정보를 대시보드에 전송
+                trade_data = {
+                    'action': '진입',
+                    'symbol': symbol,
+                    'direction': '매수' if direction == 'LONG' else '매도',
+                    'price': row['close'],
+                    'leverage': current_leverage,
+                    'position_ratio': position_ratio * 100,
+                    'capital': current_capital,
+                    'phase': phase_name,
+                    'strategy': STRATEGY_KOR_MAP.get(strategy_name, strategy_name),
+                    'reason': reason,
+                    'ml_prediction': predicted_return * 100,
+                    'market_condition': market_condition,
+                    'pnl_rate': 0,
+                    'pnl': 0
+                }
+                send_trade_result_to_dashboard(trade_data)
+                
                 results['trade_log'].append(log_msg)
             
             # 피라미딩 체크 (기존 포지션에 추가 진입)
@@ -600,6 +641,25 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                             )
                             logger.info(log_msg)
                             send_log_to_dashboard(log_msg)
+                            
+                            # 청산 상세 정보를 대시보드에 전송
+                            close_data = {
+                                'action': '청산',
+                                'symbol': pos_key[0],
+                                'direction': '매수' if pos_dir == 'LONG' else '매도',
+                                'entry_price': entry_price,
+                                'exit_price': current_price,
+                                'pnl_rate': pnl_rate * 100,
+                                'profit': profit,
+                                'capital': current_capital,
+                                'close_reason': close_reason,
+                                'leverage': lev,
+                                'strategy': STRATEGY_KOR_MAP.get(strategy_name, strategy_name),
+                                'market_condition': market_condition,
+                                'pnl': profit
+                            }
+                            send_trade_result_to_dashboard(close_data)
+                            
                             results['trade_log'].append(log_msg)
                             trade_history.append({**entry, 'symbol': pos_key[0], 'direction': pos_dir})
                             
@@ -2444,6 +2504,51 @@ def run_crypto_backtest(df: pd.DataFrame, initial_capital: float = 10000000, mod
         print(f"   {strategy_kor}: {analysis['trades']}회, 승률 {analysis['win_rate']:.1f}%, 수익 {analysis['total_pnl']:+,.0f}원")
     
     return results
+
+def send_backtest_status_to_dashboard(status_data):
+    """백테스트 상태를 웹대시보드에 전송"""
+    try:
+        dashboard_data = {
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'type': 'backtest_status',
+            'data': status_data
+        }
+        requests.post('http://34.47.77.230:5001/api/status', json=dashboard_data, timeout=1)
+    except Exception as e:
+        print(f"대시보드 상태 전송 오류: {e}")
+
+def send_trade_result_to_dashboard(trade_data):
+    """거래 결과를 웹대시보드에 전송"""
+    try:
+        dashboard_data = {
+            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'type': 'trade_result',
+            'data': trade_data
+        }
+        requests.post('http://34.47.77.230:5001/api/trade', json=dashboard_data, timeout=1)
+    except Exception as e:
+        print(f"대시보드 거래 전송 오류: {e}")
+
+def detect_market_condition_simple(prices, window=100):
+    """시장국면을 5가지로 세분화하여 판별"""
+    if len(prices) < window:
+        return '횡보장'
+    
+    start = prices[-window]
+    end = prices[-1]
+    ret = (end - start) / start
+    
+    # 5가지 시장국면으로 세분화
+    if ret >= 0.15:  # 15% 이상 급등
+        return '급등장'
+    elif ret >= 0.05:  # 5~15% 상승
+        return '상승장'
+    elif ret >= -0.05:  # -5~5% 횡보
+        return '횡보장'
+    elif ret >= -0.15:  # -15~-5% 하락
+        return '하락장'
+    else:  # -15% 이하 급락
+        return '급락장'
 
 if __name__ == "__main__":
     import pandas as pd
