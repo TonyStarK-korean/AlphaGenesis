@@ -1614,17 +1614,17 @@ def generate_advanced_short_signal(row: pd.Series, ml_pred: float, regime: str) 
     }
     
     # 1. ML 예측 기반 숏 신호
-    if ml_pred < -0.015:  # 강한 하락 예측
+    if ml_pred < -0.007:  # 강한 하락 예측
         short_signal['signal'] = -1
         short_signal['strength'] = 2
         short_signal['confidence'] += 0.4
         short_signal['reason'].append('강한ML하락예측')
-    elif ml_pred < -0.01:  # 중간 하락 예측
+    elif ml_pred < -0.003:  # 중간 하락 예측
         short_signal['signal'] = -1
         short_signal['strength'] = 1
         short_signal['confidence'] += 0.3
         short_signal['reason'].append('중간ML하락예측')
-    elif ml_pred < -0.005:  # 약한 하락 예측
+    elif ml_pred < -0.001:  # 약한 하락 예측
         short_signal['signal'] = -1
         short_signal['strength'] = 1
         short_signal['confidence'] += 0.2
@@ -1723,11 +1723,11 @@ def get_short_leverage_settings(regime: str, ml_pred: float, volatility: float) 
         min_leverage = 1.0
     
     # ML 예측에 따른 조정
-    if ml_pred < -0.015:  # 강한 하락 예측
+    if ml_pred < -0.007:  # 강한 하락 예측
         leverage_multiplier = 1.4
-    elif ml_pred < -0.01:  # 중간 하락 예측
+    elif ml_pred < -0.003:  # 중간 하락 예측
         leverage_multiplier = 1.2
-    elif ml_pred < -0.005:  # 약한 하락 예측
+    elif ml_pred < -0.001:  # 약한 하락 예측
         leverage_multiplier = 1.1
     else:
         leverage_multiplier = 1.0
@@ -1987,22 +1987,22 @@ def generate_crypto_trading_signal(row: pd.Series, ml_pred: float, regime: str) 
     }
     
     # 1. ML 예측 기반 신호
-    if ml_pred > 0.015:  # 강한 상승 예측
+    if ml_pred > 0.007:  # 강한 상승 예측
         crypto_signal['signal'] = 1
         crypto_signal['strength'] = 3
         crypto_signal['confidence'] += 0.4
         crypto_signal['reason'].append('강한ML상승예측')
-    elif ml_pred > 0.01:  # 중간 상승 예측
+    elif ml_pred > 0.003:  # 중간 상승 예측
         crypto_signal['signal'] = 1
         crypto_signal['strength'] = 2
         crypto_signal['confidence'] += 0.3
         crypto_signal['reason'].append('중간ML상승예측')
-    elif ml_pred < -0.015:  # 강한 하락 예측
+    elif ml_pred < -0.007:  # 강한 하락 예측
         crypto_signal['signal'] = -1
         crypto_signal['strength'] = 3
         crypto_signal['confidence'] += 0.4
         crypto_signal['reason'].append('강한ML하락예측')
-    elif ml_pred < -0.01:  # 중간 하락 예측
+    elif ml_pred < -0.003:  # 중간 하락 예측
         crypto_signal['signal'] = -1
         crypto_signal['strength'] = 2
         crypto_signal['confidence'] += 0.3
