@@ -19,8 +19,8 @@ import subprocess
 def send_log_to_dashboard(log_msg):
     """대시보드로 로그 전송 (로컬과 원격 모두)"""
     urls = [
-        'http://localhost:5000/api/realtime_log',    # 로컬 테스트용
-        'http://34.47.77.230:5000/api/realtime_log'  # 원격 대시보드
+        'http://localhost:5001/api/realtime_log',    # 로컬 테스트용
+        'http://34.47.77.230:5001/api/realtime_log'  # 원격 대시보드
     ]
     
     for url in urls:

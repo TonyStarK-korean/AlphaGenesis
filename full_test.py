@@ -43,7 +43,7 @@ def send_test_log(message):
     """테스트 로그를 대시보드로 전송"""
     try:
         response = requests.post(
-            'http://localhost:5000/api/realtime_log',
+            'http://localhost:5001/api/realtime_log',
             json={'log': message},
             timeout=2
         )

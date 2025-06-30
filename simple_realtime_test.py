@@ -14,8 +14,8 @@ import json
 def send_log_to_dashboard(log_msg):
     """대시보드로 로그 전송"""
     urls = [
-        'http://localhost:5000/api/realtime_log',
-        'http://34.47.77.230:5000/api/realtime_log'
+        'http://localhost:5001/api/realtime_log',
+        'http://34.47.77.230:5001/api/realtime_log'
     ]
     
     success = False

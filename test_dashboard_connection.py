@@ -12,7 +12,7 @@ from datetime import datetime
 def send_log_to_dashboard(log_msg):
     """대시보드로 로그 전송"""
     try:
-        url = 'http://localhost:5000/api/realtime_log'
+        url = 'http://localhost:5001/api/realtime_log'
         response = requests.post(url, json={'log': log_msg}, timeout=2)
         print(f"✅ 로그 전송 성공: {response.status_code}")
     except Exception as e:

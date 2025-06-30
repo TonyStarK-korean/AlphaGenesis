@@ -130,8 +130,8 @@ def generate_historical_data(years: int = 3) -> pd.DataFrame:
 def send_log_to_dashboard(log_msg):
     try:
         # 로컬과 원격 대시보드에 모두 전송 (포트 5000 통일)
-        local_dashboard_url = 'http://localhost:5000/api/realtime_log'
-        remote_dashboard_url = 'http://34.47.77.230:5000/api/realtime_log'
+        local_dashboard_url = 'http://localhost:5001/api/realtime_log'
+        remote_dashboard_url = 'http://34.47.77.230:5001/api/realtime_log'
         
         # 로컬 우선 시도
         requests.post(local_dashboard_url, json={'log': log_msg}, timeout=1)
