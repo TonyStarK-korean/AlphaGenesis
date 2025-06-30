@@ -156,7 +156,21 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
     market_condition = detect_market_condition_simple(prices)
     
     # 백테스트 시작 정보를 대시보드에 전송
-    period_str = f"{df.index[0].strftime('%Y-%m-%d')} ~ {df.index[-1].strftime('%Y-%m-%d')} ({market_condition} 검증)"
+    # 인덱스 타입 확인 및 적절한 날짜 형식 생성
+    start_date = df.index[0]
+    end_date = df.index[-1]
+    
+    if hasattr(start_date, 'strftime'):
+        start_str = start_date.strftime('%Y-%m-%d')
+    else:
+        start_str = str(start_date)
+    
+    if hasattr(end_date, 'strftime'):
+        end_str = end_date.strftime('%Y-%m-%d')
+    else:
+        end_str = str(end_date)
+    
+    period_str = f"{start_str} ~ {end_str} ({market_condition} 검증)"
     backtest_info = {
         'symbol': df.get('symbol', 'BTC/USDT').iloc[0] if 'symbol' in df.columns else 'BTC/USDT',
         'period': period_str,
@@ -296,8 +310,13 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 # 인덱스 기반 날짜 생성 (테스트 데이터용)
                 start_date = datetime(2023, 1, 1)
                 timestamp = start_date + timedelta(hours=idx)
-            timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M")
-            current_month = timestamp.strftime("%Y-%m")
+            
+            if hasattr(timestamp, 'strftime'):
+                timestamp_str = timestamp.strftime("%Y-%m-%d %H:%M")
+                current_month = timestamp.strftime("%Y-%m")
+            else:
+                timestamp_str = str(timestamp)
+                current_month = str(timestamp)[:7]  # YYYY-MM 형식 추출
             
             # === Phase 전환 체크 ===
             current_drawdown = (peak_capital - current_capital) / peak_capital if current_capital < peak_capital else 0
@@ -2269,7 +2288,10 @@ def run_crypto_backtest(df: pd.DataFrame, initial_capital: float = 10000000, mod
     
     for idx, (timestamp, row) in enumerate(df.iterrows()):
         try:
-            timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M')
+            if hasattr(timestamp, 'strftime'):
+                timestamp_str = timestamp.strftime('%Y-%m-%d %H:%M')
+            else:
+                timestamp_str = str(timestamp)
             
             # ML 예측
             if model:
