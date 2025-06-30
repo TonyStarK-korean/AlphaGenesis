@@ -380,7 +380,6 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 reason = signal_desc + f" | ML예측: {predicted_return*100:.2f}%"
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
             
-<<<<<<< HEAD
             # === 개선된 동적 레버리지 계산 ===
             if signal == -1:  # 숏 전략
                 # 숏 전용 레버리지 설정
@@ -427,17 +426,6 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 logger.info(f"[{timestamp_str}] === 매매 현황 === | Phase: {phase_name} | 총자산: {current_capital:,.0f} | 실현손익: {realized_pnl:+,.0f} | 미실현손익: {unrealized_pnl:+,.0f} | 수익률: {pnl_rate:+.2f}% | 보유포지션: {open_positions_count}개")
                 logger.info(f"[{timestamp_str}] === Phase 상태 === | 연속승리: {consecutive_wins}회 | 연속손실: {consecutive_losses}회 | 낙폭: {current_drawdown*100:.2f}% | 레버리지: {current_leverage:.2f}배 ({leverage_reason})")
                 if positions:
-=======
-            # 매매 현황 로그 (매매 발생시 또는 포지션 보유시에만 출력)
-            open_positions_count = len([p for p in positions.values() if p['status'] == 'OPEN'])
-            trade_occurred = direction is not None or any(entry.get('status') == 'OPEN' for entry in positions.values())
-            
-            if (idx % 100 == 0 and open_positions_count > 0) or trade_occurred:
-                total_pnl = realized_pnl + unrealized_pnl
-                pnl_rate = (total_pnl / initial_capital) * 100
-                if open_positions_count > 0:  # 포지션이 있을 때만 상세 로그 출력
-                    logger.info(f"[{timestamp_str}] === 매매 현황 === | 총자산: {current_capital:,.0f} | 실현손익: {realized_pnl:+,.0f} | 미실현손익: {unrealized_pnl:+,.0f} | 수익률: {pnl_rate:+.2f}% | 보유포지션: {open_positions_count}개")
->>>>>>> c9b0f8e81c4e09828fe33eecc40ff536ee421253
                     logger.info("┌────────┬─────┬────────┬────────┬────────┬────────┬────────┬────────┐")
                     logger.info("│  종목  │ 방향 │ 진입가 │ 현재가 │ 평가손익 │ 수익률 │ 레버리지 │ 진입시각 │")
                     logger.info("├────────┼─────┼────────┼────────┼────────┼────────┼────────┼────────┤")
