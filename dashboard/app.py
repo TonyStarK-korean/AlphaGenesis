@@ -287,6 +287,45 @@ def receive_realtime_log():
     try:
         data = request.get_json()
         log_msg = data.get('log', '')
+        
+        # 로그를 파일에 저장
+        with open('dashboard/realtime_logs.txt', 'a', encoding='utf-8') as f:
+            f.write(f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')} - {log_msg}\n")
+        
+        # 실시간 데이터 파싱 및 업데이트
+        if '총자산:' in log_msg and '수익률:' in log_msg:
+            import re
+            # 총자산 파싱
+            capital_match = re.search(r'총자산: ([\d,]+)', log_msg)
+            if capital_match:
+                dashboard_manager.real_time_data['current_capital'] = float(capital_match.group(1).replace(',', ''))
+            
+            # 수익률 파싱
+            return_match = re.search(r'수익률: ([+-]?[\d.]+)%', log_msg)
+            if return_match:
+                dashboard_manager.real_time_data['total_return'] = float(return_match.group(1))
+            
+            # 실현손익 파싱
+            realized_pnl_match = re.search(r'실현손익: ([+-]?[\d,]+)', log_msg)
+            if realized_pnl_match:
+                dashboard_manager.real_time_data['realized_pnl'] = float(realized_pnl_match.group(1).replace(',', ''))
+            
+            # 미실현손익 파싱
+            unrealized_pnl_match = re.search(r'미실현손익: ([+-]?[\d,]+)', log_msg)
+            if unrealized_pnl_match:
+                dashboard_manager.real_time_data['unrealized_pnl'] = float(unrealized_pnl_match.group(1).replace(',', ''))
+            
+            # 포지션 수 파싱
+            position_match = re.search(r'보유포지션: (\d+)개', log_msg)
+            if position_match:
+                dashboard_manager.real_time_data['open_positions'] = int(position_match.group(1))
+        
+        # ML 예측값 파싱
+        ml_pred_match = re.search(r'ML예측: ([+-]?[\d.]+)%', log_msg)
+        if ml_pred_match:
+            dashboard_manager.real_time_data['ml_prediction'] = float(ml_pred_match.group(1))
+                
+        dashboard_manager.real_time_data['last_update'] = datetime.now()
         print(f"[실시간 로그] {log_msg}")
         return jsonify({'status': 'received'})
     except Exception as e:
@@ -297,8 +336,28 @@ def receive_report():
     """백테스트 리포트 수신 API"""
     try:
         data = request.get_json()
-        print(f"[백테스트 리포트] {data}")
-        return jsonify({'status': 'received'})
+        
+        # 리포트를 파일에 저장
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        report_path = f'dashboard/reports/report_{timestamp}.json'
+        os.makedirs('dashboard/reports', exist_ok=True)
+        
+        with open(report_path, 'w', encoding='utf-8') as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        
+        # 최신 리포트 정보 업데이트
+        if isinstance(data, dict):
+            dashboard_manager.real_time_data.update({
+                'current_capital': data.get('current_capital', dashboard_manager.real_time_data.get('current_capital', 0)),
+                'realized_pnl': data.get('realized_pnl', 0),
+                'unrealized_pnl': data.get('unrealized_pnl', 0),
+                'open_positions': data.get('open_positions', 0),
+                'total_return': data.get('total_return', 0),
+                'last_update': datetime.now()
+            })
+        
+        print(f"[백테스트 리포트] 저장위치: {report_path}")
+        return jsonify({'status': 'received', 'saved_to': report_path})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

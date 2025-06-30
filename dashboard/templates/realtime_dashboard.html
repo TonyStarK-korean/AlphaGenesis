@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 AlphaGenesis 실시간 백테스트 대시보드</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #333;
+            min-height: 100vh;
+        }
+        
+        .header {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 20px;
+            text-align: center;
+            color: white;
+            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .card {
+            background: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+        }
+        
+        .stat-card {
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .stat-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #4CAF50, #2196F3, #FF9800);
+        }
+        
+        .stat-icon {
+            font-size: 3em;
+            margin-bottom: 15px;
+            color: #667eea;
+        }
+        
+        .stat-value {
+            font-size: 2.2em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 1.1em;
+        }
+        
+        .positive { color: #4CAF50; }
+        .negative { color: #f44336; }
+        .neutral { color: #2196F3; }
+        
+        .chart-container {
+            position: relative;
+            height: 400px;
+            margin-top: 20px;
+        }
+        
+        .logs-container {
+            grid-column: 1 / -1;
+            max-height: 400px;
+            overflow-y: auto;
+            background: #1e1e1e;
+            color: #00ff00;
+            font-family: 'Courier New', monospace;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.5);
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 5px 10px;
+            border-left: 3px solid #00ff00;
+            background: rgba(0, 255, 0, 0.1);
+            border-radius: 3px;
+        }
+        
+        .log-timestamp {
+            color: #888;
+            font-size: 0.9em;
+        }
+        
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+            animation: pulse 2s infinite;
+        }
+        
+        .status-online { background-color: #4CAF50; }
+        .status-offline { background-color: #f44336; }
+        
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7); }
+            70% { box-shadow: 0 0 0 10px rgba(76, 175, 80, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(76, 175, 80, 0); }
+        }
+        
+        .strategy-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+        }
+        
+        .regime-badge {
+            display: inline-block;
+            padding: 5px 15px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            font-weight: bold;
+            color: white;
+        }
+        
+        .regime-급등 { background: #ff6b6b; }
+        .regime-상승 { background: #4ecdc4; }
+        .regime-횡보 { background: #45b7d1; }
+        .regime-하락 { background: #f9ca24; }
+        .regime-급락 { background: #6c5ce7; }
+        
+        .footer {
+            text-align: center;
+            padding: 20px;
+            color: rgba(255, 255, 255, 0.8);
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🚀 AlphaGenesis 실시간 백테스트 대시보드</h1>
+        <p><span class="status-indicator status-online"></span>실시간 모니터링 중...</p>
+    </div>
+    
+    <div class="container">
+        <div class="dashboard-grid">
+            <!-- 총자산 카드 -->
+            <div class="card stat-card">
+                <div class="stat-icon"><i class="fas fa-coins"></i></div>
+                <div class="stat-value" id="current-capital">₩10,000,000</div>
+                <div class="stat-label">현재 총자산</div>
+            </div>
+            
+            <!-- 수익률 카드 -->
+            <div class="card stat-card">
+                <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                <div class="stat-value" id="total-return">0.00%</div>
+                <div class="stat-label">총 수익률</div>
+            </div>
+            
+            <!-- 실현손익 카드 -->
+            <div class="card stat-card">
+                <div class="stat-icon"><i class="fas fa-money-bill-wave"></i></div>
+                <div class="stat-value" id="realized-pnl">₩0</div>
+                <div class="stat-label">실현손익</div>
+            </div>
+            
+            <!-- 미실현손익 카드 -->
+            <div class="card stat-card">
+                <div class="stat-icon"><i class="fas fa-balance-scale"></i></div>
+                <div class="stat-value" id="unrealized-pnl">₩0</div>
+                <div class="stat-label">미실현손익</div>
+            </div>
+            
+            <!-- 포지션 수 카드 -->
+            <div class="card stat-card">
+                <div class="stat-icon"><i class="fas fa-briefcase"></i></div>
+                <div class="stat-value" id="open-positions">0</div>
+                <div class="stat-label">보유포지션</div>
+            </div>
+            
+            <!-- ML 예측값 카드 -->
+            <div class="card stat-card">
+                <div class="stat-icon"><i class="fas fa-brain"></i></div>
+                <div class="stat-value" id="ml-prediction">0.00%</div>
+                <div class="stat-label">ML 예측값</div>
+            </div>
+            
+            <!-- 전략 & 시장국면 카드 -->
+            <div class="card stat-card">
+                <div class="stat-icon"><i class="fas fa-chess-knight"></i></div>
+                <div class="strategy-badge" id="current-strategy">크로노스</div>
+                <br><br>
+                <div class="regime-badge regime-횡보" id="current-regime">횡보</div>
+                <div class="stat-label" style="margin-top: 10px;">전략 & 시장국면</div>
+            </div>
+            
+            <!-- 거래 통계 카드 -->
+            <div class="card stat-card">
+                <div class="stat-icon"><i class="fas fa-chart-bar"></i></div>
+                <div class="stat-value" id="trades-count">0</div>
+                <div class="stat-label">총 거래 횟수</div>
+            </div>
+        </div>
+        
+        <!-- 자산 변화 차트 -->
+        <div class="card">
+            <h3><i class="fas fa-chart-area"></i> 실시간 자산 변화</h3>
+            <div class="chart-container">
+                <canvas id="capitalChart"></canvas>
+            </div>
+        </div>
+        
+        <!-- 실시간 로그 -->
+        <div class="card logs-container">
+            <h3 style="color: #00ff00; margin-bottom: 15px;"><i class="fas fa-terminal"></i> 실시간 거래 로그</h3>
+            <div id="logs-display"></div>
+        </div>
+    </div>
+    
+    <div class="footer">
+        <p>© 2024 AlphaGenesis Trading System - 실시간 백테스트 모니터링</p>
+        <p>마지막 업데이트: <span id="last-update">--:--:--</span></p>
+    </div>
+
+    <script>
+        // 차트 초기화
+        const ctx = document.getElementById('capitalChart').getContext('2d');
+        const capitalChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: '총자산 (원)',
+                    data: [],
+                    borderColor: '#667eea',
+                    backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                    borderWidth: 3,
+                    fill: true,
+                    tension: 0.4
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        display: true,
+                        position: 'top'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: false,
+                        ticks: {
+                            callback: function(value) {
+                                return '₩' + value.toLocaleString();
+                            }
+                        }
+                    }
+                },
+                animation: {
+                    duration: 300
+                }
+            }
+        });
+        
+        // 실시간 데이터 업데이트 함수
+        function updateDashboard() {
+            fetch('/api/realtime_data')
+                .then(response => response.json())
+                .then(data => {
+                    // 통계 업데이트
+                    document.getElementById('current-capital').textContent = '₩' + data.current_capital.toLocaleString();
+                    document.getElementById('current-capital').className = 'stat-value ' + (data.total_return > 0 ? 'positive' : data.total_return < 0 ? 'negative' : 'neutral');
+                    
+                    document.getElementById('total-return').textContent = data.total_return.toFixed(2) + '%';
+                    document.getElementById('total-return').className = 'stat-value ' + (data.total_return > 0 ? 'positive' : data.total_return < 0 ? 'negative' : 'neutral');
+                    
+                    document.getElementById('realized-pnl').textContent = '₩' + data.realized_pnl.toLocaleString();
+                    document.getElementById('realized-pnl').className = 'stat-value ' + (data.realized_pnl > 0 ? 'positive' : data.realized_pnl < 0 ? 'negative' : 'neutral');
+                    
+                    document.getElementById('unrealized-pnl').textContent = '₩' + data.unrealized_pnl.toLocaleString();
+                    document.getElementById('unrealized-pnl').className = 'stat-value ' + (data.unrealized_pnl > 0 ? 'positive' : data.unrealized_pnl < 0 ? 'negative' : 'neutral');
+                    
+                    document.getElementById('open-positions').textContent = data.open_positions + '개';
+                    document.getElementById('ml-prediction').textContent = data.ml_prediction.toFixed(2) + '%';
+                    document.getElementById('ml-prediction').className = 'stat-value ' + (data.ml_prediction > 0 ? 'positive' : data.ml_prediction < 0 ? 'negative' : 'neutral');
+                    
+                    document.getElementById('current-strategy').textContent = data.strategy;
+                    document.getElementById('current-regime').textContent = data.regime;
+                    document.getElementById('current-regime').className = 'regime-badge regime-' + data.regime;
+                    
+                    document.getElementById('trades-count').textContent = data.trades_count + '회';
+                    
+                    // 차트 업데이트
+                    if (data.capital_history && data.timestamp_history) {
+                        capitalChart.data.labels = data.timestamp_history;
+                        capitalChart.data.datasets[0].data = data.capital_history;
+                        capitalChart.update('none');
+                    }
+                    
+                    // 로그 업데이트
+                    const logsDisplay = document.getElementById('logs-display');
+                    if (data.logs && data.logs.length > 0) {
+                        logsDisplay.innerHTML = '';
+                        data.logs.slice(-20).forEach(log => {
+                            const logEntry = document.createElement('div');
+                            logEntry.className = 'log-entry';
+                            logEntry.innerHTML = `<span class="log-timestamp">[${log.timestamp}]</span> ${log.message}`;
+                            logsDisplay.appendChild(logEntry);
+                        });
+                        logsDisplay.scrollTop = logsDisplay.scrollHeight;
+                    }
+                    
+                    // 마지막 업데이트 시간
+                    document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+                })
+                .catch(error => {
+                    console.error('데이터 업데이트 오류:', error);
+                });
+        }
+        
+        // 1초마다 데이터 업데이트
+        setInterval(updateDashboard, 1000);
+        
+        // 초기 로드
+        updateDashboard();
+    </script>
+</body>
+</html> 

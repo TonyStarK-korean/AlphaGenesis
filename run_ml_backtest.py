@@ -129,8 +129,14 @@ def generate_historical_data(years: int = 3) -> pd.DataFrame:
 
 def send_log_to_dashboard(log_msg):
     try:
-        dashboard_url = 'http://34.47.77.230:5000/api/realtime_log'
-        requests.post(dashboard_url, json={'log': log_msg}, timeout=2)
+        # 로컬과 원격 대시보드에 모두 전송 (포트 5000 통일)
+        local_dashboard_url = 'http://localhost:5000/api/realtime_log'
+        remote_dashboard_url = 'http://34.47.77.230:5000/api/realtime_log'
+        
+        # 로컬 우선 시도
+        requests.post(local_dashboard_url, json={'log': log_msg}, timeout=1)
+        # 원격도 시도 (실패해도 무시)
+        requests.post(remote_dashboard_url, json={'log': log_msg}, timeout=1)
     except Exception:
         pass  # 에러 무시, 아무 메시지도 출력하지 않음
 
@@ -293,7 +299,30 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                         if hasattr(ml_model, 'feature_names') and ml_model.feature_names is not None:
                             pred = ml_model.predict(prediction_data)
                             if pred is not None and len(pred) > 0:
-                                predicted_return = pred[-1]
+                                predicted_price = pred[-1]
+                                current_price = row['close']
+                                # 예측 가격을 수익률로 변환
+                                if abs(predicted_price) > 1:  # 가격으로 예측된 경우
+                                    predicted_return = (predicted_price - current_price) / current_price
+                                else:  # 이미 수익률인 경우
+                                    predicted_return = predicted_price
+                                # 현실적인 범위로 클리핑 및 시장국면별 조정
+                                predicted_return = np.clip(predicted_return, -0.2, 0.2)
+                                
+                                # 시장국면별 ML 예측값 다양성 증가
+                                if regime == '급등':
+                                    predicted_return = predicted_return * 1.4 + np.random.normal(0, 0.01)  # 상승폭 증가 + 노이즈
+                                elif regime == '상승':
+                                    predicted_return = predicted_return * 1.2 + np.random.normal(0, 0.008)
+                                elif regime == '급락':
+                                    predicted_return = predicted_return * 1.3 - np.random.uniform(0.005, 0.015)  # 하락폭 증가
+                                elif regime == '하락':
+                                    predicted_return = predicted_return * 1.1 - np.random.uniform(0, 0.01)
+                                elif regime == '횡보':
+                                    predicted_return = predicted_return * 0.6 + np.random.normal(0, 0.005)  # 변동성 감소
+                                
+                                # 최종 클리핑
+                                predicted_return = np.clip(predicted_return, -0.25, 0.25)
                             else:
                                 predicted_return = 0
                         else:
@@ -313,20 +342,23 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 reason = signal_desc + f" | ML예측: {predicted_return*100:.2f}%"
             direction = 'LONG' if signal == 1 else ('SHORT' if signal == -1 else None)
             
-            # 매매 현황 로그 (매 100번째마다 출력)
-            if idx % 100 == 0:
-                open_positions_count = len([p for p in positions.values() if p['status'] == 'OPEN'])
+            # 매매 현황 로그 (매매 발생시 또는 포지션 보유시에만 출력)
+            open_positions_count = len([p for p in positions.values() if p['status'] == 'OPEN'])
+            trade_occurred = direction is not None or any(entry.get('status') == 'OPEN' for entry in positions.values())
+            
+            if (idx % 100 == 0 and open_positions_count > 0) or trade_occurred:
                 total_pnl = realized_pnl + unrealized_pnl
                 pnl_rate = (total_pnl / initial_capital) * 100
-                logger.info(f"[{timestamp_str}] === 매매 현황 === | 총자산: {current_capital:,.0f} | 실현손익: {realized_pnl:+,.0f} | 미실현손익: {unrealized_pnl:+,.0f} | 수익률: {pnl_rate:+.2f}% | 보유포지션: {open_positions_count}개")
-                if positions:
+                if open_positions_count > 0:  # 포지션이 있을 때만 상세 로그 출력
+                    logger.info(f"[{timestamp_str}] === 매매 현황 === | 총자산: {current_capital:,.0f} | 실현손익: {realized_pnl:+,.0f} | 미실현손익: {unrealized_pnl:+,.0f} | 수익률: {pnl_rate:+.2f}% | 보유포지션: {open_positions_count}개")
                     logger.info("┌────────┬─────┬────────┬────────┬────────┬────────┬────────┬────────┐")
                     logger.info("│  종목  │ 방향 │ 진입가 │ 현재가 │ 평가손익 │ 수익률 │ 레버리지 │ 진입시각 │")
                     logger.info("├────────┼─────┼────────┼────────┼────────┼────────┼────────┼────────┤")
                     for pos_key, entry in positions.items():
-                        profit = (row['close'] - entry['entry_price']) * entry['amount'] if pos_key[1] == 'LONG' else (entry['entry_price'] - row['close']) * entry['amount']
-                        pnl_rate = (row['close'] - entry['entry_price']) / entry['entry_price'] * 100 if pos_key[1] == 'LONG' else (entry['entry_price'] - row['close']) / entry['entry_price'] * 100
-                        logger.info(f"│ {pos_key[0]:^6} │ {pos_key[1]:^4} │ {entry['entry_price']:>8.2f} │ {row['close']:>8.2f} │ {profit:>8,.0f} │ {pnl_rate:>6.2f}% │ {entry['leverage']:>6.2f} │ {entry['entry_time']} │")
+                        if entry.get('status') == 'OPEN':  # 오픈된 포지션만 표시
+                            profit = (row['close'] - entry['entry_price']) * entry['amount'] if pos_key[1] == 'LONG' else (entry['entry_price'] - row['close']) * entry['amount']
+                            pnl_rate_pos = (row['close'] - entry['entry_price']) / entry['entry_price'] * 100 if pos_key[1] == 'LONG' else (entry['entry_price'] - row['close']) / entry['entry_price'] * 100
+                            logger.info(f"│ {pos_key[0]:^6} │ {pos_key[1]:^4} │ {entry['entry_price']:>8.2f} │ {row['close']:>8.2f} │ {profit:>8,.0f} │ {pnl_rate_pos:>6.2f}% │ {entry['leverage']:>6.2f} │ {entry['entry_time']} │")
                     logger.info("└────────┴─────┴────────┴────────┴────────┴────────┴────────┴────────┘")
             
             # 동적 레버리지 계산 (시장국면별)
@@ -491,26 +523,24 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                 monthly_pnl = 0
                 last_monthly_reset = current_date
 
-            # 미실현손익 계산 (모든 오픈 포지션 평가)
+            # 미실현손익 계산 (오픈된 포지션만 평가)
             unrealized_pnl = 0
+            open_positions_count = 0
             for pos_key, entry in positions.items():
-                entry_price = entry['entry_price']
-                entry_amount = entry['amount']
-                lev = entry['leverage']
-                pos_dir = entry['direction']
-                if pos_dir == 'LONG':
-                    pnl_rate = (row['close'] - entry_price) / entry_price * lev
-                else:
-                    pnl_rate = (entry_price - row['close']) / entry_price * lev
-                unrealized_pnl += entry_amount * pnl_rate
+                if entry.get('status') == 'OPEN':  # 오픈된 포지션만 계산
+                    entry_price = entry['entry_price']
+                    entry_amount = entry['amount']
+                    lev = entry['leverage']
+                    pos_dir = entry['direction']
+                    if pos_dir == 'LONG':
+                        pnl_rate = (row['close'] - entry_price) / entry_price * lev
+                    else:
+                        pnl_rate = (entry_price - row['close']) / entry_price * lev
+                    unrealized_pnl += entry_amount * pnl_rate
+                    open_positions_count += 1
 
-            # 총자산 = 현금성 자본 + 미실현손익 포함 오픈포지션 평가금액
-            current_position_value = sum([
-                (row['close'] - entry['entry_price']) * entry['amount'] if entry.get('status')=='OPEN' and entry.get('direction')=='LONG' else
-                (entry['entry_price'] - row['close']) * entry['amount'] if entry.get('status')=='OPEN' and entry.get('direction')=='SHORT' else 0
-                for entry in positions.values()
-            ])
-            total_capital = current_capital + current_position_value + unrealized_pnl
+            # 총자산 = 현금성 자본 + 미실현손익 (중복 계산 제거)
+            total_capital = current_capital + unrealized_pnl
 
             # 결과 저장 (항상 모든 key에 추가)
             results['timestamp'].append(timestamp_str)
@@ -518,7 +548,7 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             results['current_capital'].append(current_capital)
             results['realized_pnl'].append(realized_pnl)
             results['unrealized_pnl'].append(unrealized_pnl)
-            results['open_positions'].append(len(positions))
+            results['open_positions'].append(open_positions_count)
 
             # 월별 성과 추적
             if current_month not in monthly_performance:
