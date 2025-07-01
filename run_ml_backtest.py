@@ -2078,7 +2078,7 @@ def send_backtest_status_to_dashboard(status_data, timestamp_str=None):
             'type': 'backtest_status',
             'data': status_data
         }
-        requests.post('http://34.47.77.230:5001/api/status', json=dashboard_data, timeout=1)
+        requests.post('http://34.47.77.230:5002/api/status', json=dashboard_data, timeout=1)
     except Exception as e:
         print(f"대시보드 상태 전송 오류: {e}")
 
@@ -2089,7 +2089,7 @@ def send_trade_result_to_dashboard(trade_data, timestamp_str=None):
             'type': 'trade_result',
             'data': trade_data
         }
-        requests.post('http://34.47.77.230:5001/api/trade', json=dashboard_data, timeout=1)
+        requests.post('http://34.47.77.230:5002/api/trade', json=dashboard_data, timeout=1)
     except Exception as e:
         print(f"대시보드 거래 전송 오류: {e}")
 
