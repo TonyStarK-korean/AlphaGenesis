@@ -5,7 +5,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 
 # 모든 외부 의존성 모듈을 mock으로 처리
 MOCK_MODE = True
-from flask import Flask, render_template, jsonify, request, send_from_directory
+from flask import Flask, render_template, jsonify, request, send_from_directory, make_response
 from flask_cors import CORS
 import pandas as pd
 import numpy as np
@@ -266,12 +266,20 @@ dashboard_manager = DashboardManager()
 @app.route('/')
 def index():
     """메인 대시보드"""
-    return render_template('main_dashboard.html')
+    response = make_response(render_template('main_dashboard.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/backtest')
 def backtest_dashboard():
     """백테스트 대시보드"""
-    return render_template('backtest_dashboard.html')
+    response = make_response(render_template('backtest_dashboard.html'))
+    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    return response
 
 @app.route('/api/config')
 def get_config():
@@ -537,17 +545,17 @@ dashboard_manager = DashboardManager()
 
 if __name__ == '__main__':
     print("🚀 AlphaGenesis 대시보드 서버 시작")
-    print("📊 대시보드 주소: http://34.47.77.230:5002")
-    print("🔄 백테스트 대시보드: http://34.47.77.230:5002/backtest")
+    print("📊 대시보드 주소: http://34.47.77.230:5001")
+    print("🔄 백테스트 대시보드: http://34.47.77.230:5001/backtest")
     print("⚡ 시스템이 24시간 운영됩니다...")
     
     # 실시간 모니터링 시작
     dashboard_manager.start_monitoring()
     
-    # Flask 서버 실행 (외부 접속 허용, 포트 5002)
+    # Flask 서버 실행 (외부 접속 허용, 포트 5001)
     app.run(
         host='0.0.0.0',  # 모든 IP에서 접속 허용
-        port=5002,       # 포트 5002 사용
+        port=5001,       # 포트 5001 사용
         debug=False,     # 운영 환경에서는 False
         threaded=True    # 멀티스레드 처리
     ) 

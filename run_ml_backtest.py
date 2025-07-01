@@ -15,7 +15,13 @@ import pytz
 from tqdm import tqdm
 import time
 import re
+try:
 import optuna
+    OPTUNA_AVAILABLE = True
+except ImportError:
+    OPTUNA_AVAILABLE = False
+    print("⚠️ Optuna가 설치되지 않았습니다. 최적화 기능은 비활성화됩니다.")
+
 import json, requests
 import calendar
 import argparse
@@ -38,7 +44,7 @@ from data.market_data.data_generator import MarketDataGenerator
 from utils.indicators.technical_indicators import TechnicalIndicators
 
 # 대시보드 API 설정
-DASHBOARD_API_URL = 'http://34.47.77.230:5002'
+DASHBOARD_API_URL = 'http://34.47.77.230:5001'
 SEND_TO_DASHBOARD = True
 
 def setup_logging():
@@ -260,20 +266,32 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
                     ml_pred = ml_pred[0] if len(ml_pred) > 0 else 0
             else:
                 ml_pred = 0
-        except Exception as e:
+                    except Exception as e:
             ml_pred = 0
         
         # 거래 신호 생성
         signal = generate_crypto_trading_signal(row, ml_pred, market_condition)
         
+        # 신호를 액션으로 변환
+        if signal['signal'] == 1:
+            action = 'LONG'
+        elif signal['signal'] == -1:
+            action = 'SHORT'
+                else:
+            action = 'HOLD'
+        
+        # 포지션 크기와 레버리지 설정
+        position_size = 0.1  # 10% 고정
+        leverage = min(signal.get('leverage_suggestion', 2.0), 7.0)  # 최대 7배
+        
         # 자본 변화 시뮬레이션
-        if signal['action'] != 'HOLD':
+        if action != 'HOLD':
             # 간단한 수익률 시뮬레이션
             price_change = np.random.normal(0.001, 0.02)  # 평균 0.1% 수익, 2% 변동성
-            if signal['action'] == 'LONG':
-                trade_return = price_change * signal['position_size'] * signal['leverage']
+            if action == 'LONG':
+                trade_return = price_change * position_size * leverage
             else:  # SHORT
-                trade_return = -price_change * signal['position_size'] * signal['leverage']
+                trade_return = -price_change * position_size * leverage
             
             current_capital += current_capital * trade_return
             
@@ -281,10 +299,10 @@ def run_ml_backtest(df: pd.DataFrame, initial_capital: float = 10000000, model=N
             trade = {
                 'timestamp': idx,
                 'symbol': 'BTC/USDT',
-                'side': signal['action'].lower(),
-                'price': row['close'],
-                'quantity': signal['position_size'],
-                'leverage': signal['leverage'],
+                'side': action.lower(),
+                    'price': row['close'],
+                'quantity': position_size,
+                'leverage': leverage,
                 'profit': current_capital * trade_return,
                 'status': 'closed'
             }
@@ -575,6 +593,7 @@ class KoreanOptunaLogger(logging.Handler):
         msg = translate_optuna_log(msg)
         print(msg)
 
+if OPTUNA_AVAILABLE:
 optuna_logger = optuna.logging.get_logger("optuna")
 optuna_logger.handlers = []
 optuna_logger.addHandler(KoreanOptunaLogger())
@@ -875,7 +894,21 @@ def get_leverage_adjustment_reason(phase, regime, ml_pred, volatility, consecuti
 
 def print_summary(result, label):
     """실전형 한글 요약 출력"""
-    print(f"[요약] {label} | 최종 자산: {result['final_capital']:,.0f}원 | 총 수익률: {result['total_return']:+.2f}% | 총 수익금: {result['final_capital']-result['initial_capital']:+,.0f}원 | 최대 낙폭: {result['max_drawdown']:+.2f}% | 거래: {result['total_trades']}회 | 승률: {result['win_rate']:.1f}%")
+    try:
+        # 필수 필드 안전하게 가져오기
+        final_capital = result.get('final_capital', 0)
+        total_return = result.get('total_return', 0)
+        max_drawdown = result.get('max_drawdown', 0)
+        total_trades = result.get('total_trades', 0)
+        win_rate = result.get('win_rate', 0)
+        initial_capital = result.get('initial_capital', 10000000)  # 기본값 설정
+        
+        total_profit = final_capital - initial_capital
+        
+        print(f"[요약] {label} | 최종 자산: {final_capital:,.0f}원 | 총 수익률: {total_return:+.2f}% | 총 수익금: {total_profit:+,.0f}원 | 최대 낙폭: {max_drawdown:+.2f}% | 거래: {total_trades}회 | 승률: {win_rate:.1f}%")
+    except Exception as e:
+        print(f"[요약 오류] {label} | 결과 출력 중 오류 발생: {e}")
+        print(f"결과 데이터: {result}")
 
 # 전략 한글 변환 맵 (숏 전략 추가)
 STRATEGY_KOR_MAP = {
@@ -2078,7 +2111,7 @@ def send_backtest_status_to_dashboard(status_data, timestamp_str=None):
             'type': 'backtest_status',
             'data': status_data
         }
-        requests.post('http://34.47.77.230:5002/api/status', json=dashboard_data, timeout=1)
+        requests.post('http://34.47.77.230:5001/api/status', json=dashboard_data, timeout=1)
     except Exception as e:
         print(f"대시보드 상태 전송 오류: {e}")
 
@@ -2089,7 +2122,7 @@ def send_trade_result_to_dashboard(trade_data, timestamp_str=None):
             'type': 'trade_result',
             'data': trade_data
         }
-        requests.post('http://34.47.77.230:5002/api/trade', json=dashboard_data, timeout=1)
+        requests.post('http://34.47.77.230:5001/api/trade', json=dashboard_data, timeout=1)
     except Exception as e:
         print(f"대시보드 거래 전송 오류: {e}")
 

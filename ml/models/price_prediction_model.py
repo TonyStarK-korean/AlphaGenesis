@@ -1,18 +1,39 @@
 import numpy as np
 import pandas as pd
 import warnings
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.linear_model import Ridge
-from sklearn.model_selection import TimeSeriesSplit
-from sklearn.metrics import mean_squared_error
-import xgboost as xgb
-import lightgbm as lgb
-import optuna
 import time
-import joblib
-from sklearn.metrics import mean_absolute_error, r2_score
 import os
 import logging
+
+# Try to import optional dependencies
+try:
+    from sklearn.ensemble import RandomForestRegressor
+    from sklearn.linear_model import Ridge
+    from sklearn.model_selection import TimeSeriesSplit
+    from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+    import joblib
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    print("⚠️ scikit-learn이 설치되지 않았습니다. 기본 모델을 사용합니다.")
+
+try:
+    import xgboost as xgb
+    XGBOOST_AVAILABLE = True
+except ImportError:
+    XGBOOST_AVAILABLE = False
+
+try:
+    import lightgbm as lgb
+    LIGHTGBM_AVAILABLE = True
+except ImportError:
+    LIGHTGBM_AVAILABLE = False
+
+try:
+    import optuna
+    OPTUNA_AVAILABLE = True
+except ImportError:
+    OPTUNA_AVAILABLE = False
 
 # 경고 메시지 필터링
 warnings.filterwarnings("ignore", message="X does not have valid feature names, but.*")
@@ -101,6 +122,23 @@ def make_features(df):
     
     return df
 
+class SimpleDummyModel:
+    """간단한 더미 모델 (sklearn이 없을 때 사용)"""
+    def __init__(self):
+        self.last_price = None
+        
+    def fit(self, X, y):
+        # 단순히 마지막 가격을 저장
+        if len(y) > 0:
+            self.last_price = y[-1]
+        return self
+        
+    def predict(self, X):
+        # 입력 크기만큼 마지막 가격 반복
+        if self.last_price is None:
+            return np.zeros(len(X))
+        return np.full(len(X), self.last_price)
+
 class PricePredictionModel:
     def __init__(self, n_splits=5):
         self.n_splits = n_splits
@@ -108,22 +146,48 @@ class PricePredictionModel:
         self.best_params = {}
         self.cv_report = {}
         self.feature_names = None
+        self.sklearn_available = SKLEARN_AVAILABLE
 
     def save_model(self, path):
-        joblib.dump({'model': self, 'cv_report': self.cv_report}, path)
-        print(f"[모델저장] 모델이 {path}에 저장되었습니다. (CV리포트 포함)")
+        if SKLEARN_AVAILABLE:
+            joblib.dump({'model': self, 'cv_report': self.cv_report}, path)
+            print(f"[모델저장] 모델이 {path}에 저장되었습니다. (CV리포트 포함)")
+        else:
+            # 단순히 pickle 사용
+            import pickle
+            with open(path, 'wb') as f:
+                pickle.dump({'model': self, 'cv_report': self.cv_report}, f)
+            print(f"[모델저장] 모델이 {path}에 저장되었습니다. (더미 모델)")
 
     @staticmethod
     def load_model(path):
         print(f"[모델불러오기] {path}에서 모델을 불러옵니다.")
-        obj = joblib.load(path)
-        if isinstance(obj, dict) and 'model' in obj:
-            model = obj['model']
-            model.cv_report = obj.get('cv_report', {})
-            return model
-        return obj
+        try:
+            if SKLEARN_AVAILABLE:
+                obj = joblib.load(path)
+            else:
+                import pickle
+                with open(path, 'rb') as f:
+                    obj = pickle.load(f)
+            
+            if isinstance(obj, dict) and 'model' in obj:
+                model = obj['model']
+                model.cv_report = obj.get('cv_report', {})
+                return model
+            return obj
+        except Exception as e:
+            print(f"⚠️ 모델 로드 실패: {e}. 새 모델을 생성합니다.")
+            return PricePredictionModel()
 
     def fit(self, df, target_col='close', horizon=1, tune=False):
+        # sklearn이 없는 경우 더미 모델 사용
+        if not SKLEARN_AVAILABLE:
+            print("[ML 모델] sklearn이 없으므로 더미 모델을 사용합니다.")
+            self.models = {'dummy': SimpleDummyModel()}
+            if len(df) > 0:
+                self.models['dummy'].fit(None, df[target_col].values)
+            return True
+            
         # 최소 데이터 요구사항 체크
         if len(df) < 50:  # 최소 데이터 요구사항을 낮춤
             print(f"[ML 모델] 데이터 부족: {len(df)}개 (최소 50개 필요)")
@@ -168,16 +232,24 @@ class PricePredictionModel:
             print(f"[ML 모델] 최종 훈련 데이터 부족: {len(X)}개 (최소 10개 필요)")
             return False
 
-        # 앙상블 모델 정의
-        self.models = {
-            'rf': RandomForestRegressor(n_estimators=100, max_depth=6, random_state=42, verbose=0),  # verbose=0 추가
-            'xgb': xgb.XGBRegressor(n_estimators=100, max_depth=6, random_state=42, verbosity=0),  # verbosity=0 추가
-            'lgb': lgb.LGBMRegressor(n_estimators=100, max_depth=6, random_state=42, verbose=-1),  # verbose=-1 추가
-            'ridge': Ridge(alpha=1.0)
-        }
+        # 앙상블 모델 정의 (사용 가능한 것만)
+        self.models = {}
+        if SKLEARN_AVAILABLE:
+            self.models['rf'] = RandomForestRegressor(n_estimators=100, max_depth=6, random_state=42, verbose=0)
+            self.models['ridge'] = Ridge(alpha=1.0)
+        if XGBOOST_AVAILABLE:
+            self.models['xgb'] = xgb.XGBRegressor(n_estimators=100, max_depth=6, random_state=42, verbosity=0)
+        if LIGHTGBM_AVAILABLE:
+            self.models['lgb'] = lgb.LGBMRegressor(n_estimators=100, max_depth=6, random_state=42, verbose=-1)
+        
+        if not self.models:
+            print("[ML 모델] 사용 가능한 ML 라이브러리가 없습니다. 더미 모델을 사용합니다.")
+            self.models = {'dummy': SimpleDummyModel()}
+            self.models['dummy'].fit(None, y)
+            return True
 
         # 하이퍼파라미터 튜닝 (Optuna) - 데이터가 충분한 경우에만
-        if tune and len(X) >= 30:
+        if tune and len(X) >= 30 and OPTUNA_AVAILABLE and SKLEARN_AVAILABLE:
             def objective(trial):
                 params = {
                     'n_estimators': trial.suggest_int('n_estimators', 50, 200),
@@ -205,7 +277,11 @@ class PricePredictionModel:
                 print(f"[ML 모델] 최적화 완료: {self.best_params['rf']}")
 
         # 각 모델 학습 및 성능 리포트
-        tscv = TimeSeriesSplit(n_splits=min(3, len(X)//10))  # fold 수 축소
+        if SKLEARN_AVAILABLE:
+            tscv = TimeSeriesSplit(n_splits=min(3, len(X)//10))  # fold 수 축소
+        else:
+            # 더미 모델은 이미 훈련되었으므로 성공 리턴
+            return True
         for name, model in self.models.items():
             fold_rmse, fold_mae, fold_r2 = [], [], []
             for train_idx, val_idx in tscv.split(X):
@@ -233,6 +309,10 @@ class PricePredictionModel:
 
     def predict(self, df):
         try:
+            # sklearn이 없고 더미 모델을 사용하는 경우
+            if not SKLEARN_AVAILABLE and 'dummy' in self.models:
+                return self.models['dummy'].predict(np.zeros((len(df), 1)))
+                
             # 모델 훈련 상태 체크
             if not hasattr(self, 'models') or not self.models:
                 return np.zeros(len(df) if hasattr(df, '__len__') else 1)
