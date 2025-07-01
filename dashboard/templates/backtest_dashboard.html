@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚀 AlphaGenesis 백테스트 대시보드</title>
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    
+    <style>
+        :root {
+            --primary-color: #667eea;
+            --secondary-color: #764ba2;
+            --success-color: #28a745;
+            --warning-color: #ffc107;
+            --danger-color: #dc3545;
+            --dark-bg: #0a0e1a;
+            --card-bg: rgba(255, 255, 255, 0.05);
+            --border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        body {
+            background-color: var(--dark-bg);
+            color: #ffffff;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            min-height: 100vh;
+        }
+        
+        .dashboard-header {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            padding: 20px 0;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+        }
+        
+        .metric-card {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.2);
+        }
+        
+        .metric-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        
+        .metric-label {
+            color: #a0a0a0;
+            font-size: 0.9rem;
+        }
+        
+        .chart-container {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border-color);
+        }
+        
+        .backtest-controls {
+            background: var(--card-bg);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 20px;
+            border: 1px solid var(--border-color);
+        }
+        
+        .log-container {
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: 10px;
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.4;
+            border: 1px solid var(--border-color);
+        }
+        
+        .log-entry {
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            border-left: 3px solid var(--success-color);
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 5px;
+        }
+        
+        .btn-gradient {
+            background: linear-gradient(135deg, var(--primary-color) 0%, var(--secondary-color) 100%);
+            border: none;
+            border-radius: 25px;
+            padding: 10px 25px;
+            color: white;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .btn-gradient:hover {
+            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(102, 126, 234, 0.3);
+            color: white;
+        }
+        
+        .form-control, .form-select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid var(--border-color);
+            color: white;
+            border-radius: 8px;
+        }
+        
+        .form-control:focus, .form-select:focus {
+            background: rgba(255, 255, 255, 0.15);
+            border-color: var(--primary-color);
+            color: white;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+        }
+        
+        .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .positive { color: var(--success-color); }
+        .negative { color: var(--danger-color); }
+        .neutral { color: var(--warning-color); }
+    </style>
+</head>
+<body>
+    <!-- 헤더 -->
+    <div class="dashboard-header">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-8">
+                    <h1><i class="fas fa-rocket"></i> AlphaGenesis 백테스트 대시보드</h1>
+                    <p class="mb-0">상위 0.01%급 ML 기반 자동매매 시스템</p>
+                </div>
+                <div class="col-md-4 text-end">
+                    <div class="mb-2">
+                        <span class="badge bg-success">
+                            <i class="fas fa-broadcast-tower"></i> 실시간 연결
+                        </span>
+                    </div>
+                    <div>
+                        <span id="connection-status">연결됨</span>
+                    </div>
+                    <div><small>마지막 업데이트: <span id="last-update">-</span></small></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="container-fluid">
+        <!-- 백테스트 컨트롤 패널 -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="backtest-controls">
+                    <h4><i class="fas fa-cogs"></i> 백테스트 설정</h4>
+                    <div class="row">
+                        <div class="col-md-3">
+                            <label class="form-label">시작 날짜</label>
+                            <input type="date" class="form-control" id="start-date" value="2023-01-01">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">종료 날짜</label>
+                            <input type="date" class="form-control" id="end-date" value="2024-01-01">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">초기 자본</label>
+                            <input type="number" class="form-control" id="initial-capital" value="10000000" step="1000000">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label">거래 심볼</label>
+                            <select class="form-select" id="trading-symbol">
+                                <option value="BTC/USDT">BTC/USDT</option>
+                                <option value="ETH/USDT">ETH/USDT</option>
+                                <option value="BNB/USDT">BNB/USDT</option>
+                                <option value="ALL">전체 심볼</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <button class="btn btn-gradient" id="start-backtest">
+                                <i class="fas fa-play"></i> 백테스트 시작
+                            </button>
+                            <button class="btn btn-outline-danger ms-2" id="stop-backtest" disabled>
+                                <i class="fas fa-stop"></i> 중지
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 실시간 지표 -->
+        <div class="row mb-4">
+            <div class="col-xl-2 col-md-4 col-6">
+                <div class="metric-card">
+                    <div class="metric-value" id="current-capital">₩100,000,000</div>
+                    <div class="metric-label">현재 자본</div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 col-6">
+                <div class="metric-card">
+                    <div class="metric-value positive" id="total-return">+0.00%</div>
+                    <div class="metric-label">총 수익률</div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 col-6">
+                <div class="metric-card">
+                    <div class="metric-value" id="daily-pnl">₩0</div>
+                    <div class="metric-label">일일 손익</div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 col-6">
+                <div class="metric-card">
+                    <div class="metric-value" id="open-positions">0</div>
+                    <div class="metric-label">오픈 포지션</div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 col-6">
+                <div class="metric-card">
+                    <div class="metric-value" id="win-rate">0.00%</div>
+                    <div class="metric-label">승률</div>
+                </div>
+            </div>
+            <div class="col-xl-2 col-md-4 col-6">
+                <div class="metric-card">
+                    <div class="metric-value" id="max-drawdown">0.00%</div>
+                    <div class="metric-label">최대 낙폭</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 차트 섹션 -->
+        <div class="row">
+            <div class="col-md-8">
+                <div class="chart-container">
+                    <h5><i class="fas fa-chart-area"></i> 자본 변화 추이</h5>
+                    <canvas id="capital-chart" height="300"></canvas>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <h5><i class="fas fa-terminal"></i> 실시간 로그</h5>
+                    <div class="log-container" id="log-container">
+                        <div class="log-entry">
+                            <strong>[시스템]</strong> 백테스트 시스템 준비 완료
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // 전역 변수
+        let isBacktestRunning = false;
+        let capitalChart = null;
+
+        // 차트 초기화
+        function initializeChart() {
+            const ctx = document.getElementById('capital-chart').getContext('2d');
+            capitalChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: [],
+                    datasets: [{
+                        label: '자본 (원)',
+                        data: [],
+                        borderColor: '#667eea',
+                        backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                        borderWidth: 3,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            labels: { color: 'white' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            ticks: { 
+                                color: 'white',
+                                callback: function(value) {
+                                    return '₩' + value.toLocaleString();
+                                }
+                            },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        },
+                        x: {
+                            ticks: { color: 'white' },
+                            grid: { color: 'rgba(255,255,255,0.1)' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 백테스트 시작
+        async function startBacktest() {
+            const startDate = document.getElementById('start-date').value;
+            const endDate = document.getElementById('end-date').value;
+            const initialCapital = document.getElementById('initial-capital').value;
+            const symbol = document.getElementById('trading-symbol').value;
+
+            if (!startDate || !endDate) {
+                alert('시작 날짜와 종료 날짜를 설정해주세요.');
+                return;
+            }
+
+            isBacktestRunning = true;
+            updateBacktestButtons();
+            
+            addLog('백테스트 시작: ' + startDate + ' ~ ' + endDate);
+            addLog('초기 자본: ₩' + parseInt(initialCapital).toLocaleString());
+            addLog('거래 심볼: ' + symbol);
+
+            try {
+                const response = await fetch('http://34.47.77.230:5001/api/backtest', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        config: {
+                            date_range: {
+                                start: startDate,
+                                end: endDate
+                            },
+                            initial_capital: parseInt(initialCapital),
+                            symbol: symbol
+                        }
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
+                addLog('백테스트 완료!');
+                updateBacktestResults(result);
+                
+            } catch (error) {
+                console.error('백테스트 오류:', error);
+                addLog('백테스트 오류: ' + error.message);
+            } finally {
+                isBacktestRunning = false;
+                updateBacktestButtons();
+            }
+        }
+
+        // 백테스트 중지
+        function stopBacktest() {
+            isBacktestRunning = false;
+            updateBacktestButtons();
+            addLog('백테스트가 중지되었습니다.');
+        }
+
+        // 백테스트 버튼 상태 업데이트
+        function updateBacktestButtons() {
+            const startBtn = document.getElementById('start-backtest');
+            const stopBtn = document.getElementById('stop-backtest');
+            
+            if (isBacktestRunning) {
+                startBtn.disabled = true;
+                startBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 실행 중...';
+                stopBtn.disabled = false;
+            } else {
+                startBtn.disabled = false;
+                startBtn.innerHTML = '<i class="fas fa-play"></i> 백테스트 시작';
+                stopBtn.disabled = true;
+            }
+        }
+
+        // 백테스트 결과 업데이트
+        function updateBacktestResults(results) {
+            if (results.final_capital) {
+                document.getElementById('current-capital').textContent = 
+                    '₩' + results.final_capital.toLocaleString();
+            }
+            
+            if (results.total_return) {
+                const returnEl = document.getElementById('total-return');
+                returnEl.textContent = results.total_return.toFixed(2) + '%';
+                returnEl.className = 'metric-value ' + (results.total_return >= 0 ? 'positive' : 'negative');
+            }
+            
+            if (results.win_rate) {
+                document.getElementById('win-rate').textContent = results.win_rate.toFixed(2) + '%';
+            }
+            
+            if (results.max_drawdown) {
+                document.getElementById('max-drawdown').textContent = results.max_drawdown.toFixed(2) + '%';
+            }
+        }
+
+        // 로그 추가
+        function addLog(message) {
+            const logContainer = document.getElementById('log-container');
+            const logEntry = document.createElement('div');
+            logEntry.className = 'log-entry';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            logEntry.innerHTML = `<strong>[${timestamp}]</strong> ${message}`;
+            
+            logContainer.appendChild(logEntry);
+            logContainer.scrollTop = logContainer.scrollHeight;
+            
+            if (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.firstChild);
+            }
+        }
+
+        // 실시간 데이터 업데이트
+        async function updateRealTimeData() {
+            try {
+                const response = await fetch('http://34.47.77.230:5001/api/real-time-data');
+                if (response.ok) {
+                    document.getElementById('connection-status').textContent = '연결됨';
+                    document.getElementById('last-update').textContent = new Date().toLocaleTimeString();
+                }
+            } catch (error) {
+                document.getElementById('connection-status').textContent = '연결 끊김';
+            }
+        }
+
+        // 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeChart();
+            
+            document.getElementById('start-backtest').addEventListener('click', startBacktest);
+            document.getElementById('stop-backtest').addEventListener('click', stopBacktest);
+            
+            setInterval(updateRealTimeData, 5000);
+            updateRealTimeData();
+            
+            const today = new Date();
+            const oneYearAgo = new Date(today.getFullYear() - 1, today.getMonth(), today.getDate());
+            document.getElementById('end-date').value = today.toISOString().split('T')[0];
+            document.getElementById('start-date').value = oneYearAgo.toISOString().split('T')[0];
+            
+            addLog('백테스트 대시보드 시스템 준비 완료');
+        });
+    </script>
+</body>
+</html>

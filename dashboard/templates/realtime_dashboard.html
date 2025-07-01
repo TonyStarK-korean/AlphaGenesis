@@ -231,7 +231,7 @@
         // 데이터 업데이트 함수
         async function updateData() {
             try {
-                const response = await fetch('/api/realtime_data');
+                const response = await fetch('http://34.47.77.230:5001/api/realtime_data');
                 if (!response.ok) throw new Error('HTTP ' + response.status);
                 
                 const data = await response.json();
