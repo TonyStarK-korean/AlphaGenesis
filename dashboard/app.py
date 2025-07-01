@@ -2,6 +2,9 @@ import sys
 import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'src'))
+
+# 모든 외부 의존성 모듈을 mock으로 처리
+MOCK_MODE = True
 from flask import Flask, render_template, jsonify, request, send_from_directory
 from flask_cors import CORS
 import pandas as pd
@@ -25,12 +28,11 @@ except ImportError:
     print("Warning: Plotly not available. Some charting features may be limited.")
     PLOTLY_AVAILABLE = False
 
-# 시스템 모듈 임포트 (선택적)
-try:
-    from config.backtest_config import backtest_config
-except ImportError:
-    print("Warning: config.backtest_config not available. Using default config.")
-    # 기본 설정 클래스 생성
+# 시스템 모듈 임포트 (MOCK 모드에서는 모든 것을 mock으로 처리)
+if MOCK_MODE:
+    print("Running in MOCK MODE - using mock classes for all dependencies")
+    
+    # 기본 설정 클래스
     class DefaultConfig:
         initial_capital = 10000000
         
@@ -45,21 +47,14 @@ except ImportError:
             pass
     
     backtest_config = DefaultConfig()
-
-try:
-    from data.market_data_downloader import MarketDataDownloader
-except ImportError:
-    print("Warning: data.market_data_downloader not available. Using mock class.")
+    
+    # Mock 클래스들
     class MarketDataDownloader:
         def download_all_data(self):
             return {}
         def get_data_summary(self):
             return {}
 
-try:
-    from core.trading_engine.adaptive_phase_manager import AdaptivePhaseManager
-except ImportError:
-    print("Warning: core.trading_engine.adaptive_phase_manager not available. Using mock class.")
     class AdaptivePhaseManager:
         def get_phase_status(self):
             return {}
@@ -68,14 +63,63 @@ except ImportError:
         def get_market_condition_history(self):
             return []
 
-try:
-    from core.trading_engine.compound_trading_engine import CompoundTradingEngine, CompoundMode
-except ImportError:
-    print("Warning: core.trading_engine.compound_trading_engine not available. Using mock class.")
     class CompoundTradingEngine:
         def run_backtest(self, days, trades_per_day):
             return {}
+    
     CompoundMode = None
+
+else:
+    # 정상 모드 - 실제 모듈 임포트 시도
+    try:
+        from config.backtest_config import backtest_config
+    except ImportError:
+        print("Warning: config.backtest_config not available. Using default config.")
+        class DefaultConfig:
+            initial_capital = 10000000
+            
+            def get_config_summary(self):
+                return {'initial_capital': self.initial_capital}
+            
+            def update_date_range(self, start, end):
+                self.start_date = start
+                self.end_date = end
+            
+            def update_phase_settings(self, phase, settings):
+                pass
+        
+        backtest_config = DefaultConfig()
+
+    try:
+        from data.market_data_downloader import MarketDataDownloader
+    except (ImportError, ModuleNotFoundError) as e:
+        print(f"Warning: data.market_data_downloader not available ({e}). Using mock class.")
+        class MarketDataDownloader:
+            def download_all_data(self):
+                return {}
+            def get_data_summary(self):
+                return {}
+
+    try:
+        from core.trading_engine.adaptive_phase_manager import AdaptivePhaseManager
+    except ImportError:
+        print("Warning: core.trading_engine.adaptive_phase_manager not available. Using mock class.")
+        class AdaptivePhaseManager:
+            def get_phase_status(self):
+                return {}
+            def get_phase_history(self):
+                return []
+            def get_market_condition_history(self):
+                return []
+
+    try:
+        from core.trading_engine.compound_trading_engine import CompoundTradingEngine, CompoundMode
+    except ImportError:
+        print("Warning: core.trading_engine.compound_trading_engine not available. Using mock class.")
+        class CompoundTradingEngine:
+            def run_backtest(self, days, trades_per_day):
+                return {}
+        CompoundMode = None
 
 app = Flask(__name__)
 CORS(app)  # 외부 접속 허용
@@ -493,17 +537,17 @@ dashboard_manager = DashboardManager()
 
 if __name__ == '__main__':
     print("🚀 AlphaGenesis 대시보드 서버 시작")
-    print("📊 대시보드 주소: http://34.47.77.230:5001")
-    print("🔄 백테스트 대시보드: http://34.47.77.230:5001/backtest")
+    print("📊 대시보드 주소: http://34.47.77.230:5002")
+    print("🔄 백테스트 대시보드: http://34.47.77.230:5002/backtest")
     print("⚡ 시스템이 24시간 운영됩니다...")
     
     # 실시간 모니터링 시작
     dashboard_manager.start_monitoring()
     
-    # Flask 서버 실행 (외부 접속 허용, 포트 5001)
+    # Flask 서버 실행 (외부 접속 허용, 포트 5002)
     app.run(
         host='0.0.0.0',  # 모든 IP에서 접속 허용
-        port=5001,       # 포트 5001 사용
+        port=5002,       # 포트 5002 사용
         debug=False,     # 운영 환경에서는 False
         threaded=True    # 멀티스레드 처리
     ) 
