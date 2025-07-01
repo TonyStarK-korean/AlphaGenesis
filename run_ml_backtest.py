@@ -38,7 +38,7 @@ from data.market_data.data_generator import MarketDataGenerator
 from utils.indicators.technical_indicators import TechnicalIndicators
 
 # 대시보드 API 설정
-DASHBOARD_API_URL = 'http://34.47.77.230:5001'
+DASHBOARD_API_URL = 'http://34.47.77.230:5002'
 SEND_TO_DASHBOARD = True
 
 def setup_logging():
