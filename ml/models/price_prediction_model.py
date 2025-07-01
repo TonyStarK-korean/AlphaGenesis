@@ -115,7 +115,12 @@ def make_features(df):
     for col in numeric_cols:
         if col in ['close', 'volume']:  # 원본 데이터는 건드리지 않음
             continue
-        df[col] = df[col].fillna(method='ffill').fillna(0)
+        try:
+            # pandas 최신 버전 호환성을 위한 안전한 방법
+            df[col] = df[col].ffill().fillna(0)
+        except:
+            # fallback: 더 안전한 방법
+            df[col] = df[col].fillna(0)
     
     # 최종적으로 완전히 NaN인 행만 제거
     df = df.dropna(subset=['close', 'volume'])
