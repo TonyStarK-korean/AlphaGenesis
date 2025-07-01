@@ -29,6 +29,7 @@ except ImportError:
 try:
     from config.backtest_config import backtest_config
 except ImportError:
+    print("Warning: config.backtest_config not available. Using default config.")
     # 기본 설정 클래스 생성
     class DefaultConfig:
         initial_capital = 10000000
@@ -48,6 +49,7 @@ except ImportError:
 try:
     from data.market_data_downloader import MarketDataDownloader
 except ImportError:
+    print("Warning: data.market_data_downloader not available. Using mock class.")
     class MarketDataDownloader:
         def download_all_data(self):
             return {}
@@ -57,6 +59,7 @@ except ImportError:
 try:
     from core.trading_engine.adaptive_phase_manager import AdaptivePhaseManager
 except ImportError:
+    print("Warning: core.trading_engine.adaptive_phase_manager not available. Using mock class.")
     class AdaptivePhaseManager:
         def get_phase_status(self):
             return {}
@@ -68,6 +71,7 @@ except ImportError:
 try:
     from core.trading_engine.compound_trading_engine import CompoundTradingEngine, CompoundMode
 except ImportError:
+    print("Warning: core.trading_engine.compound_trading_engine not available. Using mock class.")
     class CompoundTradingEngine:
         def run_backtest(self, days, trades_per_day):
             return {}
