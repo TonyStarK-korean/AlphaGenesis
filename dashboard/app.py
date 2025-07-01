@@ -401,7 +401,20 @@ def get_phase_analysis():
 def get_data_summary():
     """데이터 요약 API"""
     try:
-        summary = dashboard_manager.data_downloader.get_data_summary()
+        import pandas as pd
+        import os
+        # BTC 1시간봉 기준 (다른 심볼도 필요시 반복)
+        file_path = 'data/market_data/BTC_USDT_1h.csv'
+        if not os.path.exists(file_path):
+            return jsonify({'error': 'BTC_USDT_1h.csv 파일이 없습니다.'}), 404
+        df = pd.read_csv(file_path)
+        start_date = str(df['timestamp'].min())[:10]
+        end_date = str(df['timestamp'].max())[:10]
+        summary = {
+            'start_date': start_date,
+            'end_date': end_date,
+            'records': len(df)
+        }
         return jsonify(summary)
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -500,23 +513,15 @@ def receive_report():
     """백테스트 리포트 수신 API"""
     try:
         data = request.json
-        
-        # 백테스트 결과 업데이트
+        # 백테스트 결과 전체 갱신
+        dashboard_manager.latest_backtest_results.update(data)
+        # 실시간 자본도 갱신
         if 'final_capital' in data:
-            dashboard_manager.latest_backtest_results['final_capital'] = data['final_capital']
+            dashboard_manager.real_time_data['current_capital'] = data['final_capital']
         if 'total_return' in data:
-            dashboard_manager.latest_backtest_results['total_return'] = data['total_return']
-        if 'win_rate' in data:
-            dashboard_manager.latest_backtest_results['win_rate'] = data['win_rate']
+            dashboard_manager.real_time_data['total_return'] = data['total_return']
         if 'max_drawdown' in data:
-            dashboard_manager.latest_backtest_results['max_drawdown'] = data['max_drawdown']
-        if 'trades' in data:
-            dashboard_manager.latest_backtest_results['trades'] = data['trades']
-        if 'capital_history' in data:
-            dashboard_manager.latest_backtest_results['capital_history'] = data['capital_history']
-            
-        print(f"[BACKTEST REPORT] 리포트 수신: {data}")
-        
+            dashboard_manager.real_time_data['max_drawdown'] = data['max_drawdown']
         return jsonify({'status': 'received'})
     except Exception as e:
         return jsonify({'error': str(e)}), 500

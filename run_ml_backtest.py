@@ -16,7 +16,7 @@ from tqdm import tqdm
 import time
 import re
 try:
-import optuna
+    import optuna
     OPTUNA_AVAILABLE = True
 except ImportError:
     OPTUNA_AVAILABLE = False
