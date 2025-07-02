@@ -5,7 +5,7 @@ sys.path.append(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 
 # 모든 외부 의존성 모듈을 mock으로 처리
 MOCK_MODE = True
-from flask import Flask, render_template, jsonify, request, send_from_directory, make_response
+from flask import Flask, render_template, jsonify, request, send_from_directory, make_response, Response, redirect
 from flask_cors import CORS
 import pandas as pd
 import numpy as np
@@ -18,6 +18,18 @@ from typing import Dict, List, Optional
 import glob
 import subprocess
 import asyncio
+
+# 백테스트 엔진 임포트
+try:
+    from .backtest_engine import BacktestEngine, create_dummy_data_if_not_exists
+    BACKTEST_AVAILABLE = True
+except ImportError:
+    try:
+        from backtest_engine import BacktestEngine, create_dummy_data_if_not_exists
+        BACKTEST_AVAILABLE = True
+    except ImportError as e:
+        print(f"Warning: backtest_engine not available ({e}). Backtest features will be disabled.")
+        BACKTEST_AVAILABLE = False
 
 # Plotly 선택적 임포트
 try:
@@ -135,6 +147,14 @@ class DashboardManager:
         self.data_downloader = MarketDataDownloader()
         self.phase_manager = AdaptivePhaseManager()
         self.trading_engine = CompoundTradingEngine()
+        
+        # 백테스트 엔진 초기화
+        if BACKTEST_AVAILABLE:
+            self.backtest_engine = BacktestEngine()
+            # 더미 데이터 생성
+            create_dummy_data_if_not_exists()
+        else:
+            self.backtest_engine = None
         
         # 실시간 데이터
         self.real_time_data = {
@@ -264,22 +284,13 @@ class DashboardManager:
 dashboard_manager = DashboardManager()
 
 @app.route('/')
-def index():
-    """메인 대시보드"""
-    response = make_response(render_template('main_dashboard.html'))
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+def root_redirect():
+    return redirect('/backtest')
 
 @app.route('/backtest')
 def backtest_dashboard():
     """백테스트 대시보드"""
-    response = make_response(render_template('backtest_dashboard.html'))
-    response.headers['Cache-Control'] = 'no-cache, no-store, must-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    return response
+    return render_template('backtest_dashboard.html')
 
 @app.route('/api/config')
 def get_config():
@@ -310,30 +321,107 @@ def update_config():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
-@app.route('/api/download-data', methods=['POST'])
-def download_data():
-    """데이터 다운로드 API"""
+@app.route('/api/data/info', methods=['GET'])
+def get_data_info():
+    """데이터 정보 반환"""
     try:
-        data = request.json
-        symbols = data.get('symbols', backtest_config.data_download['symbols'])
+        if not BACKTEST_AVAILABLE:
+            return jsonify({'error': '백테스트 엔진을 사용할 수 없습니다.'}), 500
         
-        # 데이터 다운로드 실행
-        all_data = dashboard_manager.data_downloader.download_all_data()
+        # 사용 가능한 심볼 목록
+        symbols = dashboard_manager.backtest_engine.get_available_symbols()
         
-        # 데이터 요약 반환
-        summary = dashboard_manager.data_downloader.get_data_summary()
+        # 기본 심볼의 데이터 정보
+        default_symbol = 'BTC_USDT'
+        data_info = dashboard_manager.backtest_engine.get_data_info(default_symbol)
         
-        return jsonify({
-            'status': 'success',
-            'downloaded_symbols': len(all_data),
-            'summary': summary
-        })
+        if data_info:
+            return jsonify({
+                'symbols': symbols,
+                'default_symbol': default_symbol,
+                'start_date': data_info['start_date'],
+                'end_date': data_info['end_date'],
+                'total_rows': data_info['total_rows']
+            })
+        else:
+            return jsonify({
+                'symbols': symbols,
+                'default_symbol': default_symbol,
+                'start_date': '2023-01-01',
+                'end_date': '2024-06-01',
+                'total_rows': 0
+            })
     except Exception as e:
+        print(f"데이터 정보 조회 오류: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/data/download', methods=['GET'])
+def download_data():
+    """BTC_USDT만 지원, symbol 파라미터 무시"""
+    try:
+        if not BACKTEST_AVAILABLE:
+            return jsonify({'error': '백테스트 엔진을 사용할 수 없습니다.'}), 500
+        symbol = 'BTC_USDT'  # 고정
+        start_date = request.args.get('start_date')
+        end_date = request.args.get('end_date')
+        if not start_date or not end_date:
+            return jsonify({'error': '시작일과 종료일을 지정해주세요.'}), 400
+        print(f"데이터 다운로드 요청: {symbol} ({start_date} ~ {end_date})")
+        data = dashboard_manager.backtest_engine.download_data(symbol, start_date, end_date)
+        if data:
+            return jsonify(data)
+        else:
+            return jsonify({'error': 'BTC_USDT 데이터가 존재하지 않거나, 해당 기간 데이터가 없습니다.'}), 404
+    except Exception as e:
+        print(f"데이터 다운로드 오류: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/strategies', methods=['GET'])
+def get_strategies():
+    """사용 가능한 전략 목록 반환"""
+    try:
+        if not BACKTEST_AVAILABLE:
+            return jsonify({'error': '백테스트 엔진을 사용할 수 없습니다.'}), 500
+        
+        strategies = dashboard_manager.backtest_engine.get_strategies()
+        return jsonify({'strategies': strategies})
+        
+    except Exception as e:
+        print(f"전략 목록 조회 오류: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/backtest/run', methods=['POST'])
+def run_backtest():
+    """BTC_USDT, CVD_0.01 전략만 지원, symbol/strategy 파라미터 무시"""
+    try:
+        if not BACKTEST_AVAILABLE:
+            return jsonify({'error': '백테스트 엔진을 사용할 수 없습니다.'}), 500
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '요청 데이터가 없습니다.'}), 400
+        config = {
+            'symbol': 'BTC_USDT',
+            'strategy': 'CVD_0.01',
+            'start_date': data.get('start_date'),
+            'end_date': data.get('end_date'),
+            'initial_capital': data.get('initial_capital', 10000000),
+            'params': {}
+        }
+        print(f"백테스트 실행 요청: {config}")
+        result = dashboard_manager.backtest_engine.run_backtest(config)
+        if result.get('success'):
+            cache_key = f"BTC_USDT_CVD_0.01_{config['start_date']}_{config['end_date']}"
+            dashboard_manager.backtest_cache[cache_key] = result
+            return jsonify(result)
+        else:
+            return jsonify({'error': result.get('error', '백테스트 실행 중 오류가 발생했습니다.')}), 500
+    except Exception as e:
+        print(f"백테스트 실행 오류: {e}")
         return jsonify({'error': str(e)}), 500
 
 @app.route('/api/backtest', methods=['POST'])
-def run_backtest():
-    """백테스트 실행 API"""
+def run_backtest_legacy():
+    """백테스트 실행 API (기존)"""
     try:
         data = request.json
         config = data.get('config', {})
@@ -373,27 +461,6 @@ def get_backtest_results():
     try:
         results = dashboard_manager.latest_backtest_results
         return jsonify(results)
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/phase-analysis')
-def get_phase_analysis():
-    """Phase 분석 API"""
-    try:
-        # Phase 상태
-        phase_status = dashboard_manager.phase_manager.get_phase_status()
-        
-        # Phase 전환 기록
-        phase_history = dashboard_manager.phase_manager.get_phase_history()
-        
-        # 시장 국면 기록
-        market_history = dashboard_manager.phase_manager.get_market_condition_history()
-        
-        return jsonify({
-            'phase_status': phase_status,
-            'phase_history': phase_history,
-            'market_history': market_history
-        })
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

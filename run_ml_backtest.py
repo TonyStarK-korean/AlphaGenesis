@@ -15,6 +15,16 @@ import pytz
 from tqdm import tqdm
 import time
 import re
+
+# scikit-learn 선택적 import
+try:
+    from sklearn.model_selection import TimeSeriesSplit
+    SKLEARN_AVAILABLE = True
+except ImportError:
+    SKLEARN_AVAILABLE = False
+    print("⚠️ scikit-learn이 설치되지 않았습니다. 워크-포워드 분석 기능은 비활성화됩니다.")
+
+# Optuna 선택적 import
 try:
     import optuna
     OPTUNA_AVAILABLE = True
@@ -40,8 +50,55 @@ class MarketCondition(Enum):
     HIGH_VOLATILITY = "HIGH_VOLATILITY"
     LOW_VOLATILITY = "LOW_VOLATILITY"
 
-# 워크-포워드 분석을 위한 추가 import
-from sklearn.model_selection import TimeSeriesSplit
+# === 간단한 예측 모델 클래스 ===
+class SimpleMovingAveragePredictor:
+    """간단한 이동평균 기반 예측 모델 (scikit-learn 없을 때 사용)"""
+    def __init__(self):
+        self.is_fitted = False
+        self.ma_short = None
+        self.ma_long = None
+        
+    def fit(self, X, y):
+        """모델 훈련 (간단한 이동평균 계산)"""
+        try:
+            # 가격 관련 컬럼 찾기
+            price_cols = [col for col in X.columns if 'close' in col.lower() or 'price' in col.lower()]
+            if not price_cols:
+                # 첫 번째 컬럼을 가격으로 가정
+                price_cols = [X.columns[0]]
+            
+            # 이동평균 계산
+            prices = X[price_cols[0]].values
+            self.ma_short = np.mean(prices[-5:]) if len(prices) >= 5 else np.mean(prices)
+            self.ma_long = np.mean(prices[-20:]) if len(prices) >= 20 else np.mean(prices)
+            
+            self.is_fitted = True
+        except Exception as e:
+            print(f"   ⚠️  간단한 모델 훈련 실패: {e}")
+            self.is_fitted = False
+    
+    def predict(self, X):
+        """예측 수행"""
+        if not self.is_fitted:
+            return np.zeros(len(X))
+        
+        try:
+            # 가격 관련 컬럼 찾기
+            price_cols = [col for col in X.columns if 'close' in col.lower() or 'price' in col.lower()]
+            if not price_cols:
+                price_cols = [X.columns[0]]
+            
+            current_price = X[price_cols[0]].iloc[-1] if len(X) > 0 else 0
+            
+            # 간단한 추세 예측
+            if self.ma_short > self.ma_long:
+                return np.array([0.001])  # 상승 예측
+            elif self.ma_short < self.ma_long:
+                return np.array([-0.001])  # 하락 예측
+            else:
+                return np.array([0.0])  # 중립
+        except:
+            return np.array([0.0])
 
 # === 누락된 함수들 추가 ===
 def detect_market_condition_simple(prices):
@@ -434,6 +491,11 @@ class PricePredictionModel:
     
     def select_features(self, X, y):
         """🔍 피처 중요도 기반 상위 N개 피처 선택"""
+        if not SKLEARN_AVAILABLE:
+            print(f"   ⚠️  scikit-learn 없음, 상위 {self.top_n_features}개 피처 선택")
+            self.selected_features = X.columns.tolist()[:self.top_n_features]
+            return
+            
         try:
             from sklearn.ensemble import RandomForestRegressor
             from sklearn.feature_selection import SelectKBest, f_regression
@@ -492,6 +554,13 @@ class PricePredictionModel:
     
     def train_ensemble_models(self, X, y):
         """🎯 다중 모델 앙상블 훈련"""
+        if not SKLEARN_AVAILABLE:
+            print(f"   ⚠️  scikit-learn 없음, 간단한 예측 모델 사용")
+            # 간단한 이동평균 기반 예측 모델
+            self.models['simple_ma'] = SimpleMovingAveragePredictor()
+            self.models['simple_ma'].fit(X, y)
+            return
+            
         try:
             from sklearn.ensemble import RandomForestRegressor
             from sklearn.linear_model import Ridge
@@ -541,11 +610,20 @@ class PricePredictionModel:
         except Exception as e:
             print(f"   ❌ 앙상블 훈련 실패: {e}")
             # 폴백: 간단한 모델만
-            self.models['simple'] = RandomForestRegressor(n_estimators=50, random_state=42)
-            self.models['simple'].fit(X, y)
+            if SKLEARN_AVAILABLE:
+                self.models['simple'] = RandomForestRegressor(n_estimators=50, random_state=42)
+                self.models['simple'].fit(X, y)
+            else:
+                self.models['simple_ma'] = SimpleMovingAveragePredictor()
+                self.models['simple_ma'].fit(X, y)
     
     def calculate_ensemble_weights(self, X, y):
         """⚖️ 앙상블 가중치 계산 (교차검증 기반)"""
+        if not SKLEARN_AVAILABLE:
+            print(f"   ⚠️  scikit-learn 없음, 균등 가중치 사용")
+            self.ensemble_weights = {name: 1.0/len(self.models) for name in self.models.keys()}
+            return
+            
         try:
             from sklearn.model_selection import TimeSeriesSplit
             from sklearn.metrics import mean_squared_error
@@ -2402,7 +2480,7 @@ def main():
     model = PricePredictionModel()
     
     # Optuna 최적화 실행
-    if args.optimize or args.optimization_only:
+    if (args.optimize or args.optimization_only) and OPTUNA_AVAILABLE:
         print("\n" + "=" * 70)
         print("🔧 Optuna 파라미터 최적화 시작")
         print("=" * 70)
@@ -2466,6 +2544,11 @@ def main():
             print("🎯 최적화 완료 - 프로그램 종료")
             print("=" * 70)
             return
+    elif args.optimize or args.optimization_only:
+        print("\n" + "=" * 70)
+        print("⚠️ Optuna가 설치되지 않아 최적화를 건너뜁니다.")
+        print("=" * 70)
+        best_params = None
     
     # 🔍 2단계: 특정 기능 확인 (고급 피처 분석)
     print("\n" + "=" * 70)
