@@ -212,24 +212,20 @@ class BacktestEngine:
             print(f"데이터 정보 조회 오류: {e}")
             return None
     
-    def download_data(self, symbol, start_date, end_date):
-        """지정된 기간의 데이터 다운로드"""
+    def download_data(self, symbol, start_date, end_date, save_csv=True):
+        """지정된 기간의 데이터 다운로드 및 CSV 저장"""
         try:
             file_path = os.path.join(self.data_dir, f"{symbol}.csv")
             if not os.path.exists(file_path):
                 return None
-                
             df = pd.read_csv(file_path)
             df['Date'] = pd.to_datetime(df['Date'])
-            
             # 날짜 필터링
             start_dt = datetime.fromisoformat(start_date)
             end_dt = datetime.fromisoformat(end_date)
             filtered_df = df[(df['Date'] >= start_dt) & (df['Date'] <= end_dt)]
-            
             if len(filtered_df) == 0:
                 return None
-                
             # OHLCV 데이터로 변환
             ohlcv_data = []
             for _, row in filtered_df.iterrows():
@@ -241,21 +237,27 @@ class BacktestEngine:
                     'close': float(row['Close']),
                     'volume': float(row['Volume'])
                 })
-            
+            # CSV 저장
+            saved_csv_path = None
+            if save_csv:
+                save_dir = os.path.join(self.data_dir, 'downloaded')
+                os.makedirs(save_dir, exist_ok=True)
+                saved_csv_path = os.path.join(save_dir, f"{symbol}_{start_date}_{end_date}.csv")
+                filtered_df.to_csv(saved_csv_path, index=False)
             return {
                 'symbol': symbol,
                 'start_date': start_date,
                 'end_date': end_date,
                 'data_points': len(ohlcv_data),
-                'ohlcv': ohlcv_data
+                'ohlcv': ohlcv_data,
+                'csv_path': saved_csv_path
             }
-            
         except Exception as e:
             print(f"데이터 다운로드 오류: {e}")
             return None
     
-    def run_backtest(self, config, progress_callback=None):
-        """백테스트 실행 (실시간 진행상황 콜백 지원)"""
+    def run_backtest(self, config, progress_callback=None, stop_flag=None):
+        """백테스트 실행 (다운로드된 CSV 우선 사용, 실시간 진행상황 콜백 지원)"""
         try:
             # 설정 추출
             start_date_str = config.get('start_date')
@@ -266,37 +268,50 @@ class BacktestEngine:
             strategy_params = config.get('params', {})
             leverage = config.get('leverage', 1)
             position_pct = config.get('position_pct', 1.0)
-            
-            print(f"백테스트 실행: {symbol} ({start_date_str} ~ {end_date_str})")
-            print(f"전략: {strategy_name}, 파라미터: {strategy_params}")
-            
+
+            if progress_callback:
+                progress_callback({'type': 'log', 'message': f"[시작] 백테스트 실행: {symbol} ({start_date_str} ~ {end_date_str})"})
+                progress_callback({'type': 'log', 'message': f"전략: {strategy_name}, 파라미터: {strategy_params}"})
+
+            # 중지 플래그: threading.Event 또는 [False] 리스트 등 사용 가능
+            if stop_flag is None:
+                stop_flag = [False]
+
             # 1. Cerebro 엔진 설정
             cerebro = bt.Cerebro()
             cerebro.broker.setcash(initial_capital)
             cerebro.broker.setcommission(commission=0.001)  # 0.1% 수수료
-            
+
             # 2. 전략 클래스 확인
             strategy_class = STRATEGY_REGISTRY.get(strategy_name)
             if not strategy_class:
                 raise ValueError(f"전략 '{strategy_name}'을(를) 찾을 수 없습니다.")
-            
-            # 3. 데이터 로드
-            file_path = os.path.join(self.data_dir, f"{symbol}.csv")
+
+            # 3. 데이터 로드: 다운로드된 CSV 우선 사용
+            downloaded_path = os.path.join(self.data_dir, 'downloaded', f"{symbol}_{start_date_str}_{end_date_str}.csv")
+            if os.path.exists(downloaded_path):
+                file_path = downloaded_path
+            else:
+                file_path = os.path.join(self.data_dir, f"{symbol}.csv")
             if not os.path.exists(file_path):
                 raise FileNotFoundError(f"데이터 파일을 찾을 수 없습니다: {file_path}")
-                
+
             df = pd.read_csv(file_path)
             df['Date'] = pd.to_datetime(df['Date'])
             df.set_index('Date', inplace=True)
-            
-            # 날짜 필터링
-            start_date = datetime.fromisoformat(start_date_str)
-            end_date = datetime.fromisoformat(end_date_str)
-            df = df[(df.index >= start_date) & (df.index <= end_date)]
-            
+
+            # 날짜 필터링(다운로드된 파일이면 이미 필터됨)
+            if not os.path.exists(downloaded_path):
+                start_date = datetime.fromisoformat(start_date_str)
+                end_date = datetime.fromisoformat(end_date_str)
+                df = df[(df.index >= start_date) & (df.index <= end_date)]
+            else:
+                start_date = datetime.fromisoformat(start_date_str)
+                end_date = datetime.fromisoformat(end_date_str)
+
             if len(df) == 0:
                 raise ValueError("선택한 기간에 데이터가 없습니다.")
-            
+
             # 4. 데이터 피드 생성
             data_feed = bt.feeds.PandasData(
                 dataname=df,
@@ -309,57 +324,79 @@ class BacktestEngine:
                 openinterest=-1
             )
             cerebro.adddata(data_feed)
-            
+
             # 5. 분석기 추가
             cerebro.addanalyzer(EquityCurveAnalyzer, _name='equity')
             cerebro.addanalyzer(TradeLogAnalyzer, _name='trades')
             cerebro.addanalyzer(bt.analyzers.SharpeRatio, _name='sharpe')
             cerebro.addanalyzer(bt.analyzers.DrawDown, _name='drawdown')
             cerebro.addanalyzer(bt.analyzers.TradeAnalyzer, _name='trade_analysis')
-            
+
             # 6. 전략 실행
+            if progress_callback:
+                progress_callback({'type': 'log', 'message': '[실행] 전략 시뮬레이션 시작'})
             results = cerebro.run(strategy=strategy_class, **strategy_params)
             strategy = results[0]
-            
+
             # 7. 결과 분석
             equity_analyzer = strategy.analyzers.equity.get_analysis()
             trade_analyzer = strategy.analyzers.trades.get_analysis()
             sharpe_analyzer = strategy.analyzers.sharpe.get_analysis()
             drawdown_analyzer = strategy.analyzers.drawdown.get_analysis()
             trade_analysis = strategy.analyzers.trade_analysis.get_analysis()
-            
+
             # 8. 자산 곡선 데이터 생성
             equity_curve = []
+            total_steps = len(equity_analyzer['equity_curve'])
+            # 진행률/ETA 계산용 시작 시간
+            start_time = time.time()
             for i, (date, equity) in enumerate(zip(equity_analyzer['dates'], equity_analyzer['equity_curve'])):
+                # 중지 요청 시 즉시 종료
+                if stop_flag and (hasattr(stop_flag, 'is_set') and stop_flag.is_set() or isinstance(stop_flag, list) and stop_flag[0]):
+                    if progress_callback:
+                        progress_callback({'type': 'log', 'message': '[중지] 백테스트가 사용자에 의해 중단되었습니다.'})
+                        progress_callback({'type': 'stopped'})
+                    return {
+                        'success': False,
+                        'error': '백테스트가 중지되었습니다.'
+                    }
                 equity_curve.append({
                     'time': date.isoformat(),
                     'value': float(equity)
                 })
-                
+
                 # 진행상황 콜백 (실시간 업데이트용)
-                if progress_callback and i % max(1, len(equity_curve) // 100) == 0:
-                    progress = (i / len(equity_analyzer['equity_curve'])) * 100
+                if progress_callback and total_steps > 0 and i % max(1, total_steps // 100) == 0:
+                    progress = (i / total_steps) * 100
+                    eta = None
+                    if i > 0:
+                        elapsed = time.time() - start_time
+                        eta = elapsed / (i / total_steps) - elapsed if i > 0 else None
                     progress_callback({
+                        'type': 'progress',
                         'progress': progress,
                         'current_equity': float(equity),
-                        'total_return': ((equity - initial_capital) / initial_capital) * 100
+                        'total_return': ((equity - initial_capital) / initial_capital) * 100,
+                        'step': i,
+                        'total_steps': total_steps,
+                        'eta': eta
                     })
-            
+
             # 9. 최종 결과 정리
             final_capital = strategy.broker.getvalue()
             total_return = ((final_capital - initial_capital) / initial_capital) * 100
-            
+
             # 승률 계산
             total_trades = len(trade_analysis.get('total', {}).get('total', 0))
             won_trades = len(trade_analysis.get('won', {}).get('total', 0))
             win_rate = (won_trades / total_trades * 100) if total_trades > 0 else 0
-            
+
             # 최대 낙폭
             max_drawdown = drawdown_analyzer.get('max', {}).get('drawdown', 0) * 100
-            
+
             # 샤프 지수
             sharpe_ratio = sharpe_analyzer.get('sharperatio', 0)
-            
+
             # 매매 로그 포맷팅
             formatted_trades = []
             for trade in trade_analyzer:
@@ -374,7 +411,11 @@ class BacktestEngine:
                     'commission': f"{trade['commission']:.2f}",
                     'pnl': f"{trade.get('pnl', 0):.2f}"
                 })
-            
+
+            if progress_callback:
+                progress_callback({'type': 'log', 'message': '[완료] 백테스트 종료'})
+                progress_callback({'type': 'result', 'final_capital': final_capital, 'total_return': total_return, 'win_rate': win_rate, 'max_drawdown': max_drawdown, 'sharpe_ratio': sharpe_ratio, 'total_trades': total_trades})
+
             result = {
                 'success': True,
                 'symbol': symbol,
@@ -404,11 +445,13 @@ class BacktestEngine:
                     )
                 }
             }
-            
+
             return result
-            
+
         except Exception as e:
             print(f"백테스트 실행 오류: {e}")
+            if progress_callback:
+                progress_callback({'type': 'error', 'message': f"[에러] {str(e)}"})
             return {
                 'success': False,
                 'error': str(e)

@@ -43,6 +43,17 @@ SEND_TO_DASHBOARD = True
 # Enum 정의
 from enum import Enum
 
+# 백테스트 결과를 파일로 저장하는 함수
+def save_backtest_results_to_file(results, file_path="dashboard/results/latest_backtest_results.json"):
+    try:
+        import json
+        os.makedirs(os.path.dirname(file_path), exist_ok=True)
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(results, f, ensure_ascii=False, indent=2)
+        print(f"✅ 백테스트 결과 파일 저장 완료: {file_path}")
+    except Exception as e:
+        print(f"백테스트 결과 파일 저장 오류: {e}")
+
 class MarketCondition(Enum):
     BULL = "BULL"
     BEAR = "BEAR"
@@ -1637,17 +1648,19 @@ def run_crypto_backtest(df: pd.DataFrame, initial_capital: float = 10000000, mod
         }
     }
     
-    # 최종 결과를 대시보드로 전송 (최적화 모드가 아닐 때만)
+    # 최종 결과를 대시보드로 전송 및 파일 저장 (최적화 모드가 아닐 때만)
     if not is_optimization:
         send_report_to_dashboard(results)
         send_log_to_dashboard("백테스트 완료!")
         send_log_to_dashboard(f"최종 결과 - 자본: ₩{current_capital:,.0f}, 수익률: {total_return:.2f}%, 승률: {win_rate:.1f}%")
-    
+        try:
+            save_backtest_results_to_file(results)
+        except Exception as e:
+            print(f"백테스트 결과 파일 저장 실패: {e}")
     logger.info(f"백테스트 완료 - 최종 자본: ₩{current_capital:,.0f}")
     logger.info(f"총 수익률: {total_return:.2f}%")
     logger.info(f"승률: {win_rate:.1f}%")
     logger.info(f"최대 낙폭: {max_drawdown:.2f}%")
-    
     return results
 
 def analyze_market_condition(row: pd.Series) -> MarketCondition:

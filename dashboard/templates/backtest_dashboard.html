@@ -378,18 +378,28 @@
             <h3><i class="fas fa-cog"></i> 백테스트 설정</h3>
             
             <div class="row">
-                <div class="col-md-6">
+                <div class="col-md-3">
                     <div class="form-group">
-                        <label class="form-label">기간 설정</label>
-                        <input type="text" id="dateRange" class="form-control" placeholder="날짜 범위를 선택하세요">
+                        <label class="form-label">시작일</label>
+                        <input type="date" id="startDate" class="form-control">
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="form-group">
+                        <label class="form-label">종료일</label>
+                        <input type="date" id="endDate" class="form-control">
                     </div>
                 </div>
                 <div class="col-md-6">
                     <div class="form-group">
                         <label class="form-label">심볼</label>
+                        <label class="form-label">심볼 <span class="badge bg-info">BTC/USDT만 지원</span></label>
                         <select id="symbolSelect" class="form-select" disabled>
                             <option value="BTC_USDT">BTC/USDT</option>
                         </select>
+                        <div class="form-text text-danger">※ 현재 백테스트는 BTC/USDT만 지원합니다.</div>
+                        <!-- 날짜 제한은 JS에서 동적으로 설정 -->
+                        <!-- 날짜 제한은 JS에서 동적으로 설정 -->
                     </div>
                 </div>
             </div>
@@ -412,14 +422,24 @@
             </div>
             
             <div class="row mt-3">
-                <div class="col-md-6">
+                <div class="col-md-3">
                     <button id="downloadBtn" class="btn btn-primary w-100">
                         <i class="fas fa-download"></i> 1. 데이터 다운로드
                     </button>
                 </div>
-                <div class="col-md-6">
+                <div class="col-md-3">
+                    <button id="downloadStopBtn" class="btn btn-warning w-100" style="display:none;">
+                        <i class="fas fa-stop"></i> 다운로드 정지
+                    </button>
+                </div>
+                <div class="col-md-3">
                     <button id="backtestBtn" class="btn btn-success w-100" disabled>
                         <i class="fas fa-play"></i> 2. 백테스트 시작
+                    </button>
+                </div>
+                <div class="col-md-3">
+                    <button id="backtestStopBtn" class="btn btn-danger w-100" style="display:none;">
+                        <i class="fas fa-stop"></i> 백테스트 정지
                     </button>
                 </div>
             </div>
@@ -505,6 +525,9 @@
         let downloadedData = null;
         let dataStatus = 'idle'; // 'idle', 'downloading', 'ready', 'error'
         let backtestRunning = false;
+        let downloadRunning = false;
+        let dataMinDate = null;
+        let dataMaxDate = null;
         
         // 전략별 기본 파라미터
         const strategyParams = {
@@ -531,14 +554,26 @@
         
         // 페이지 로드 시 초기화
         document.addEventListener('DOMContentLoaded', function() {
-            initializeDateRangePicker();
             loadDataInfo();
-            
             // 이벤트 리스너 등록
             document.getElementById('strategySelect').addEventListener('change', updateParamInputs);
             document.getElementById('downloadBtn').addEventListener('click', downloadData);
+            document.getElementById('downloadStopBtn').addEventListener('click', stopDownload);
             document.getElementById('backtestBtn').addEventListener('click', runBacktest);
+            document.getElementById('backtestStopBtn').addEventListener('click', stopBacktest);
+
+            // 시작일/종료일 입력 시 다운로드 버튼 활성화
+            document.getElementById('startDate').addEventListener('input', checkDownloadReady);
+            document.getElementById('endDate').addEventListener('input', checkDownloadReady);
+            checkDownloadReady();
         });
+
+        // 시작일/종료일 입력 시 다운로드 버튼 활성화
+        function checkDownloadReady() {
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            document.getElementById('downloadBtn').disabled = !(start && end);
+        }
         
         // 날짜 범위 선택기 초기화
         function initializeDateRangePicker() {
@@ -567,7 +602,6 @@
                         showError(data.error);
                         return;
                     }
-                    
                     // 심볼 옵션 업데이트
                     const symbolSelect = document.getElementById('symbolSelect');
                     symbolSelect.innerHTML = '';
@@ -577,9 +611,16 @@
                         option.textContent = symbol.replace('_', '/');
                         symbolSelect.appendChild(option);
                     });
-                    
-                    // 데이터 기간 정보 표시
+                    // 데이터 기간 정보 표시 및 달력 제한
                     if (data.start_date && data.end_date) {
+                        dataMinDate = data.start_date;
+                        dataMaxDate = data.end_date;
+                        document.getElementById('startDate').setAttribute('min', dataMinDate);
+                        document.getElementById('startDate').setAttribute('max', dataMaxDate);
+                        document.getElementById('endDate').setAttribute('min', dataMinDate);
+                        document.getElementById('endDate').setAttribute('max', dataMaxDate);
+                        document.getElementById('startDate').value = dataMinDate;
+                        document.getElementById('endDate').value = dataMaxDate;
                         const periodInfo = document.createElement('div');
                         periodInfo.className = 'data-period';
                         periodInfo.innerHTML = `<strong>백테스트 가능 기간:</strong> ${data.start_date} ~ ${data.end_date}`;
@@ -620,23 +661,53 @@
         }
         
         // 데이터 다운로드
+        // 데이터 다운로드 (진행률/예상시간 표시)
         function downloadData() {
-            const dateRange = $('#dateRange').data('daterangepicker');
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
             const symbol = 'BTC_USDT';
-            if (!dateRange.startDate || !dateRange.endDate) {
-                showError('날짜 범위를 선택해주세요.');
+            if (!startDate || !endDate) {
+                showError('시작일과 종료일을 선택해주세요.');
                 return;
             }
             setDataStatus('downloading');
             showProgress();
+            downloadRunning = true;
+            document.getElementById('downloadBtn').style.display = 'none';
+            document.getElementById('downloadStopBtn').style.display = '';
+
+            // 진행률 초기화
+            updateProgress(0);
+            let progress = 0;
+            let estTime = 0;
+            let progressInterval = null;
+            const startTime = Date.now();
+
+            // 진행률 시뮬레이션 (실제 구현 시 서버에서 진행률 받아와야 함)
+            progressInterval = setInterval(() => {
+                if (!downloadRunning) {
+                    clearInterval(progressInterval);
+                    return;
+                }
+                progress += Math.random() * 10 + 5; // 5~15% 증가
+                if (progress > 100) progress = 100;
+                estTime = Math.max(0, 5 - ((Date.now() - startTime) / 1000));
+                updateProgress(progress);
+                showStatus(`데이터 다운로드 중... (${Math.round(progress)}%)  예상 남은 시간: ${estTime.toFixed(1)}초`, 'loading');
+                if (progress >= 100) {
+                    clearInterval(progressInterval);
+                }
+            }, 400);
+
             const params = new URLSearchParams({
                 symbol: symbol,
-                start_date: dateRange.startDate.format('YYYY-MM-DD'),
-                end_date: dateRange.endDate.format('YYYY-MM-DD')
+                start_date: startDate,
+                end_date: endDate
             });
             fetch(`/api/data/download?${params}`)
                 .then(response => response.json())
                 .then(data => {
+                    if (!downloadRunning) return;
                     if (data.error) {
                         setDataStatus('error');
                         showError(data.error);
@@ -649,11 +720,25 @@
                     showStatus(`✅ 데이터 다운로드 완료 (${data.data_points}개 데이터 포인트)`, 'ready');
                 })
                 .catch(error => {
+                    if (!downloadRunning) return;
                     console.error('데이터 다운로드 오류:', error);
                     setDataStatus('error');
                     hideProgress();
                     showError('데이터 다운로드 중 오류가 발생했습니다.');
+                })
+                .finally(() => {
+                    document.getElementById('downloadBtn').style.display = '';
+                    document.getElementById('downloadStopBtn').style.display = 'none';
+                    downloadRunning = false;
                 });
+        }
+
+        function stopDownload() {
+            downloadRunning = false;
+            hideProgress();
+            showStatus('데이터 다운로드가 중지되었습니다.', 'error');
+            document.getElementById('downloadBtn').style.display = '';
+            document.getElementById('downloadStopBtn').style.display = 'none';
         }
         
         // 백테스트 실행
@@ -662,24 +747,37 @@
                 showError('먼저 데이터를 다운로드해야 합니다.');
                 return;
             }
-            const dateRange = $('#dateRange').data('daterangepicker');
+            const startDate = document.getElementById('startDate').value;
+            const endDate = document.getElementById('endDate').value;
             const symbol = 'BTC_USDT';
             const strategy = 'CVD_0.01';
             const initialCapital = parseFloat(document.getElementById('initialCapital').value);
             const config = {
                 symbol: symbol,
                 strategy: strategy,
-                start_date: dateRange.startDate.format('YYYY-MM-DD'),
-                end_date: dateRange.endDate.format('YYYY-MM-DD'),
+                start_date: startDate,
+                end_date: endDate,
                 initial_capital: initialCapital,
                 params: {}
             };
             backtestRunning = true;
             document.getElementById('backtestBtn').disabled = true;
+            document.getElementById('backtestBtn').style.display = 'none';
+            document.getElementById('backtestStopBtn').style.display = '';
             document.getElementById('downloadBtn').disabled = true;
             showProgress();
             showStatus('백테스트 실행 중...', 'loading');
             simulateBacktest(config);
+        }
+
+        function stopBacktest() {
+            backtestRunning = false;
+            hideProgress();
+            showStatus('백테스트가 중지되었습니다.', 'error');
+            document.getElementById('backtestBtn').style.display = '';
+            document.getElementById('backtestStopBtn').style.display = 'none';
+            document.getElementById('backtestBtn').disabled = false;
+            document.getElementById('downloadBtn').disabled = false;
         }
         
         // 백테스트 시뮬레이션 (실제로는 서버에서 실행)
@@ -863,5 +961,23 @@
         });
     </script>
 </body>
+        <script>
+        // 실제 데이터 범위에 맞게 날짜 선택 제한
+        document.addEventListener('DOMContentLoaded', function() {
+            fetch('/api/data/info')
+                .then(res => res.json())
+                .then(data => {
+                    if (data && data.start_date && data.end_date) {
+                        document.getElementById('startDate').setAttribute('min', data.start_date);
+                        document.getElementById('startDate').setAttribute('max', data.end_date);
+                        document.getElementById('endDate').setAttribute('min', data.start_date);
+                        document.getElementById('endDate').setAttribute('max', data.end_date);
+                        // 기본값도 데이터 범위 내로
+                        document.getElementById('startDate').value = data.start_date;
+                        document.getElementById('endDate').value = data.end_date;
+                    }
+                });
+        });
+        </script>
 </html>
 
