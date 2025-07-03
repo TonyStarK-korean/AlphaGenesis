@@ -82,7 +82,7 @@ class DetailedBacktestLogger:
         print(f"📊 총 거래 수: {self.trade_count}건")
         print(f"✅ 승리 거래: {self.win_count}건")
         print(f"❌ 손실 거래: {self.loss_count}건")
-        print(f"�� 승률: {win_rate:.1f}%")
+        print(f"승률: {win_rate:.1f}%")
         print(f"📈 총 수익: {self.total_profit:,.0f}원")
         print(f"📉 총 손실: {self.total_loss:,.0f}원")
         print(f"💵 순손익: {self.total_profit - self.total_loss:,.0f}원")
@@ -91,7 +91,7 @@ class DetailedBacktestLogger:
 def run_detailed_backtest_with_logs():
     """상세 로그와 함께 백테스트 실행"""
     
-    print("�� AlphaGenesis 상세 백테스트 시작")
+    print("AlphaGenesis 상세 백테스트 시작")
     print("=" * 120)
     
     # 설정
@@ -144,7 +144,7 @@ def run_detailed_backtest_with_logs():
     print("✅ ML 모델 훈련 완료")
     
     # 4. 백테스트 실행
-    print("\n�� 백테스트 실행 중...")
+    print("\n백테스트 실행 중...")
     print("=" * 120)
     print("종목      | 시장국면 | 방향 | 전략        | 수익률   | 수익금      | 남은자산")
     print("-" * 120)
@@ -320,7 +320,7 @@ if __name__ == "__main__":
     results = run_detailed_backtest_with_logs()
     
     if results:
-        print(f"\n�� 백테스트 완료!")
+        print(f"\n백테스트 완료!")
         print(f"   최종 수익률: {results['total_return']:.2f}%")
         print(f"   총 거래 수: {results['total_trades']}건")
         print(f"   승률: {results['win_rate']:.1f}%")
