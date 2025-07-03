@@ -126,14 +126,11 @@ def improved_backtest():
     df = make_features(df)
     print("✅ 피처 생성 완료")
     
-    # ML 모델 훈련 (수정된 부분)
+    # ML 모델 훈련
     print("\n🤖 ML 모델 훈련 중...")
     model = PricePredictionModel()
-    success = model.fit(df, target_col='close', horizon=1, tune=False)  # train -> fit으로 변경
-    if success:
-        print("✅ ML 모델 훈련 완료")
-    else:
-        print("⚠️ ML 모델 훈련 실패, 기본 모델 사용")
+    model.train(df)
+    print("✅ ML 모델 훈련 완료")
     
     # 백테스트 실행
     print("\n백테스트 실행 중...")
