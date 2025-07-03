@@ -311,7 +311,7 @@ scp -r username@34.47.77.230:/path/to/AlphaGenesis/logs C:\Project\AlphaGenesis\
 
 **AlphaGenesis** - 상위 0.01%급 통합 고수익 자동매매 시스템
 
-Copyright © 2024 AlphaGenesis Team
+Copyright © 2025 AlphaGenesis Team
 
 이 프로젝트는 교육 및 연구 목적으로 개발되었습니다. 실전 투자에 사용 시 발생하는 모든 손실에 대해 책임지지 않습니다.
 
@@ -319,4 +319,4 @@ Copyright © 2024 AlphaGenesis Team
 
 **🎯 상위 0.01%급 통합 고수익 전략으로 월 수익률 25~35% 달성!**
 
-*Last Updated: 2024-01-15* 
+*Last Updated: 2025-07-03* 
