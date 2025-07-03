@@ -129,8 +129,11 @@ def improved_backtest():
     # ML 모델 훈련
     print("\n🤖 ML 모델 훈련 중...")
     model = PricePredictionModel()
-    model.train(df)
-    print("✅ ML 모델 훈련 완료")
+    success = model.fit(df, target_col='close', horizon=1, tune=False)
+    if success:
+        print("✅ ML 모델 훈련 완료")
+    else:
+        print("⚠️ ML 모델 훈련 실패, 기본 모델 사용")
     
     # 백테스트 실행
     print("\n백테스트 실행 중...")
