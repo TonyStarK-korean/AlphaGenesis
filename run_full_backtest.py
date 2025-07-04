@@ -192,4 +192,140 @@ class BacktestEngine:
                         self.position_info['stop_loss'], self.position_info['take_profit']
                     )
                     if should_close:
-                        pnl = calculate_pnl(self.position, self
+                        pnl = calculate_pnl(self.position, self)
+                        self.capital += pnl
+                        self.peak_capital = max(self.peak_capital, self.capital)
+                        self.trades.append({
+                            'entry_time': self.position_info['entry_time'],
+                            'exit_time': current_time,
+                            'position': self.position,
+                            'entry_price': self.position_info['entry_price'],
+                            'exit_price': current_price,
+                            'pnl': pnl,
+                            'leverage': self.position_info.get('leverage', 1),
+                            'reason': close_reason
+                        })
+                        self.position = 0
+                        self.position_info = {}
+                        position_closed_in_hour = True
+                        self.consecutive_wins = 0
+                        self.consecutive_losses += 1
+                        self.logger.log_trade_event(current_time, 'CLOSE', pnl, self.capital)
+
+            # --- 포지션 유지/진입 결정 ---
+            if self.position == 0:
+                # 포지션이 없을 때만 진입 신호 확인
+                if row_1h.get('long_entry_signal') == 1:
+                    # 롱 진입 신호
+                    entry_price = row_1h['close']
+                    stop_loss = entry_price * 0.98 # 진입가 대비 2% 손절
+                    take_profit = entry_price * 1.05 # 진입가 대비 5% 익절
+                    signal_strength = row_1h.get('signal_strength', 1)
+                    dynamic_leverage, reasons = self._calculate_dynamic_leverage(row_1h, row_1h)
+                    self.position = 1
+                    self.position_info = {
+                        'entry_time': idx_1h,
+                        'entry_price': entry_price,
+                        'stop_loss': stop_loss,
+                        'take_profit': take_profit,
+                        'leverage': dynamic_leverage,
+                        'signal_strength': signal_strength,
+                        'reasons': reasons
+                    }
+                    self.capital -= (entry_price * dynamic_leverage)
+                    self.logger.log_trade_event(idx_1h, 'OPEN_LONG', entry_price, self.capital, dynamic_leverage, reasons)
+                
+                elif row_1h.get('short_entry_signal') == 1:
+                    # 숏 진입 신호
+                    entry_price = row_1h['close']
+                    stop_loss = entry_price * 1.02 # 진입가 대비 2% 손절
+                    take_profit = entry_price * 0.95 # 진입가 대비 5% 익절
+                    signal_strength = row_1h.get('signal_strength', 1)
+                    dynamic_leverage, reasons = self._calculate_dynamic_leverage(row_1h, row_1h)
+                    self.position = -1
+                    self.position_info = {
+                        'entry_time': idx_1h,
+                        'entry_price': entry_price,
+                        'stop_loss': stop_loss,
+                        'take_profit': take_profit,
+                        'leverage': dynamic_leverage,
+                        'signal_strength': signal_strength,
+                        'reasons': reasons
+                    }
+                    self.capital += (entry_price * dynamic_leverage)
+                    self.logger.log_trade_event(idx_1h, 'OPEN_SHORT', entry_price, self.capital, dynamic_leverage, reasons)
+
+            # --- 포지션 상태에 따른 자본 곡선 업데이트 ---
+            self.equity_curve.append({'time': idx_1h, 'capital': self.capital})
+
+            # --- Phase 업데이트 ---
+            self._update_phase(row_1h)
+
+        print("✅ 백테스트 완료!")
+        return pd.DataFrame(self.equity_curve).set_index('time')
+
+def parse_arguments():
+    """
+    커맨드 라인 인자를 파싱합니다.
+    """
+    parser = argparse.ArgumentParser(description="AlphaGenesis 통합 백테스트 실행기")
+    parser.add_argument("--start_date", type=str, default="2022-01-01", help="백테스트 시작 날짜 (형식: YYYY-MM-DD)")
+    parser.add_argument("--end_date", type=str, default=str(datetime.now().date()), help="백테스트 종료 날짜 (형식: YYYY-MM-DD)")
+    parser.add_argument("--symbol", type=str, default="BTC/USDT", help="거래할 심볼")
+    parser.add_argument("--interval", type=str, default="1h", help="캔들스틱 인터벌 (예: 1m, 5m, 1h, 1d)")
+    parser.add_argument("--leverage", type=float, default=1.0, help="기본 레버리지 설정")
+    parser.add_argument("--capital", type=float, default=100000, help="초기 자본금")
+    parser.add_argument("--mode", type=str, default="test", help="모드 선택 (test 또는 live)")
+    return parser.parse_args()
+
+def main():
+    """
+    메인 함수: 전체 백테스트 프로세스를 관장합니다.
+    """
+    args = parse_arguments()
+
+    # --- 0. 로깅 및 설정 ---
+    log_filename = f"backtest_log_{args.symbol.replace('/', '_')}_{args.start_date}_to_{args.end_date}.txt"
+    setup_logging(log_filename)
+    logger = BacktestLogger(log_filename)
+    logger.log_system_event(datetime.now(), "백테스트 시작", {
+        "심볼": args.symbol,
+        "시작일자": args.start_date,
+        "종료일자": args.end_date,
+        "기본레버리지": args.leverage,
+        "초기자본금": args.capital,
+        "모드": args.mode
+    })
+
+    # --- 1. 데이터 다운로드 및 전처리 ---
+    print("📥 데이터 다운로드 및 전처리 중...")
+    downloader = LocalDataDownloaderFixed(args.symbol, args.start_date, args.end_date, args.interval)
+    df_1h, df_5m = downloader.get_data()
+    
+    if df_1h is None or df_5m is None:
+        print("❌ 데이터프레임이 비어있습니다. 데이터 다운로드에 실패했습니다.")
+        return
+
+    # --- 2. 전략 및 모델 초기화 ---
+    print("🛠️ 전략 및 모델 초기화 중...")
+    strategy_manager = None # 전략 매니저 초기화 (필요시 추가 기능 구현)
+    model = PricePredictionModel() # 기본 모델 인스턴스 생성 (추후 개선 가능)
+    backtest_engine = BacktestEngine(args.capital, strategy_manager, model, logger)
+
+    # --- 3. 백테스트 실행 ---
+    result_equity_curve = backtest_engine.run(df_1h, df_5m)
+
+    # --- 4. 결과 분석 및 저장 ---
+    result_filename = f"backtest_result_{args.symbol.replace('/', '_')}_{args.start_date}_to_{args.end_date}.csv"
+    result_equity_curve.to_csv(result_filename)
+    print(f"📈 결과 저장 완료: {result_filename}")
+
+    logger.log_system_event(datetime.now(), "백테스트 종료", {
+        "최종자본금": backtest_engine.capital,
+        "거래건수": len(backtest_engine.trades),
+        "연속승리": backtest_engine.consecutive_wins,
+        "연속패배": backtest_engine.consecutive_losses
+    })
+
+if __name__ == "__main__":
+    main()
