@@ -351,13 +351,18 @@ class DataManager:
     def _is_valid_symbol(self, symbol: str) -> bool:
         """심볼 유효성 검사"""
         try:
-            # 기본 심볼 리스트
+            # 기본 심볼 리스트 (바이낸스에서 확인된 심볼들)
             valid_symbols = [
                 'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'DOT/USDT',
                 'SOL/USDT', 'AVAX/USDT', 'MATIC/USDT', 'LINK/USDT', 'UNI/USDT',
                 'LTC/USDT', 'BCH/USDT', 'XRP/USDT', 'DOGE/USDT', 'ATOM/USDT',
                 'FTM/USDT', 'NEAR/USDT', 'ALGO/USDT', 'VET/USDT', 'MANA/USDT',
-                'SAND/USDT', 'AXS/USDT', 'THETA/USDT', 'FIL/USDT', 'TRX/USDT'
+                'SAND/USDT', 'AXS/USDT', 'THETA/USDT', 'FIL/USDT', 'TRX/USDT',
+                'SHIB/USDT', 'COTI/USDT', 'APE/USDT', 'GMT/USDT', 'CRV/USDT',
+                'AAVE/USDT', 'SUSHI/USDT', 'COMP/USDT', 'YFI/USDT', 'SNX/USDT',
+                'MKR/USDT', 'UMA/USDT', 'BAL/USDT', 'REN/USDT', 'KNC/USDT',
+                'ZRX/USDT', 'BAND/USDT', 'LRC/USDT', 'STORJ/USDT', 'BNT/USDT',
+                'ENJ/USDT', 'CHZ/USDT', 'HOT/USDT', 'DENT/USDT', 'WAN/USDT'
             ]
             
             # 심볼 정규화 후 검사

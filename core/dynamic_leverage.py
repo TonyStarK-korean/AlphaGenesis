@@ -80,14 +80,24 @@ class DynamicLeverageManager:
             레버리지 정보 딕셔너리
         """
         try:
+            # 데이터 유효성 검사
+            if market_data.empty or len(market_data) < 2:
+                return {
+                    'optimal_leverage': 1.0,
+                    'market_regime': 'sideways',
+                    'volatility': 0.2,
+                    'trend_strength': 0.0,
+                    'risk_level': 'medium'
+                }
+            
             # 1. 시장 국면 분석
-            market_regime = self._analyze_market_regime(market_data)
+            market_regime = self._analyze_market_regime_safe(market_data)
             
             # 2. 변동성 계산
-            volatility = self._calculate_volatility(market_data)
+            volatility = self._calculate_volatility_safe(market_data)
             
             # 3. 트렌드 강도 계산
-            trend_strength = self._calculate_trend_strength(market_data)
+            trend_strength = self._calculate_trend_strength_safe(market_data)
             
             # 4. 기본 레버리지 계산
             base_leverage = self.base_leverage
@@ -315,6 +325,57 @@ class DynamicLeverageManager:
             return "✅ 안정적 레버리지 - 적절한 위험 수준"
         else:
             return "🛡️ 보수적 레버리지 - 안전 우선"
+    
+    def _analyze_market_regime_safe(self, data: pd.DataFrame) -> str:
+        """시장 국면 분석 - 안전한 버전"""
+        try:
+            if data.empty or len(data) < 2:
+                return 'sideways'
+            
+            # 간단한 트렌드 분석
+            close_prices = data['close']
+            if len(close_prices) < 2:
+                return 'sideways'
+            
+            # 최근 가격 변화율
+            recent_change = (close_prices.iloc[-1] - close_prices.iloc[0]) / close_prices.iloc[0] * 100
+            
+            if recent_change > 5:
+                return 'bull_strong'
+            elif recent_change > 2:
+                return 'bull_weak'
+            elif recent_change > -2:
+                return 'sideways'
+            elif recent_change > -5:
+                return 'bear_weak'
+            else:
+                return 'bear_strong'
+                
+        except Exception as e:
+            logger.error(f"시장 국면 분석 실패: {e}")
+            return 'sideways'
+    
+    def _calculate_volatility_safe(self, data: pd.DataFrame) -> float:
+        """변동성 계산 - 안전한 버전"""
+        try:
+            if data.empty or len(data) < 2:
+                return 0.2
+            
+            # 간단한 변동성 계산
+            close_prices = data['close']
+            if len(close_prices) < 2:
+                return 0.2
+            
+            # 가격 변화율의 표준편차
+            returns = close_prices.pct_change().dropna()
+            if len(returns) > 0:
+                return float(returns.std()) * 100  # 백분율로 변환
+            else:
+                return 0.2
+                
+        except Exception as e:
+            logger.error(f"변동성 계산 실패: {e}")
+            return 0.2
 
 class SmartPositionManager:
     """지능형 포지션 관리자"""
@@ -450,3 +511,95 @@ class SmartPositionManager:
                 break
         
         return sell_schedule
+    
+    def _analyze_market_regime_safe(self, data: pd.DataFrame) -> str:
+        """시장 국면 분석 - 안전한 버전"""
+        try:
+            if data.empty or len(data) < 2:
+                return 'sideways'
+            
+            # 간단한 트렌드 분석
+            close_prices = data['close']
+            if len(close_prices) < 2:
+                return 'sideways'
+            
+            # 최근 가격 변화율
+            recent_change = (close_prices.iloc[-1] - close_prices.iloc[0]) / close_prices.iloc[0] * 100
+            
+            if recent_change > 5:
+                return 'bull_strong'
+            elif recent_change > 2:
+                return 'bull_weak'
+            elif recent_change > -2:
+                return 'sideways'
+            elif recent_change > -5:
+                return 'bear_weak'
+            else:
+                return 'bear_strong'
+                
+        except Exception as e:
+            logger.error(f"시장 국면 분석 실패: {e}")
+            return 'sideways'
+    
+    def _calculate_volatility_safe(self, data: pd.DataFrame) -> float:
+        """변동성 계산 - 안전한 버전"""
+        try:
+            if data.empty or len(data) < 2:
+                return 0.2
+            
+            # 간단한 변동성 계산
+            close_prices = data['close']
+            if len(close_prices) < 2:
+                return 0.2
+            
+            # 가격 변화율의 표준편차
+            returns = close_prices.pct_change().dropna()
+            if len(returns) > 0:
+                return float(returns.std()) * 100  # 백분율로 변환
+            else:
+                return 0.2
+                
+        except Exception as e:
+            logger.error(f"변동성 계산 실패: {e}")
+            return 0.2
+    
+    def _calculate_trend_strength_safe(self, data: pd.DataFrame) -> float:
+        """트렌드 강도 계산 - 안전한 버전"""
+        try:
+            if data.empty or len(data) < 2:
+                return 0.0
+            
+            # 간단한 트렌드 강도 계산
+            close_prices = data['close']
+            if len(close_prices) < 2:
+                return 0.0
+            
+            # 선형 회귀를 이용한 트렌드 강도
+            x = np.arange(len(close_prices))
+            y = close_prices.values
+            
+            # 상관계수를 이용한 트렌드 강도
+            correlation = np.corrcoef(x, y)[0, 1] if len(x) > 1 else 0
+            
+            return abs(correlation) if not np.isnan(correlation) else 0.0
+            
+        except Exception as e:
+            logger.error(f"트렌드 강도 계산 실패: {e}")
+            return 0.0
+    
+    def _assess_risk_level_safe(self, leverage: float, volatility: float, trend_strength: float) -> str:
+        """리스크 레벨 평가 - 안전한 버전"""
+        try:
+            # 리스크 점수 계산 (간단한 버전)
+            risk_score = (leverage - 1.0) * 10 + volatility * 100 + (1 - trend_strength) * 20
+            
+            if risk_score < 30:
+                return 'low'
+            elif risk_score < 60:
+                return 'medium'
+            else:
+                return 'high'
+                
+        except Exception as e:
+            logger.error(f"리스크 레벨 평가 실패: {e}")
+            return 'medium'
