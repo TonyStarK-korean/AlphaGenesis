@@ -1045,7 +1045,15 @@
                 eventSource.close();
             }
 
-            eventSource = new EventSource('/api/backtest/stream_log');
+            // 백테스트 설정 파라미터 준비
+            const params = new URLSearchParams({
+                start_date: document.getElementById('startDate').value,
+                end_date: document.getElementById('endDate').value,
+                symbol: document.querySelector('input[name="symbolType"]:checked').value === 'all' ? 'ALL_MARKET' : document.getElementById('symbolSelect').value,
+                strategy: document.getElementById('strategy').options[document.getElementById('strategy').selectedIndex].text
+            });
+
+            eventSource = new EventSource(`/api/backtest/stream_log?${params.toString()}`);
             
             eventSource.onmessage = function(event) {
                 const data = JSON.parse(event.data);

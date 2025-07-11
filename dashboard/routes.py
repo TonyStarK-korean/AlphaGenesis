@@ -491,52 +491,87 @@ def stream_backtest_log():
         import time
         import json
         import random
+        from datetime import datetime
+        
+        # 쿼리 파라미터에서 백테스트 설정 가져오기
+        start_date = request.args.get('start_date', '2025-01-01')
+        end_date = request.args.get('end_date', '2025-07-11')
+        symbol = request.args.get('symbol', 'BTC/USDT')
+        strategy = request.args.get('strategy', '트리플 콤보 전략')
+        
+        # 개별 심볼 선택 시 해당 심볼만 사용
+        if symbol == 'ALL_MARKET':
+            symbol = 'BTC/USDT'  # 전체 시장 분석 시 대표 심볼 사용
+            is_market_wide = True
+        else:
+            is_market_wide = False
+            # 심볼 형식 정규화
+            if 'USDT' in symbol and '/' not in symbol:
+                symbol = symbol.replace('USDT', '/USDT')
+        
+        # 날짜 포맷 변환
+        try:
+            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+            date_range = f"{start_dt.strftime('%Y-%m-%d')} ~ {end_dt.strftime('%Y-%m-%d')}"
+            period_days = (end_dt - start_dt).days
+        except:
+            date_range = f"{start_date} ~ {end_date}"
+            period_days = 30
         
         # 상세한 매매 시뮬레이션 로그
         log_events = [
             # 초기화 단계
             {"message": "🚀 백테스트 시작", "type": "system", "progress": 0},
-            {"message": "📊 BTC/USDT 데이터 로딩 중...", "type": "data", "progress": 5},
-            {"message": "✅ 2024-12-11 ~ 2025-01-11 (1개월) 데이터 로드 완료", "type": "data", "progress": 10},
-            {"message": "🔧 트리플 콤보 전략 초기화", "type": "strategy", "progress": 15},
+            {"message": f"📊 {symbol} 데이터 로딩 중...", "type": "data", "progress": 5},
+            {"message": f"✅ {date_range} ({period_days}일) 데이터 로드 완료", "type": "data", "progress": 10},
+            {"message": f"🔧 {strategy} 초기화", "type": "strategy", "progress": 15},
             {"message": "⚙️ 동적 레버리지 시스템 활성화", "type": "system", "progress": 20},
             {"message": "🎯 초기 자본: 10,000,000원 | 기본 비중: 6%", "type": "capital", "progress": 25},
             
             # 시장 분석 단계
-            {"message": "📈 시장 분석 중... 현재 BTC 가격: $43,250", "type": "market", "progress": 30},
-            {"message": "🔍 시장 국면 분석: 상승 추세 (RSI: 58.4, MACD: 양수)", "type": "analysis", "progress": 35},
+            {"message": f"📈 {'시장 전체' if is_market_wide else symbol} 분석 중... 현재 {symbol.split('/')[0]} 가격: $43,250", "type": "market", "progress": 30},
+            {"message": f"🔍 {'전체 시장' if is_market_wide else symbol} 국면 분석: 상승 추세 (RSI: 58.4, MACD: 양수)", "type": "analysis", "progress": 35},
             {"message": "⚡ 동적 레버리지 계산: 현재 변동성 12.5% → 레버리지 2.3x", "type": "leverage", "progress": 40},
             
-            # 첫 번째 매수 신호
+            # 첫 번째 매수 신호 - 상세 진입 로그
             {"message": "🎯 매수 신호 발생! RSI(52.1) + MACD 골든크로스 + 볼린저 하단 터치", "type": "signal", "progress": 45},
-            {"message": "💰 기본 매수 진입: 2% 비중 (200,000원) | 가격: $43,180", "type": "buy", "progress": 50},
-            {"message": "📊 포지션 정보: LONG 0.0046 BTC | 예상 수익률: +8.5%", "type": "position", "progress": 52},
+            {"message": "💰 [진입] 기본 매수 실행", "type": "buy", "progress": 50},
+            {"message": f"  └─ 심볼: {symbol} | 진입가: $43,180", "type": "buy", "progress": 50},
+            {"message": f"  └─ 수량: 0.0046 {symbol.split('/')[0]} | 투입금: 200,000원 (2%)", "type": "buy", "progress": 51},
+            {"message": f"  └─ 손절가: $41,022 (-5%) | 익절가: $47,498 (+10%)", "type": "buy", "progress": 51},
+            {"message": f"📊 포지션 현황: LONG 0.0046 {symbol.split('/')[0]} | 평균단가: $43,180", "type": "position", "progress": 52},
             
-            # 분할매수 시나리오
+            # 분할매수 시나리오 - 상세 로그
             {"message": "⚠️ 가격 하락 감지: $43,180 → $42,850 (-0.76%)", "type": "price", "progress": 55},
-            {"message": "🔄 분할매수 1차: 2% 추가 비중 (200,000원) | 가격: $42,850", "type": "buy_add", "progress": 58},
-            {"message": "📈 누적 포지션: 0.0093 BTC | 평균 단가: $43,015", "type": "position", "progress": 60},
+            {"message": "🔄 [분할매수 1차] 추가 진입 실행", "type": "buy_add", "progress": 58},
+            {"message": f"  └─ 진입가: $42,850 | 수량: +0.0047 {symbol.split('/')[0]} | 투입금: +200,000원", "type": "buy_add", "progress": 58},
+            {"message": f"📈 누적 포지션: 0.0093 {symbol.split('/')[0]} | 평균단가: $43,015 | 총투입: 400,000원", "type": "position", "progress": 60},
             
             {"message": "⚠️ 추가 하락: $42,850 → $42,520 (-0.77%)", "type": "price", "progress": 62},
-            {"message": "🔄 분할매수 2차 (최종): 2% 추가 비중 (200,000원) | 가격: $42,520", "type": "buy_add", "progress": 65},
-            {"message": "📊 최종 포지션: 0.0140 BTC | 평균 단가: $42,850 | 총 투입: 600,000원", "type": "position", "progress": 68},
+            {"message": "🔄 [분할매수 2차] 최종 진입 실행", "type": "buy_add", "progress": 65},
+            {"message": f"  └─ 진입가: $42,520 | 수량: +0.0047 {symbol.split('/')[0]} | 투입금: +200,000원", "type": "buy_add", "progress": 65},
+            {"message": f"📊 최종 포지션: 0.0140 {symbol.split('/')[0]} | 평균단가: $42,850 | 총투입: 600,000원", "type": "position", "progress": 68},
             
-            # 수익 전환 및 매도
+            # 수익 전환 및 매도 - 상세 청산 로그
             {"message": "🚀 반등 시작! $42,520 → $43,820 (+3.06%)", "type": "price", "progress": 70},
-            {"message": "💚 수익 전환: +$13,580 (+2.26%)", "type": "profit", "progress": 72},
-            {"message": "🎯 분할매도 1차: 33% 물량 매도 | 가격: $43,820", "type": "sell", "progress": 75},
-            {"message": "💰 부분 이익실현: +$4,526 | 잔여 포지션: 0.0093 BTC", "type": "profit", "progress": 78},
+            {"message": "💚 수익 전환 확인: 현재 +$13,580 (+2.26%)", "type": "profit", "progress": 72},
+            {"message": "🎯 [분할매도 1차] 33% 물량 매도 실행", "type": "sell", "progress": 75},
+            {"message": f"  └─ 매도가: $43,820 | 수량: -0.0046 {symbol.split('/')[0]} | 수익: +$4,526", "type": "sell", "progress": 75},
+            {"message": f"📊 잔여 포지션: 0.0093 {symbol.split('/')[0]} | 평균단가: $42,850 | 미실현: +$9,027", "type": "position", "progress": 78},
             
-            # 추가 상승 및 완전 매도
+            # 추가 상승 및 완전 매도 - 상세 청산 로그
             {"message": "📈 지속 상승: $43,820 → $44,250 (+0.98%)", "type": "price", "progress": 80},
-            {"message": "🎯 분할매도 2차: 50% 물량 매도 | 가격: $44,180", "type": "sell", "progress": 85},
-            {"message": "🎯 분할매도 3차 (완전청산): 잔여 물량 매도 | 가격: $44,320", "type": "sell", "progress": 90},
-            {"message": "✅ 포지션 완전 청산 | 총 수익: +$18,240 (+3.04%)", "type": "profit", "progress": 92},
+            {"message": "🎯 [분할매도 2차] 50% 물량 매도 실행", "type": "sell", "progress": 85},
+            {"message": f"  └─ 매도가: $44,180 | 수량: -0.0047 {symbol.split('/')[0]} | 수익: +$6,254", "type": "sell", "progress": 85},
+            {"message": "🎯 [분할매도 3차] 완전 청산 실행", "type": "sell", "progress": 90},
+            {"message": f"  └─ 매도가: $44,320 | 수량: -0.0047 {symbol.split('/')[0]} | 수익: +$6,908", "type": "sell", "progress": 90},
+            {"message": f"✅ 포지션 완전 청산 완료 | 총 수익: +$18,240 (+3.04%) | 거래기간: 4시간", "type": "profit", "progress": 92},
             
-            # 두 번째 매매 사이클
+            # 두 번째 매매 사이클 - 시장 전체 vs 개별 심볼에 따라 다르게 표시
             {"message": "🔍 새로운 기회 탐색 중...", "type": "analysis", "progress": 94},
             {"message": "⚡ 레버리지 재계산: 변동성 감소 → 레버리지 2.8x", "type": "leverage", "progress": 95},
-            {"message": "🎯 새로운 매수 신호: ETH/USDT 진입", "type": "signal", "progress": 96},
+            {"message": f"🎯 새로운 매수 신호: {symbol if not is_market_wide else 'ETH/USDT'} {'추가 진입' if not is_market_wide else '진입'}", "type": "signal", "progress": 96},
             
             # 최종 결과
             {"message": "📊 백테스트 완료!", "type": "system", "progress": 100},
