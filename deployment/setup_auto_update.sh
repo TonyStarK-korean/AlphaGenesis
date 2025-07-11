@@ -58,12 +58,12 @@ print_status "Python 패키지 설치 완료"
 echo
 
 # 4. 프로젝트 디렉토리 확인
-PROJECT_DIR="/root/AlphaGenesis"
+PROJECT_DIR="/home/outerwoolf/AlphaGenesis"
 print_step "4. 프로젝트 디렉토리 확인..."
 
 if [ ! -d "$PROJECT_DIR" ]; then
     print_warning "프로젝트 디렉토리가 없습니다. GitHub에서 클론합니다..."
-    cd /root
+    cd /home/outerwoolf
     git clone https://github.com/TonyStarK-korean/AlphaGenesis.git
     print_status "프로젝트 클론 완료"
 else
