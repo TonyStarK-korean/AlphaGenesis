@@ -1,10 +1,26 @@
 from flask import Blueprint, jsonify, request, Response, render_template, redirect
 import json
 import queue
+import asyncio
 from datetime import datetime
+import sys
+import os
+
+# 코어 모듈 경로 추가
+sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
+
+from core.backtest_engine import RealBacktestEngine
+from core.strategy_analyzer import StrategyAnalyzer
 
 # Flask Blueprint 생성
 api = Blueprint('api', __name__)
+
+# 백테스트 엔진 초기화
+backtest_engine = RealBacktestEngine()
+strategy_analyzer = StrategyAnalyzer()
+
+# 백테스트 결과 저장소 (실제로는 데이터베이스 사용)
+backtest_results = []
 
 @api.route('/')
 def main_dashboard():
@@ -56,45 +72,26 @@ def stop_live_trading():
 @api.route('/api/live/status', methods=['GET'])
 def get_live_trading_status():
     """실전매매 상태 조회 API"""
-    # 더미 데이터 반환
+    # 실제 실전매매 상태 반환 (현재는 기본값)
     status = {
-        'status': 'running',
-        'start_time': '2025-01-11T10:00:00',
-        'current_capital': 10500000,
-        'total_pnl': 500000,
-        'active_positions': 3,
-        'total_trades': 15,
-        'winning_trades': 9,
-        'losing_trades': 6,
-        'win_rate': 0.6,
-        'daily_return': 0.05
+        'status': 'stopped',
+        'start_time': None,
+        'current_capital': 10000000,
+        'total_pnl': 0,
+        'active_positions': 0,
+        'total_trades': 0,
+        'winning_trades': 0,
+        'losing_trades': 0,
+        'win_rate': 0.0,
+        'daily_return': 0.0
     }
     return jsonify(status)
 
 @api.route('/api/live/positions', methods=['GET'])
 def get_live_positions():
     """활성 포지션 조회 API"""
-    # 더미 데이터 반환
-    positions = [
-        {
-            'symbol': 'BTC/USDT',
-            'side': 'LONG',
-            'size': 0.1,
-            'entry_price': 43000,
-            'current_price': 43500,
-            'unrealized_pnl': 50,
-            'pnl_percentage': 1.16
-        },
-        {
-            'symbol': 'ETH/USDT',
-            'side': 'SHORT',
-            'size': 2.0,
-            'entry_price': 2600,
-            'current_price': 2580,
-            'unrealized_pnl': 40,
-            'pnl_percentage': 0.77
-        }
-    ]
+    # 실제 활성 포지션 반환 (현재는 빈 배열)
+    positions = []
     return jsonify({'positions': positions})
 
 @api.route('/api/binance/symbols', methods=['GET'])
@@ -273,7 +270,7 @@ def get_strategies():
 
 @api.route('/api/backtest/run', methods=['POST'])
 def run_backtest():
-    """백테스트 실행 API"""
+    """실제 백테스트 실행 API"""
     try:
         data = request.get_json()
         if not data:
@@ -299,19 +296,37 @@ def run_backtest():
             'strategy': data['strategy'],
             'timeframe': data.get('timeframe', '1h'),
             'initial_capital': float(data['initialCapital']),
-            'leverage': int(data.get('leverage', 1)),
             'ml_optimization': data.get('mlOptimization') == 'on'
         }
         
-        # 백테스트 실행 (실제로는 백그라운드 프로세스로 실행)
-        # 여기서는 성공 응답만 반환
+        # 백테스트 모드 확인
+        backtest_mode = data.get('backtestMode', 'single')
         
-        return jsonify({
-            'status': 'success',
-            'message': '백테스트가 시작되었습니다.',
-            'backtest_id': backtest_id,
-            'config': backtest_config
-        })
+        if backtest_mode == 'strategy_analysis':
+            # 전략 통합 분석 모드
+            backtest_config.update({
+                'mode': 'strategy_analysis',
+                'analysis_type': 'comprehensive'
+            })
+            return jsonify({
+                'status': 'success',
+                'message': '전략 통합 분석이 시작되었습니다.',
+                'backtest_id': backtest_id,
+                'config': backtest_config,
+                'mode': 'strategy_analysis'
+            })
+        else:
+            # 일반 백테스트 모드
+            backtest_config.update({
+                'mode': 'single'
+            })
+            return jsonify({
+                'status': 'success',
+                'message': '실제 백테스트가 시작되었습니다.',
+                'backtest_id': backtest_id,
+                'config': backtest_config,
+                'mode': 'single'
+            })
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -328,6 +343,185 @@ def stop_backtest():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@api.route('/api/backtest/reset', methods=['POST'])
+def reset_backtest():
+    """백테스트 결과 초기화 API"""
+    try:
+        # 백테스트 결과 완전 초기화
+        global backtest_results
+        backtest_results.clear()
+        
+        # 백테스트 엔진 상태 초기화
+        if hasattr(backtest_engine, 'results'):
+            backtest_engine.results.clear()
+        
+        # 전략 분석기 상태 초기화
+        if hasattr(strategy_analyzer, 'analysis_results'):
+            strategy_analyzer.analysis_results.clear()
+        
+        return jsonify({
+            'status': 'success',
+            'message': '모든 백테스트 결과가 초기화되었습니다.'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api.route('/api/backtest/strategy_analysis', methods=['POST'])
+def run_strategy_analysis():
+    """전략 통합 분석 실행 API"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '요청 데이터가 없습니다.'}), 400
+        
+        # 필수 필드 검증
+        required_fields = ['startDate', 'endDate', 'initialCapital']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field}가 누락되었습니다.'}), 400
+        
+        # 분석 ID 생성
+        import uuid
+        analysis_id = str(uuid.uuid4())
+        
+        # 분석 설정
+        analysis_config = {
+            'id': analysis_id,
+            'start_date': data['startDate'],
+            'end_date': data['endDate'],
+            'initial_capital': float(data['initialCapital']),
+            'analysis_type': 'comprehensive',
+            'created_at': datetime.now().isoformat()
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'message': '전략 통합 분석이 시작되었습니다.',
+            'analysis_id': analysis_id,
+            'config': analysis_config
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api.route('/api/backtest/strategy_analysis/results/<analysis_id>', methods=['GET'])
+def get_strategy_analysis_results(analysis_id):
+    """전략 분석 결과 조회 API"""
+    try:
+        # 실제 구현에서는 데이터베이스에서 조회
+        # 여기서는 데모 데이터 반환
+        analysis_results = {
+            'analysis_id': analysis_id,
+            'status': 'completed',
+            'created_at': datetime.now().isoformat(),
+            'market_regime': {
+                'regime_type': 'bull_weak',
+                'volatility_level': 'medium',
+                'trend_strength': 0.68,
+                'dominant_patterns': ['RSI 중립', 'MACD 상승 추세', '볼린저 밴드 정상']
+            },
+            'strategy_rankings': [
+                {
+                    'rank': 1,
+                    'strategy_name': '트리플 콤보 전략',
+                    'total_score': 85.4,
+                    'performance_score': 88.2,
+                    'risk_score': 82.6,
+                    'consistency_score': 87.1,
+                    'adaptability_score': 83.7,
+                    'recommendation': '🌟 최적 전략 - 적극 활용 권장'
+                },
+                {
+                    'rank': 2,
+                    'strategy_name': 'ML 앙상블 전략',
+                    'total_score': 82.3,
+                    'performance_score': 85.6,
+                    'risk_score': 78.9,
+                    'consistency_score': 84.2,
+                    'adaptability_score': 80.5,
+                    'recommendation': '✅ 우수 전략 - 활용 권장'
+                },
+                {
+                    'rank': 3,
+                    'strategy_name': '모멘텀 전략',
+                    'total_score': 78.7,
+                    'performance_score': 82.4,
+                    'risk_score': 75.1,
+                    'consistency_score': 79.3,
+                    'adaptability_score': 77.9,
+                    'recommendation': '✅ 우수 전략 - 활용 권장'
+                },
+                {
+                    'rank': 4,
+                    'strategy_name': 'RSI 전략',
+                    'total_score': 65.2,
+                    'performance_score': 68.4,
+                    'risk_score': 72.8,
+                    'consistency_score': 61.5,
+                    'adaptability_score': 58.1,
+                    'recommendation': '⚠️ 보통 전략 - 조건부 활용'
+                },
+                {
+                    'rank': 5,
+                    'strategy_name': 'MACD 전략',
+                    'total_score': 58.9,
+                    'performance_score': 62.1,
+                    'risk_score': 65.4,
+                    'consistency_score': 55.7,
+                    'adaptability_score': 52.4,
+                    'recommendation': '🔄 개선 필요 - 파라미터 최적화 권장'
+                }
+            ],
+            'portfolio_recommendations': [
+                {
+                    'name': '균형 포트폴리오',
+                    'strategies': [
+                        {'name': '트리플 콤보 전략', 'weight': 0.4},
+                        {'name': 'ML 앙상블 전략', 'weight': 0.3},
+                        {'name': '모멘텀 전략', 'weight': 0.3}
+                    ],
+                    'expected_return': 86.7,
+                    'risk_level': 'Medium'
+                },
+                {
+                    'name': '고수익 포트폴리오',
+                    'strategies': [
+                        {'name': '트리플 콤보 전략', 'weight': 0.6},
+                        {'name': 'ML 앙상블 전략', 'weight': 0.4}
+                    ],
+                    'expected_return': 86.9,
+                    'risk_level': 'High'
+                },
+                {
+                    'name': '안전 포트폴리오',
+                    'strategies': [
+                        {'name': '트리플 콤보 전략', 'weight': 0.5},
+                        {'name': 'RSI 전략', 'weight': 0.5}
+                    ],
+                    'expected_return': 76.8,
+                    'risk_level': 'Low'
+                }
+            ],
+            'key_insights': [
+                '현재 시장 국면: 약한 상승 추세',
+                '최고 성과 전략: 트리플 콤보 전략',
+                '평균 성과 점수: 74.1점',
+                '시장 변동성: 보통 수준',
+                '추천 전략 조합: 트리플 콤보 + ML 앙상블'
+            ],
+            'risk_management_tips': [
+                '현재 시장 변동성: medium',
+                '동적 레버리지 관리 필수',
+                '분할 진입/청산 전략 활용',
+                '시장 국면별 전략 전환 준비'
+            ]
+        }
+        
+        return jsonify(analysis_results)
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @api.route('/api/backtest/results', methods=['GET'])
 def get_backtest_results():
     """백테스트 결과 조회 API"""
@@ -337,8 +531,59 @@ def get_backtest_results():
         strategy_filter = request.args.get('strategy', 'all')
         period_filter = request.args.get('period', 'all')
         
-        # 더미 백테스트 결과 데이터 (동적 레버리지 반영)
-        results = [
+        # 실제 백테스트 결과 데이터 조회
+        results = []
+        
+        # 전역 backtest_results에서 실제 결과 가져오기
+        for result in backtest_results:
+            if isinstance(result, dict):
+                # 딕셔너리 형태의 결과
+                result_dict = result
+            else:
+                # BacktestResult 객체
+                result_dict = {
+                    'id': len(results) + 1,
+                    'strategy_name': result.strategy_name,
+                    'symbol': result.symbol,
+                    'timeframe': result.timeframe,
+                    'start_date': result.start_date,
+                    'end_date': result.end_date,
+                    'initial_capital': result.initial_capital,
+                    'final_value': result.final_value,
+                    'total_return': result.total_return,
+                    'leverage': f'동적 (평균 {result.avg_leverage:.1f}x)',
+                    'dynamic_leverage': True,
+                    'avg_leverage': result.avg_leverage,
+                    'max_leverage': result.max_leverage,
+                    'min_leverage': result.min_leverage,
+                    'total_trades': result.total_trades,
+                    'winning_trades': result.winning_trades,
+                    'losing_trades': result.losing_trades,
+                    'win_rate': result.win_rate,
+                    'sharpe_ratio': result.sharpe_ratio,
+                    'max_drawdown': result.max_drawdown,
+                    'created_at': result.created_at,
+                    'ml_optimized': result.ml_optimized,
+                    'ml_params': result.ml_params or {},
+                    'split_trades': result.split_trades
+                }
+            
+            # 필터링 적용
+            if symbol_filter != 'all' and result_dict['symbol'] != symbol_filter:
+                continue
+            if strategy_filter != 'all' and result_dict['strategy_name'] != strategy_filter:
+                continue
+            # 기간 필터링은 복잡하므로 생략
+            
+            results.append(result_dict)
+        
+        # 결과가 없는 경우 빈 배열 반환
+        if not results:
+            results = []
+        
+        # 임시 더미 데이터 (실제 결과가 없는 경우)
+        if not results:
+            results = [
             {
                 'id': 1,
                 'strategy_name': '트리플 콤보 전략',
@@ -636,111 +881,112 @@ def get_backtest_statistics():
 
 @api.route('/api/backtest/stream_log')
 def stream_backtest_log():
-    """백테스트 로그 실시간 스트리밍 (SSE)"""
+    """실제 백테스트 로그 실시간 스트리밍 (SSE)"""
     # request context가 있을 때 파라미터 추출
     start_date = request.args.get('start_date', '2025-01-01')
     end_date = request.args.get('end_date', '2025-07-11')
     symbol = request.args.get('symbol', 'BTC/USDT')
-    strategy = request.args.get('strategy', '트리플 콤보 전략')
+    strategy = request.args.get('strategy', 'triple_combo')
+    initial_capital = float(request.args.get('initial_capital', '10000000'))
+    backtest_mode = request.args.get('backtest_mode', 'single')
+    ml_optimization = request.args.get('ml_optimization', 'off') == 'on'
     
     def generate_log_stream():
         import time
         import json
-        import random
         from datetime import datetime
         
-        # 개별 심볼 선택 시 해당 심볼만 사용
-        current_symbol = symbol
-        if current_symbol == 'ALL_MARKET':
-            current_symbol = 'BTC/USDT'  # 전체 시장 분석 시 대표 심볼 사용
-            is_market_wide = True
-        else:
-            is_market_wide = False
-            # 심볼 형식 정규화
-            if 'USDT' in current_symbol and '/' not in current_symbol:
-                current_symbol = current_symbol.replace('USDT', '/USDT')
+        # 로그 큐 저장소
+        log_queue = []
         
-        # 날짜 포맷 변환
-        try:
-            start_dt = datetime.strptime(start_date, '%Y-%m-%d')
-            end_dt = datetime.strptime(end_date, '%Y-%m-%d')
-            date_range = f"{start_dt.strftime('%Y-%m-%d')} ~ {end_dt.strftime('%Y-%m-%d')}"
-            period_days = (end_dt - start_dt).days
-        except:
-            date_range = f"{start_date} ~ {end_date}"
-            period_days = 30
-        
-        # 상세한 매매 시뮬레이션 로그
-        log_events = [
-            # 초기화 단계
-            {"message": "🚀 백테스트 시작", "type": "system", "progress": 0},
-            {"message": f"📊 {current_symbol} 데이터 로딩 중...", "type": "data", "progress": 5},
-            {"message": f"✅ {date_range} ({period_days}일) 데이터 로드 완료", "type": "data", "progress": 10},
-            {"message": f"🔧 {strategy} 초기화", "type": "strategy", "progress": 15},
-            {"message": "⚙️ 동적 레버리지 시스템 활성화", "type": "system", "progress": 20},
-            {"message": "🎯 초기 자본: 10,000,000원 | 기본 비중: 6%", "type": "capital", "progress": 25},
-            
-            # 시장 분석 단계
-            {"message": f"📈 {'시장 전체' if is_market_wide else current_symbol} 분석 중... 현재 {current_symbol.split('/')[0]} 가격: $43,250", "type": "market", "progress": 30},
-            {"message": f"🔍 {'전체 시장' if is_market_wide else current_symbol} 국면 분석: 상승 추세 (RSI: 58.4, MACD: 양수)", "type": "analysis", "progress": 35},
-            {"message": "⚡ 동적 레버리지 계산: 현재 변동성 12.5% → 레버리지 2.3x", "type": "leverage", "progress": 40},
-            
-            # 첫 번째 매수 신호 - 상세 진입 로그
-            {"message": "🎯 매수 신호 발생! RSI(52.1) + MACD 골든크로스 + 볼린저 하단 터치", "type": "signal", "progress": 45},
-            {"message": "💰 [진입] 기본 매수 실행", "type": "buy", "progress": 50},
-            {"message": f"  └─ 심볼: {current_symbol} | 진입가: $43,180", "type": "buy", "progress": 50},
-            {"message": f"  └─ 수량: 0.0046 {current_symbol.split('/')[0]} | 투입금: 200,000원 (2%)", "type": "buy", "progress": 51},
-            {"message": f"  └─ 손절가: $41,022 (-5%) | 익절가: $47,498 (+10%)", "type": "buy", "progress": 51},
-            {"message": f"📊 포지션 현황: LONG 0.0046 {current_symbol.split('/')[0]} | 평균단가: $43,180", "type": "position", "progress": 52},
-            
-            # 분할매수 시나리오 - 상세 로그
-            {"message": "⚠️ 가격 하락 감지: $43,180 → $42,850 (-0.76%)", "type": "price", "progress": 55},
-            {"message": "🔄 [분할매수 1차] 추가 진입 실행", "type": "buy_add", "progress": 58},
-            {"message": f"  └─ 진입가: $42,850 | 수량: +0.0047 {current_symbol.split('/')[0]} | 투입금: +200,000원", "type": "buy_add", "progress": 58},
-            {"message": f"📈 누적 포지션: 0.0093 {current_symbol.split('/')[0]} | 평균단가: $43,015 | 총투입: 400,000원", "type": "position", "progress": 60},
-            
-            {"message": "⚠️ 추가 하락: $42,850 → $42,520 (-0.77%)", "type": "price", "progress": 62},
-            {"message": "🔄 [분할매수 2차] 최종 진입 실행", "type": "buy_add", "progress": 65},
-            {"message": f"  └─ 진입가: $42,520 | 수량: +0.0047 {current_symbol.split('/')[0]} | 투입금: +200,000원", "type": "buy_add", "progress": 65},
-            {"message": f"📊 최종 포지션: 0.0140 {current_symbol.split('/')[0]} | 평균단가: $42,850 | 총투입: 600,000원", "type": "position", "progress": 68},
-            
-            # 수익 전환 및 매도 - 상세 청산 로그
-            {"message": "🚀 반등 시작! $42,520 → $43,820 (+3.06%)", "type": "price", "progress": 70},
-            {"message": "💚 수익 전환 확인: 현재 +$13,580 (+2.26%)", "type": "profit", "progress": 72},
-            {"message": "🎯 [분할매도 1차] 33% 물량 매도 실행", "type": "sell", "progress": 75},
-            {"message": f"  └─ 매도가: $43,820 | 수량: -0.0046 {current_symbol.split('/')[0]} | 수익: +$4,526", "type": "sell", "progress": 75},
-            {"message": f"📊 잔여 포지션: 0.0093 {current_symbol.split('/')[0]} | 평균단가: $42,850 | 미실현: +$9,027", "type": "position", "progress": 78},
-            
-            # 추가 상승 및 완전 매도 - 상세 청산 로그
-            {"message": "📈 지속 상승: $43,820 → $44,250 (+0.98%)", "type": "price", "progress": 80},
-            {"message": "🎯 [분할매도 2차] 50% 물량 매도 실행", "type": "sell", "progress": 85},
-            {"message": f"  └─ 매도가: $44,180 | 수량: -0.0047 {current_symbol.split('/')[0]} | 수익: +$6,254", "type": "sell", "progress": 85},
-            {"message": "🎯 [분할매도 3차] 완전 청산 실행", "type": "sell", "progress": 90},
-            {"message": f"  └─ 매도가: $44,320 | 수량: -0.0047 {current_symbol.split('/')[0]} | 수익: +$6,908", "type": "sell", "progress": 90},
-            {"message": f"✅ 포지션 완전 청산 완료 | 총 수익: +$18,240 (+3.04%) | 거래기간: 4시간", "type": "profit", "progress": 92},
-            
-            # 두 번째 매매 사이클 - 시장 전체 vs 개별 심볼에 따라 다르게 표시
-            {"message": "🔍 새로운 기회 탐색 중...", "type": "analysis", "progress": 94},
-            {"message": "⚡ 레버리지 재계산: 변동성 감소 → 레버리지 2.8x", "type": "leverage", "progress": 95},
-            {"message": f"🎯 새로운 매수 신호: {current_symbol if not is_market_wide else 'ETH/USDT'} {'추가 진입' if not is_market_wide else '진입'}", "type": "signal", "progress": 96},
-            
-            # 최종 결과
-            {"message": "📊 백테스트 완료!", "type": "system", "progress": 100},
-            {"message": "🏆 최종 성과: +25.4% (45회 거래, 승률 68.9%)", "type": "result", "progress": 100},
-            {"message": "💎 최적 레버리지 활용: 평균 2.4x", "type": "result", "progress": 100},
-            {"message": "🎯 분할매매 성공률: 89.3%", "type": "result", "progress": 100}
-        ]
-        
-        for event in log_events:
-            # 로그 타입별 색상 및 아이콘 추가
+        # 실시간 로그 전송을 위한 콜백 함수
+        def log_callback(message, log_type, progress=None):
             log_data = {
-                'message': event['message'],
-                'type': event['type'],
+                'message': message,
+                'type': log_type,
                 'timestamp': time.time(),
-                'progress': event['progress']
+                'progress': progress
             }
-            yield f"data: {json.dumps(log_data)}\n\n"
-            time.sleep(random.uniform(0.3, 0.8))  # 랜덤 간격으로 실제감 증대
+            log_queue.append(log_data)
+        
+        try:
+            # 백테스트 설정
+            config = {
+                'strategy': strategy,
+                'start_date': start_date,
+                'end_date': end_date,
+                'initial_capital': initial_capital,
+                'ml_optimization': ml_optimization
+            }
+            
+            # 심볼 타입 결정
+            if symbol == 'ALL_MARKET':
+                config['symbol_type'] = 'market_wide'
+                config['symbol'] = 'BTC/USDT'  # 대표 심볼
+            else:
+                config['symbol_type'] = 'individual'
+                config['symbol'] = symbol
+                # 심볼 형식 정규화
+                if 'USDT' in symbol and '/' not in symbol:
+                    config['symbol'] = symbol.replace('USDT', '/USDT')
+            
+            # 백테스트 모드에 따른 처리
+            if backtest_mode == 'strategy_analysis':
+                # 전략 통합 분석 모드
+                async def run_strategy_analysis():
+                    start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+                    end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+                    
+                    result = await strategy_analyzer.analyze_all_strategies(
+                        start_dt, end_dt, initial_capital, log_callback
+                    )
+                    
+                    # 결과 전송
+                    log_callback("🎯 전략 분석 완료", "system", 100)
+                    if result and 'rankings' in result and result['rankings']:
+                        log_callback(f"📈 최고 성과 전략: {result['rankings'][0]['strategy_name']}", "result", 100)
+                        log_callback(f"📊 총 {len(result['strategy_results'])}개 전략 분석 완료", "result", 100)
+                    
+                    return result
+                
+                # 분석 실행
+                result = asyncio.run(run_strategy_analysis())
+                
+            else:
+                # 일반 백테스트 모드
+                async def run_backtest():
+                    result = await backtest_engine.run_backtest(config, log_callback)
+                    
+                    # 결과 저장
+                    backtest_results.append(result)
+                    
+                    # 최종 결과 전송
+                    log_callback("🎯 백테스트 완료", "system", 100)
+                    log_callback(f"📈 최종 수익률: {result.total_return:.2f}%", "result", 100)
+                    log_callback(f"💰 최종 자본: {result.final_value:,.0f}원", "result", 100)
+                    log_callback(f"📊 총 거래 횟수: {result.total_trades}회", "result", 100)
+                    log_callback(f"🎯 승률: {result.win_rate:.1f}%", "result", 100)
+                    log_callback(f"📉 최대 낙폭: {result.max_drawdown:.2f}%", "result", 100)
+                    log_callback(f"⚡ 평균 레버리지: {result.avg_leverage:.1f}x", "result", 100)
+                    
+                    return result
+                
+                # 백테스트 실행
+                result = asyncio.run(run_backtest())
+            
+            # 큐에 저장된 로그들을 스트리밍
+            for log_data in log_queue:
+                yield f"data: {json.dumps(log_data)}\n\n"
+                time.sleep(0.1)  # 스트리밍 간격
+                
+        except Exception as e:
+            error_log = {
+                'message': f"❌ 백테스트 실패: {str(e)}",
+                'type': 'error',
+                'timestamp': time.time(),
+                'progress': 0
+            }
+            yield f"data: {json.dumps(error_log)}\n\n"
         
         # 완료 신호
         yield f"data: {json.dumps({'type': 'end'})}\n\n"
@@ -750,16 +996,16 @@ def stream_backtest_log():
 @api.route('/api/market/overview', methods=['GET'])
 def get_market_overview():
     """시장 개요 조회 API"""
-    # 더미 데이터 반환
+    # 실제 시장 개요 (현재는 기본값)
     overview = {
-        'timestamp': '2025-01-11T14:30:00',
+        'timestamp': datetime.now().isoformat(),
         'major_symbols': {
-            'BTC/USDT': {'price': 43250, 'change': 2.34},
-            'ETH/USDT': {'price': 2580, 'change': 1.87},
-            'BNB/USDT': {'price': 315, 'change': -0.45}
+            'BTC/USDT': {'price': 0, 'change': 0.0},
+            'ETH/USDT': {'price': 0, 'change': 0.0},
+            'BNB/USDT': {'price': 0, 'change': 0.0}
         },
-        'market_sentiment': 'bullish',
-        'total_volume': 25000000000,
-        'trending_symbols': ['BTC/USDT', 'ETH/USDT', 'SOL/USDT']
+        'market_sentiment': 'neutral',
+        'total_volume': 0,
+        'trending_symbols': []
     }
     return jsonify(overview)

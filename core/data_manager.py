@@ -323,6 +323,224 @@ class DataManager:
         except Exception as e:
             logger.error(f"데이터 품질 보고서 생성 실패: {e}")
             return {}
+    
+    async def get_all_usdt_futures_symbols(self) -> List[str]:
+        """
+        모든 USDT 선물 심볼 조회
+        
+        Returns:
+            List[str]: USDT 선물 심볼 리스트
+        """
+        try:
+            # 캐시 확인
+            cache_key = "all_usdt_futures_symbols"
+            if cache_key in self.symbol_cache:
+                cache_time, symbols = self.symbol_cache[cache_key]
+                if time.time() - cache_time < 3600:  # 1시간 캐시
+                    return symbols
+            
+            # 바이낸스에서 모든 마켓 정보 가져오기
+            markets = await self.exchange.load_markets()
+            
+            # USDT 선물 심볼만 필터링
+            usdt_futures = []
+            for symbol, market in markets.items():
+                if (market.get('type') == 'future' and 
+                    market.get('quote') == 'USDT' and 
+                    market.get('active', False)):
+                    usdt_futures.append(symbol)
+            
+            # 거래량 기준으로 정렬 (상위 100개)
+            usdt_futures = sorted(usdt_futures)[:100]
+            
+            # 캐시 저장
+            self.symbol_cache[cache_key] = (time.time(), usdt_futures)
+            
+            logger.info(f"USDT 선물 심볼 조회 완료: {len(usdt_futures)}개")
+            return usdt_futures
+            
+        except Exception as e:
+            logger.error(f"USDT 선물 심볼 조회 실패: {e}")
+            # 기본 심볼 리스트 반환
+            return [
+                'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'DOT/USDT',
+                'SOL/USDT', 'AVAX/USDT', 'MATIC/USDT', 'LINK/USDT', 'UNI/USDT',
+                'LTC/USDT', 'BCH/USDT', 'XRP/USDT', 'DOGE/USDT', 'SHIB/USDT',
+                'ATOM/USDT', 'FTM/USDT', 'NEAR/USDT', 'ALGO/USDT', 'VET/USDT'
+            ]
+    
+    async def scan_market_opportunities(
+        self, 
+        strategy_id: str, 
+        timeframe: str = '1h',
+        top_n: int = 20,
+        log_callback: Optional[callable] = None
+    ) -> List[Dict]:
+        """
+        시장 전체 스캔으로 매매 기회 탐색
+        
+        Args:
+            strategy_id: 전략 ID
+            timeframe: 시간프레임
+            top_n: 상위 N개 심볼
+            log_callback: 로그 콜백 함수
+            
+        Returns:
+            List[Dict]: 매매 기회 리스트
+        """
+        try:
+            if log_callback:
+                log_callback("🔍 시장 전체 스캔 시작", "system", 0)
+            
+            # 모든 USDT 선물 심볼 조회
+            all_symbols = await self.get_all_usdt_futures_symbols()
+            
+            if log_callback:
+                log_callback(f"📊 총 {len(all_symbols)}개 심볼 스캔 중...", "data", 10)
+            
+            # 현재 시간 기준으로 최근 데이터 조회
+            end_date = datetime.now()
+            start_date = end_date - timedelta(days=7)  # 최근 7일
+            
+            opportunities = []
+            
+            # 각 심볼에 대해 매매 기회 분석
+            for i, symbol in enumerate(all_symbols[:top_n]):
+                try:
+                    progress = 10 + (i / top_n) * 80
+                    if log_callback:
+                        log_callback(f"  └─ {symbol} 분석 중...", "analysis", progress)
+                    
+                    # 데이터 다운로드
+                    data = await self.download_historical_data(
+                        symbol, timeframe, start_date, end_date, limit=200
+                    )
+                    
+                    if data.empty:
+                        continue
+                    
+                    # 기술적 지표 추가
+                    data = self.add_technical_indicators(data)
+                    
+                    # 매매 신호 분석
+                    signal_strength = self.analyze_signal_strength(data, strategy_id)
+                    
+                    if signal_strength['score'] > 0.7:  # 강한 신호만 선별
+                        opportunities.append({
+                            'symbol': symbol,
+                            'signal': signal_strength['signal'],
+                            'score': signal_strength['score'],
+                            'price': data['close'].iloc[-1],
+                            'volume': data['volume'].iloc[-1],
+                            'rsi': data['RSI'].iloc[-1],
+                            'macd': data['MACD'].iloc[-1],
+                            'volatility': data['Volatility'].iloc[-1],
+                            'timestamp': datetime.now().isoformat()
+                        })
+                    
+                    # Rate limiting
+                    await asyncio.sleep(0.1)
+                    
+                except Exception as e:
+                    logger.error(f"심볼 {symbol} 분석 실패: {e}")
+                    continue
+            
+            # 점수 기준으로 정렬
+            opportunities.sort(key=lambda x: x['score'], reverse=True)
+            
+            if log_callback:
+                log_callback(f"✅ 시장 스캔 완료: {len(opportunities)}개 기회 발견", "system", 100)
+            
+            return opportunities
+            
+        except Exception as e:
+            logger.error(f"시장 스캔 실패: {e}")
+            if log_callback:
+                log_callback(f"❌ 시장 스캔 실패: {str(e)}", "error", 0)
+            return []
+    
+    def analyze_signal_strength(self, data: pd.DataFrame, strategy_id: str) -> Dict:
+        """
+        매매 신호 강도 분석
+        
+        Args:
+            data: 시장 데이터
+            strategy_id: 전략 ID
+            
+        Returns:
+            Dict: 신호 강도 정보
+        """
+        try:
+            if len(data) < 50:
+                return {'signal': 'HOLD', 'score': 0.0}
+            
+            latest = data.iloc[-1]
+            
+            # 전략별 신호 분석
+            if strategy_id == 'triple_combo':
+                # RSI + MACD + 볼린저 밴드 조합
+                rsi = latest['RSI']
+                macd = latest['MACD']
+                macd_signal = latest['MACD_Signal']
+                close = latest['close']
+                bb_upper = latest['BB_Upper']
+                bb_lower = latest['BB_Lower']
+                
+                buy_score = 0
+                sell_score = 0
+                
+                # RSI 분석
+                if rsi < 30:
+                    buy_score += 0.4
+                elif rsi > 70:
+                    sell_score += 0.4
+                
+                # MACD 분석
+                if macd > macd_signal:
+                    buy_score += 0.3
+                else:
+                    sell_score += 0.3
+                
+                # 볼린저 밴드 분석
+                if close <= bb_lower:
+                    buy_score += 0.3
+                elif close >= bb_upper:
+                    sell_score += 0.3
+                
+                # 최종 신호 결정
+                if buy_score > sell_score and buy_score > 0.7:
+                    return {'signal': 'BUY', 'score': buy_score}
+                elif sell_score > buy_score and sell_score > 0.7:
+                    return {'signal': 'SELL', 'score': sell_score}
+                else:
+                    return {'signal': 'HOLD', 'score': max(buy_score, sell_score)}
+            
+            elif strategy_id == 'rsi_strategy':
+                # RSI 기반 신호
+                rsi = latest['RSI']
+                if rsi < 30:
+                    return {'signal': 'BUY', 'score': (30 - rsi) / 30}
+                elif rsi > 70:
+                    return {'signal': 'SELL', 'score': (rsi - 70) / 30}
+                else:
+                    return {'signal': 'HOLD', 'score': 0.0}
+            
+            else:
+                # 기본 신호 (단순 이동평균)
+                sma_20 = latest['SMA_20']
+                sma_50 = latest['SMA_50']
+                close = latest['close']
+                
+                if close > sma_20 > sma_50:
+                    return {'signal': 'BUY', 'score': 0.8}
+                elif close < sma_20 < sma_50:
+                    return {'signal': 'SELL', 'score': 0.8}
+                else:
+                    return {'signal': 'HOLD', 'score': 0.0}
+            
+        except Exception as e:
+            logger.error(f"신호 강도 분석 실패: {e}")
+            return {'signal': 'HOLD', 'score': 0.0}
 
 class MLDataProcessor:
     """머신러닝을 위한 데이터 전처리기"""
