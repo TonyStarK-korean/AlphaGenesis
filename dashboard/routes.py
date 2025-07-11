@@ -11,6 +11,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
 
 from core.backtest_engine import RealBacktestEngine
 from core.strategy_analyzer import StrategyAnalyzer
+from core.portfolio_optimizer import PortfolioOptimizer
 
 # Flask Blueprint 생성
 api = Blueprint('api', __name__)
@@ -18,6 +19,7 @@ api = Blueprint('api', __name__)
 # 백테스트 엔진 초기화
 backtest_engine = RealBacktestEngine()
 strategy_analyzer = StrategyAnalyzer()
+portfolio_optimizer = PortfolioOptimizer()
 
 # 백테스트 결과 저장소 (실제로는 데이터베이스 사용)
 backtest_results = []
@@ -302,7 +304,12 @@ def run_backtest():
         
         # 전략 이름을 ID로 변환
         strategy_name = data['strategy']
-        strategy_id = strategy_name_to_id.get(strategy_name, strategy_name)
+        
+        # 기본값 체크
+        if strategy_name == '전략을 선택하세요' or not strategy_name:
+            strategy_id = 'triple_combo'  # 기본 전략
+        else:
+            strategy_id = strategy_name_to_id.get(strategy_name, strategy_name)
         
         # 백테스트 설정
         backtest_config = {
@@ -775,7 +782,10 @@ def stream_backtest_log():
     }
     
     # 전략 이름을 ID로 변환
-    strategy = strategy_name_to_id.get(strategy_name, strategy_name)
+    if strategy_name == '전략을 선택하세요' or not strategy_name:
+        strategy = 'triple_combo'  # 기본 전략
+    else:
+        strategy = strategy_name_to_id.get(strategy_name, strategy_name)
     
     def generate_log_stream():
         import time
@@ -949,3 +959,247 @@ def get_market_overview():
         'trending_symbols': []
     }
     return jsonify(overview)
+
+@api.route('/api/portfolio/optimize', methods=['POST'])
+def optimize_portfolio():
+    """포트폴리오 최적화 실행 API"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '요청 데이터가 없습니다.'}), 400
+        
+        # 필수 필드 검증
+        required_fields = ['strategy_results', 'optimization_method', 'risk_level']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field}가 누락되었습니다.'}), 400
+        
+        # 포트폴리오 최적화 실행
+        optimized_portfolios = portfolio_optimizer.optimize_portfolio(
+            strategy_results=data['strategy_results'],
+            optimization_method=data['optimization_method'],
+            risk_level=data['risk_level'],
+            constraints=data.get('constraints', {})
+        )
+        
+        # 포트폴리오 보고서 생성
+        report = portfolio_optimizer.generate_portfolio_report(optimized_portfolios)
+        
+        return jsonify({
+            'status': 'success',
+            'portfolios': [{
+                'name': p.name,
+                'weights': p.weights,
+                'expected_return': p.expected_return,
+                'volatility': p.volatility,
+                'sharpe_ratio': p.sharpe_ratio,
+                'max_drawdown': p.max_drawdown,
+                'var_95': p.var_95,
+                'cvar_95': p.cvar_95,
+                'strategies': p.strategies,
+                'rebalancing_frequency': p.rebalancing_frequency,
+                'risk_level': p.risk_level,
+                'created_at': p.created_at
+            } for p in optimized_portfolios],
+            'report': report,
+            'timestamp': datetime.now().isoformat()
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api.route('/api/portfolio/analyze', methods=['POST'])
+def analyze_portfolio_with_optimization():
+    """전략 분석 후 포트폴리오 최적화 통합 실행 API"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '요청 데이터가 없습니다.'}), 400
+        
+        # 필수 필드 검증
+        required_fields = ['startDate', 'endDate', 'initialCapital']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field}가 누락되었습니다.'}), 400
+        
+        # 분석 ID 생성
+        import uuid
+        analysis_id = str(uuid.uuid4())
+        
+        # 전략 분석 설정
+        start_dt = datetime.strptime(data['startDate'], '%Y-%m-%d')
+        end_dt = datetime.strptime(data['endDate'], '%Y-%m-%d')
+        initial_capital = float(data['initialCapital'])
+        
+        # 전략 분석 실행
+        async def run_integrated_analysis():
+            # 1. 전략 분석 실행
+            strategy_results = await strategy_analyzer.analyze_all_strategies(
+                start_dt, end_dt, initial_capital
+            )
+            
+            # 2. 전략 결과를 포트폴리오 최적화 형태로 변환
+            portfolio_strategy_results = []
+            if 'strategy_results' in strategy_results:
+                for result in strategy_results['strategy_results']:
+                    portfolio_strategy_results.append({
+                        'strategy_name': result.get('strategy_name', ''),
+                        'total_return': result.get('total_return', 0),
+                        'sharpe_ratio': result.get('sharpe_ratio', 0),
+                        'max_drawdown': result.get('max_drawdown', 0),
+                        'win_rate': result.get('win_rate', 0),
+                        'volatility': result.get('volatility', 0)
+                    })
+            
+            # 3. 포트폴리오 최적화 실행
+            optimization_methods = ['sharpe', 'min_vol', 'max_return', 'risk_parity']
+            all_portfolios = []
+            
+            for method in optimization_methods:
+                portfolios = portfolio_optimizer.optimize_portfolio(
+                    strategy_results=portfolio_strategy_results,
+                    optimization_method=method,
+                    risk_level=data.get('risk_level', 'medium'),
+                    constraints=data.get('constraints', {})
+                )
+                all_portfolios.extend(portfolios)
+            
+            # 4. 포트폴리오 보고서 생성
+            report = portfolio_optimizer.generate_portfolio_report(all_portfolios)
+            
+            return {
+                'analysis_id': analysis_id,
+                'status': 'completed',
+                'strategy_analysis': strategy_results,
+                'portfolio_optimization': {
+                    'portfolios': [{
+                        'name': p.name,
+                        'weights': p.weights,
+                        'expected_return': p.expected_return,
+                        'volatility': p.volatility,
+                        'sharpe_ratio': p.sharpe_ratio,
+                        'max_drawdown': p.max_drawdown,
+                        'var_95': p.var_95,
+                        'cvar_95': p.cvar_95,
+                        'strategies': p.strategies,
+                        'rebalancing_frequency': p.rebalancing_frequency,
+                        'risk_level': p.risk_level,
+                        'created_at': p.created_at
+                    } for p in all_portfolios],
+                    'report': report
+                },
+                'timestamp': datetime.now().isoformat()
+            }
+        
+        # 결과 반환 (실제로는 비동기 실행)
+        return jsonify({
+            'status': 'success',
+            'message': '전략 분석 및 포트폴리오 최적화가 시작되었습니다.',
+            'analysis_id': analysis_id,
+            'config': {
+                'start_date': data['startDate'],
+                'end_date': data['endDate'],
+                'initial_capital': initial_capital,
+                'risk_level': data.get('risk_level', 'medium'),
+                'analysis_type': 'integrated'
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api.route('/api/portfolio/backtest', methods=['POST'])
+def backtest_portfolio():
+    """포트폴리오 백테스트 실행 API"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '요청 데이터가 없습니다.'}), 400
+        
+        # 필수 필드 검증
+        required_fields = ['portfolio_weights', 'start_date', 'end_date', 'initial_capital']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field}가 누락되었습니다.'}), 400
+        
+        # 포트폴리오 백테스트 실행
+        portfolio_weights = data['portfolio_weights']
+        start_date = data['start_date']
+        end_date = data['end_date']
+        initial_capital = float(data['initial_capital'])
+        
+        # 각 전략별 백테스트 실행 후 포트폴리오 성과 계산
+        async def run_portfolio_backtest():
+            portfolio_results = []
+            total_portfolio_value = 0
+            
+            for strategy_name, weight in portfolio_weights.items():
+                if weight > 0:
+                    # 개별 전략 백테스트
+                    strategy_config = {
+                        'strategy': strategy_name,
+                        'symbol': 'BTC/USDT',
+                        'symbol_type': 'individual',
+                        'start_date': start_date,
+                        'end_date': end_date,
+                        'timeframe': '1h',
+                        'initial_capital': initial_capital * weight,
+                        'ml_optimization': False
+                    }
+                    
+                    try:
+                        result = await backtest_engine.run_backtest(strategy_config)
+                        portfolio_results.append({
+                            'strategy': strategy_name,
+                            'weight': weight,
+                            'allocated_capital': initial_capital * weight,
+                            'final_value': result.final_value,
+                            'return': result.total_return,
+                            'sharpe_ratio': result.sharpe_ratio,
+                            'max_drawdown': result.max_drawdown,
+                            'trades': result.total_trades
+                        })
+                        total_portfolio_value += result.final_value
+                    except Exception as e:
+                        logger.error(f"전략 {strategy_name} 백테스트 실패: {e}")
+                        portfolio_results.append({
+                            'strategy': strategy_name,
+                            'weight': weight,
+                            'allocated_capital': initial_capital * weight,
+                            'final_value': initial_capital * weight,
+                            'return': 0,
+                            'sharpe_ratio': 0,
+                            'max_drawdown': 0,
+                            'trades': 0,
+                            'error': str(e)
+                        })
+                        total_portfolio_value += initial_capital * weight
+            
+            # 포트폴리오 전체 성과 계산
+            portfolio_return = (total_portfolio_value - initial_capital) / initial_capital * 100
+            
+            return {
+                'portfolio_performance': {
+                    'initial_capital': initial_capital,
+                    'final_value': total_portfolio_value,
+                    'total_return': portfolio_return,
+                    'weights': portfolio_weights
+                },
+                'strategy_results': portfolio_results,
+                'timestamp': datetime.now().isoformat()
+            }
+        
+        # 결과 반환
+        return jsonify({
+            'status': 'success',
+            'message': '포트폴리오 백테스트가 시작되었습니다.',
+            'portfolio_config': {
+                'weights': portfolio_weights,
+                'start_date': start_date,
+                'end_date': end_date,
+                'initial_capital': initial_capital
+            }
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500

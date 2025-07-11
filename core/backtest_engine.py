@@ -179,9 +179,28 @@ class RealBacktestEngine:
             if symbol_type == 'individual':
                 data = await self.download_symbol_data(symbol, timeframe, start_date, end_date, log_callback)
                 symbols_to_test = [symbol]
+                
+                # 데이터가 없는 경우 처리
+                if data.empty:
+                    if log_callback:
+                        log_callback(f"⚠️ {symbol} 데이터 없음, 기본 심볼로 대체", "data", 15)
+                    # 기본 심볼로 대체
+                    data = await self.download_symbol_data('BTC/USDT', timeframe, start_date, end_date, log_callback)
+                    symbols_to_test = ['BTC/USDT']
             else:
                 data = await self.download_market_data(timeframe, start_date, end_date, log_callback)
                 symbols_to_test = list(data.keys())
+                
+                # 유효한 데이터가 있는 심볼만 선택
+                valid_symbols = [s for s in symbols_to_test if s in data and not data[s].empty]
+                if valid_symbols:
+                    symbols_to_test = valid_symbols
+                else:
+                    if log_callback:
+                        log_callback(f"⚠️ 유효한 시장 데이터 없음, 기본 심볼 사용", "data", 15)
+                    # 기본 심볼 사용
+                    data = await self.download_symbol_data('BTC/USDT', timeframe, start_date, end_date, log_callback)
+                    symbols_to_test = ['BTC/USDT']
             
             if log_callback:
                 log_callback(f"✅ 데이터 다운로드 완료", "data", 20)

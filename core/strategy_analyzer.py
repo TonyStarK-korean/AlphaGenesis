@@ -11,6 +11,7 @@ from dataclasses import dataclass
 import asyncio
 
 from .backtest_engine import RealBacktestEngine, BacktestResult
+from .portfolio_optimizer import PortfolioOptimizer
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,7 @@ class StrategyAnalyzer:
     
     def __init__(self):
         self.backtest_engine = RealBacktestEngine()
+        self.portfolio_optimizer = PortfolioOptimizer()
         self.analysis_results = []
         
         # 전략 가중치 설정
@@ -105,6 +107,45 @@ class StrategyAnalyzer:
             # 포트폴리오 조합 제안
             portfolio_combinations = self.suggest_portfolio_combinations(strategy_analyses)
             
+            # 포트폴리오 최적화 실행
+            portfolio_optimization = None
+            if strategy_results:
+                try:
+                    # 전략 결과를 포트폴리오 최적화 형태로 변환
+                    portfolio_strategy_results = []
+                    for result in strategy_results:
+                        portfolio_strategy_results.append({
+                            'strategy_name': result.strategy_name,
+                            'total_return': result.total_return,
+                            'sharpe_ratio': result.sharpe_ratio,
+                            'max_drawdown': result.max_drawdown,
+                            'win_rate': result.win_rate,
+                            'volatility': result.total_return / result.sharpe_ratio if result.sharpe_ratio > 0 else 20.0
+                        })
+                    
+                    # 다양한 최적화 방법으로 포트폴리오 생성
+                    optimized_portfolios = self.portfolio_optimizer.optimize_portfolio(
+                        strategy_results=portfolio_strategy_results,
+                        optimization_method='all',
+                        risk_level='medium'
+                    )
+                    
+                    # 포트폴리오 보고서 생성
+                    portfolio_report = self.portfolio_optimizer.generate_portfolio_report(optimized_portfolios)
+                    
+                    portfolio_optimization = {
+                        'portfolios': optimized_portfolios,
+                        'report': portfolio_report
+                    }
+                    
+                    if log_callback:
+                        log_callback(f"📊 포트폴리오 최적화 완료 ({len(optimized_portfolios)}개)", "system", 95)
+                        
+                except Exception as e:
+                    logger.error(f"포트폴리오 최적화 실패: {e}")
+                    if log_callback:
+                        log_callback(f"⚠️ 포트폴리오 최적화 실패: {str(e)}", "warning", 95)
+            
             if log_callback:
                 log_callback("✅ 전략 통합 분석 완료", "system", 100)
             
@@ -115,6 +156,7 @@ class StrategyAnalyzer:
                 'rankings': rankings,
                 'recommendations': recommendations,
                 'portfolio_combinations': portfolio_combinations,
+                'portfolio_optimization': portfolio_optimization,
                 'analysis_summary': self.generate_analysis_summary(strategy_analyses, market_regime)
             }
             

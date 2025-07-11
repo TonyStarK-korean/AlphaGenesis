@@ -853,6 +853,10 @@
                             <input type="radio" id="comprehensiveMode" name="backtestMode" value="comprehensive">
                             <label for="comprehensiveMode">전략 통합 분석</label>
                         </div>
+                        <div class="radio-group">
+                            <input type="radio" id="portfolioMode" name="backtestMode" value="portfolio">
+                            <label for="portfolioMode">포트폴리오 최적화</label>
+                        </div>
                     </div>
                 </div>
 
@@ -1432,7 +1436,14 @@
             try {
                 updateStatus('running', backtestMode === 'comprehensive' ? '전략 통합 분석 시작 중...' : '백테스트 시작 중...');
                 
-                const endpoint = backtestMode === 'comprehensive' ? '/api/backtest/comprehensive' : '/api/backtest/run';
+                let endpoint;
+                if (backtestMode === 'comprehensive') {
+                    endpoint = '/api/backtest/comprehensive';
+                } else if (backtestMode === 'portfolio') {
+                    endpoint = '/api/portfolio/analyze';
+                } else {
+                    endpoint = '/api/backtest/run';
+                }
                 const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
