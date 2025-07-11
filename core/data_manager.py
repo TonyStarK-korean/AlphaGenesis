@@ -477,7 +477,7 @@ class DataManager:
             latest = data.iloc[-1]
             
             # 전략별 신호 분석
-            if strategy_id == 'triple_combo':
+            if strategy_id == 'triple_combo' or strategy_id == 'simple_triple_combo':
                 # RSI + MACD + 볼린저 밴드 조합
                 rsi = latest['RSI']
                 macd = latest['MACD']

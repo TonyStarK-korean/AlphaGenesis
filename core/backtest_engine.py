@@ -105,6 +105,19 @@ class RealBacktestEngine:
                     'confidence_threshold': (0.6, 0.8),
                     'ensemble_models': ['XGBoost', 'RandomForest', 'LSTM']
                 }
+            },
+            'simple_triple_combo': {
+                'name': '심플 트리플 콤보',
+                'description': '간단한 트리플 콤보 전략',
+                'timeframe': '1h',
+                'params': {
+                    'rsi_period': (10, 20),
+                    'rsi_oversold': (25, 35),
+                    'rsi_overbought': (65, 75),
+                    'macd_fast': (10, 15),
+                    'macd_slow': (20, 30),
+                    'bb_period': (15, 25)
+                }
             }
         }
         
@@ -143,6 +156,13 @@ class RealBacktestEngine:
             timeframe = config.get('timeframe', '1h')
             initial_capital = float(config.get('initial_capital', 10000000))
             ml_optimization = config.get('ml_optimization', False)
+            
+            # 전략 존재 확인
+            if strategy_id not in self.strategies:
+                error_msg = f"지원하지 않는 전략: {strategy_id}"
+                if log_callback:
+                    log_callback(f"❌ {error_msg}", "error", 0)
+                raise ValueError(error_msg)
             
             if log_callback:
                 log_callback(f"📊 설정 검증 완료", "system", 5)
@@ -349,6 +369,14 @@ class RealBacktestEngine:
             'ml_ensemble': {
                 'confidence_threshold': 0.7,
                 'ensemble_models': ['XGBoost', 'RandomForest']
+            },
+            'simple_triple_combo': {
+                'rsi_period': 14,
+                'rsi_oversold': 30,
+                'rsi_overbought': 70,
+                'macd_fast': 12,
+                'macd_slow': 26,
+                'bb_period': 20
             }
         }
         return defaults.get(strategy_id, {})
@@ -580,6 +608,36 @@ class RealBacktestEngine:
             
             if strategy_id == 'triple_combo':
                 # 트리플 콤보 전략
+                rsi_oversold = params.get('rsi_oversold', 30)
+                rsi_overbought = params.get('rsi_overbought', 70)
+                
+                for i in range(len(data)):
+                    if i < 50:  # 충분한 데이터가 있을 때까지 대기
+                        signals.append(0)
+                        continue
+                    
+                    rsi = data['RSI'].iloc[i]
+                    macd = data['MACD'].iloc[i]
+                    macd_signal = data['MACD_Signal'].iloc[i]
+                    bb_upper = data['BB_Upper'].iloc[i]
+                    bb_lower = data['BB_Lower'].iloc[i]
+                    close = data['close'].iloc[i]
+                    
+                    # 매수 신호
+                    if (rsi < rsi_oversold and 
+                        macd > macd_signal and 
+                        close <= bb_lower):
+                        signals.append(1)
+                    # 매도 신호
+                    elif (rsi > rsi_overbought and 
+                          macd < macd_signal and 
+                          close >= bb_upper):
+                        signals.append(-1)
+                    else:
+                        signals.append(0)
+            
+            elif strategy_id == 'simple_triple_combo':
+                # 심플 트리플 콤보 전략 (triple_combo와 같은 로직)
                 rsi_oversold = params.get('rsi_oversold', 30)
                 rsi_overbought = params.get('rsi_overbought', 70)
                 
