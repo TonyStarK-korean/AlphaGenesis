@@ -149,6 +149,16 @@ class RealBacktestEngine:
             
             # 설정 추출
             strategy_id = config.get('strategy')
+            
+            # 전략 존재 확인
+            if strategy_id not in self.strategies:
+                supported_strategies = ', '.join(self.strategies.keys())
+                error_msg = f"지원하지 않는 전략: {strategy_id}. 지원하는 전략: {supported_strategies}"
+                logger.error(error_msg)
+                if log_callback:
+                    log_callback(f"❌ {error_msg}", "error", 0)
+                raise ValueError(error_msg)
+            
             symbol = config.get('symbol')
             symbol_type = config.get('symbol_type', 'individual')
             start_date = datetime.strptime(config.get('start_date'), '%Y-%m-%d')
@@ -157,12 +167,6 @@ class RealBacktestEngine:
             initial_capital = float(config.get('initial_capital', 10000000))
             ml_optimization = config.get('ml_optimization', False)
             
-            # 전략 존재 확인
-            if strategy_id not in self.strategies:
-                error_msg = f"지원하지 않는 전략: {strategy_id}"
-                if log_callback:
-                    log_callback(f"❌ {error_msg}", "error", 0)
-                raise ValueError(error_msg)
             
             if log_callback:
                 log_callback(f"📊 설정 검증 완료", "system", 5)

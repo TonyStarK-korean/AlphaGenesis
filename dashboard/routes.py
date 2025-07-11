@@ -286,6 +286,24 @@ def run_backtest():
         import uuid
         backtest_id = str(uuid.uuid4())
         
+        # 전략 이름을 ID로 매핑
+        strategy_name_to_id = {
+            '트리플 콤보 전략': 'triple_combo',
+            '심플 트리플 콤보': 'simple_triple_combo',
+            'RSI 전략': 'rsi_strategy',
+            'MACD 전략': 'macd_strategy',
+            '볼린저 밴드 전략': 'bollinger_strategy',
+            '모멘텀 전략': 'momentum_strategy',
+            '평균 회귀 전략': 'mean_reversion',
+            'ML 앙상블 전략': 'ml_ensemble',
+            '그리드 트레이딩': 'grid_trading',
+            '차익거래 전략': 'arbitrage'
+        }
+        
+        # 전략 이름을 ID로 변환
+        strategy_name = data['strategy']
+        strategy_id = strategy_name_to_id.get(strategy_name, strategy_name)
+        
         # 백테스트 설정
         backtest_config = {
             'id': backtest_id,
@@ -293,7 +311,7 @@ def run_backtest():
             'end_date': data['endDate'],
             'symbol': data.get('symbol', 'BTC/USDT'),
             'symbol_type': data.get('symbolType', 'individual'),
-            'strategy': data['strategy'],
+            'strategy': strategy_id,
             'timeframe': data.get('timeframe', '1h'),
             'initial_capital': float(data['initialCapital']),
             'ml_optimization': data.get('mlOptimization') == 'on'
@@ -737,10 +755,27 @@ def stream_backtest_log():
     start_date = request.args.get('start_date', '2025-01-01')
     end_date = request.args.get('end_date', '2025-07-11')
     symbol = request.args.get('symbol', 'BTC/USDT')
-    strategy = request.args.get('strategy', 'triple_combo')
+    strategy_name = request.args.get('strategy', 'triple_combo')
     initial_capital = float(request.args.get('initial_capital', '10000000'))
     backtest_mode = request.args.get('backtest_mode', 'single')
     ml_optimization = request.args.get('ml_optimization', 'off') == 'on'
+    
+    # 전략 이름을 ID로 매핑
+    strategy_name_to_id = {
+        '트리플 콤보 전략': 'triple_combo',
+        '심플 트리플 콤보': 'simple_triple_combo',
+        'RSI 전략': 'rsi_strategy',
+        'MACD 전략': 'macd_strategy',
+        '볼린저 밴드 전략': 'bollinger_strategy',
+        '모멘텀 전략': 'momentum_strategy',
+        '평균 회귀 전략': 'mean_reversion',
+        'ML 앙상블 전략': 'ml_ensemble',
+        '그리드 트레이딩': 'grid_trading',
+        '차익거래 전략': 'arbitrage'
+    }
+    
+    # 전략 이름을 ID로 변환
+    strategy = strategy_name_to_id.get(strategy_name, strategy_name)
     
     def generate_log_stream():
         import time
