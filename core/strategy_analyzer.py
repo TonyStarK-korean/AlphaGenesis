@@ -252,21 +252,36 @@ class StrategyAnalyzer:
         try:
             patterns = []
             
+            # 데이터 유효성 검사
+            if data.empty or len(data) == 0:
+                return ['데이터 부족']
+            
             # RSI 패턴
-            rsi_avg = data['RSI'].mean()
-            if rsi_avg > 70:
-                patterns.append('과매수 상태')
-            elif rsi_avg < 30:
-                patterns.append('과매도 상태')
-            else:
-                patterns.append('RSI 중립')
+            if 'RSI' in data.columns and not data['RSI'].empty:
+                rsi_avg = float(data['RSI'].mean()) if not pd.isna(data['RSI'].mean()) else 50
+                if rsi_avg > 70:
+                    patterns.append('과매수 상태')
+                elif rsi_avg < 30:
+                    patterns.append('과매도 상태')
+                else:
+                    patterns.append('RSI 중립')
             
             # MACD 패턴
-            macd_positive = (data['MACD'] > data['MACD_Signal']).sum()
-            macd_total = len(data)
-            if macd_positive / macd_total > 0.6:
-                patterns.append('MACD 상승 추세')
-            elif macd_positive / macd_total < 0.4:
+            if 'MACD' in data.columns and 'MACD_Signal' in data.columns:
+                try:
+                    macd_positive = (data['MACD'] > data['MACD_Signal']).sum()
+                    macd_total = len(data)
+                    if macd_total > 0 and macd_positive / macd_total > 0.6:
+                        patterns.append('MACD 상승 추세')
+                    elif macd_total > 0 and macd_positive / macd_total < 0.4:
+                        patterns.append('MACD 하락 추세')
+                    else:
+                        patterns.append('MACD 중립')
+                except Exception as e:
+                    logger.error(f"MACD 패턴 분석 실패: {e}")
+                    patterns.append('MACD 분석 실패')
+            
+            return patterns if patterns else ['패턴 분석 실패']
                 patterns.append('MACD 하락 추세')
             else:
                 patterns.append('MACD 혼재')

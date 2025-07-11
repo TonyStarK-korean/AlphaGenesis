@@ -521,9 +521,19 @@ class RealBacktestEngine:
                     signal = signals[i]
                     
                     # 동적 레버리지 계산
-                    leverage = self.leverage_manager.calculate_optimal_leverage(
-                        row, data.iloc[max(0, i-20):i+1]
-                    )
+                    try:
+                        recent_data = data.iloc[max(0, i-20):i+1]
+                        leverage_result = self.leverage_manager.calculate_optimal_leverage(
+                            market_data=recent_data,
+                            strategy=strategy_id,
+                            current_position=portfolio.get('capital', 0),
+                            portfolio_value=portfolio.get('capital', 100000),
+                            risk_metrics=None
+                        )
+                        leverage = leverage_result.get('optimal_leverage', 1.0) if isinstance(leverage_result, dict) else 1.0
+                    except Exception as e:
+                        logger.error(f"레버리지 계산 실패: {e}")
+                        leverage = 1.0  # 기본값
                     
                     portfolio['leverage_history'].append(leverage)
                     
@@ -843,10 +853,24 @@ class RealBacktestEngine:
             if not leverage_history:
                 return {'avg': 1.0, 'max': 1.0, 'min': 1.0}
             
+            # 레버리지 값들을 숫자로 변환
+            numeric_leverages = []
+            for lev in leverage_history:
+                if isinstance(lev, (int, float)):
+                    numeric_leverages.append(float(lev))
+                elif isinstance(lev, dict):
+                    # 딕셔너리인 경우 optimal_leverage 값 사용
+                    numeric_leverages.append(float(lev.get('optimal_leverage', 1.0)))
+                else:
+                    numeric_leverages.append(1.0)
+            
+            if not numeric_leverages:
+                return {'avg': 1.0, 'max': 1.0, 'min': 1.0}
+            
             return {
-                'avg': np.mean(leverage_history),
-                'max': max(leverage_history),
-                'min': min(leverage_history)
+                'avg': float(np.mean(numeric_leverages)),
+                'max': float(max(numeric_leverages)),
+                'min': float(min(numeric_leverages))
             }
             
         except Exception as e:

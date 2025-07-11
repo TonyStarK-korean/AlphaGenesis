@@ -93,6 +93,11 @@ class DataManager:
             if '/' not in symbol:
                 symbol = symbol.replace('USDT', '/USDT')
             
+            # 심볼 유효성 검사
+            if not self._is_valid_symbol(symbol):
+                logger.warning(f"지원되지 않는 심볼: {symbol}, 기본 심볼 사용")
+                symbol = 'BTC/USDT'  # 기본 심볼로 대체
+            
             # 기본 날짜 설정
             if not end_date:
                 end_date = datetime.now()
@@ -343,6 +348,29 @@ class DataManager:
             logger.error(f"데이터 품질 보고서 생성 실패: {e}")
             return {}
     
+    def _is_valid_symbol(self, symbol: str) -> bool:
+        """심볼 유효성 검사"""
+        try:
+            # 기본 심볼 리스트
+            valid_symbols = [
+                'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'DOT/USDT',
+                'SOL/USDT', 'AVAX/USDT', 'MATIC/USDT', 'LINK/USDT', 'UNI/USDT',
+                'LTC/USDT', 'BCH/USDT', 'XRP/USDT', 'DOGE/USDT', 'ATOM/USDT',
+                'FTM/USDT', 'NEAR/USDT', 'ALGO/USDT', 'VET/USDT', 'MANA/USDT',
+                'SAND/USDT', 'AXS/USDT', 'THETA/USDT', 'FIL/USDT', 'TRX/USDT'
+            ]
+            
+            # 심볼 정규화 후 검사
+            normalized_symbol = symbol.upper().replace('USDT', '/USDT')
+            if '/' not in normalized_symbol:
+                normalized_symbol = normalized_symbol + '/USDT'
+            
+            return normalized_symbol in valid_symbols
+            
+        except Exception as e:
+            logger.error(f"심볼 유효성 검사 실패: {e}")
+            return False
+    
     async def get_all_usdt_futures_symbols(self) -> List[str]:
         """
         모든 USDT 선물 심볼 조회
@@ -359,24 +387,35 @@ class DataManager:
                     return symbols
             
             # 바이낸스에서 모든 마켓 정보 가져오기
-            markets = self.exchange.load_markets()
-            
-            # USDT 선물 심볼만 필터링
-            usdt_futures = []
-            for symbol, market in markets.items():
-                if (market.get('type') == 'future' and 
-                    market.get('quote') == 'USDT' and 
-                    market.get('active', False)):
-                    usdt_futures.append(symbol)
-            
-            # 거래량 기준으로 정렬 (상위 100개)
-            usdt_futures = sorted(usdt_futures)[:100]
-            
-            # 캐시 저장
-            self.symbol_cache[cache_key] = (time.time(), usdt_futures)
-            
-            logger.info(f"USDT 선물 심볼 조회 완료: {len(usdt_futures)}개")
-            return usdt_futures
+            try:
+                markets = self.exchange.load_markets()
+                
+                # USDT 선물 심볼만 필터링
+                usdt_futures = []
+                for symbol, market in markets.items():
+                    if (market.get('type') == 'future' and 
+                        market.get('quote') == 'USDT' and 
+                        market.get('active', False)):
+                        usdt_futures.append(symbol)
+                
+                # 거래량 기준으로 정렬 (상위 100개)
+                usdt_futures = sorted(usdt_futures)[:100]
+                
+                # 캐시 저장
+                self.symbol_cache[cache_key] = (time.time(), usdt_futures)
+                
+                logger.info(f"USDT 선물 심볼 조회 완료: {len(usdt_futures)}개")
+                return usdt_futures
+                
+            except Exception as e:
+                logger.error(f"USDT 선물 심볼 조회 실패: {e}")
+                # 기본 심볼 리스트 반환
+                return [
+                    'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'DOT/USDT',
+                    'SOL/USDT', 'AVAX/USDT', 'MATIC/USDT', 'LINK/USDT', 'UNI/USDT',
+                    'LTC/USDT', 'BCH/USDT', 'XRP/USDT', 'DOGE/USDT', 'ATOM/USDT',
+                    'FTM/USDT', 'NEAR/USDT', 'ALGO/USDT', 'VET/USDT', 'MANA/USDT'
+                ]
             
         except Exception as e:
             logger.error(f"USDT 선물 심볼 조회 실패: {e}")
@@ -384,8 +423,8 @@ class DataManager:
             return [
                 'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'DOT/USDT',
                 'SOL/USDT', 'AVAX/USDT', 'MATIC/USDT', 'LINK/USDT', 'UNI/USDT',
-                'LTC/USDT', 'BCH/USDT', 'XRP/USDT', 'DOGE/USDT', 'SHIB/USDT',
-                'ATOM/USDT', 'FTM/USDT', 'NEAR/USDT', 'ALGO/USDT', 'VET/USDT'
+                'LTC/USDT', 'BCH/USDT', 'XRP/USDT', 'DOGE/USDT', 'ATOM/USDT',
+                'FTM/USDT', 'NEAR/USDT', 'ALGO/USDT', 'VET/USDT', 'MANA/USDT'
             ]
     
     async def scan_market_opportunities(
