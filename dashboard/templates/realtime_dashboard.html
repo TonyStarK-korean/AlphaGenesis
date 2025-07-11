@@ -25,6 +25,29 @@
             background: rgba(255,255,255,0.1);
             border-radius: 15px;
             backdrop-filter: blur(10px);
+            position: relative;
+        }
+        .nav-button {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+        .nav-button:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
         }
         .header h1 {
             font-size: 2.5em;
@@ -133,6 +156,9 @@
     
     <div class="container">
         <div class="header">
+            <a href="/" class="nav-button">
+                🏠 메인 페이지
+            </a>
             <h1>🚀 AlphaGenesis 실시간 대시보드</h1>
             <p>실시간 백테스트 모니터링 시스템</p>
         </div>

@@ -26,12 +26,37 @@
             position: sticky;
             top: 0;
             z-index: 1000;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
 
         .header h1 {
             color: #2c3e50;
             font-size: 2rem;
+            flex-grow: 1;
             text-align: center;
+        }
+
+        .nav-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 0.75rem 1.5rem;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .nav-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
         .container {
@@ -421,7 +446,11 @@
 </head>
 <body>
     <div class="header">
+        <a href="/" class="nav-button">
+            🏠 메인 페이지
+        </a>
         <h1>🚀 AlphaGenesis 백테스트 대시보드</h1>
+        <div style="width: 120px;"></div> <!-- 균형을 위한 공간 -->
     </div>
 
     <div class="container">
