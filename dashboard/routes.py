@@ -277,7 +277,7 @@ def stop_backtest():
 def get_backtest_results():
     """백테스트 결과 조회 API"""
     try:
-        # 더미 백테스트 결과 데이터
+        # 더미 백테스트 결과 데이터 (동적 레버리지 반영)
         results = [
             {
                 'id': 1,
@@ -287,17 +287,26 @@ def get_backtest_results():
                 'start_date': '2024-12-11',
                 'end_date': '2025-01-11',
                 'initial_capital': 10000000,
-                'final_value': 12500000,
-                'leverage': 2,
+                'final_value': 12540000,
+                'leverage': '동적 (평균 2.4x)',
+                'dynamic_leverage': True,
+                'avg_leverage': 2.4,
+                'max_leverage': 3.2,
+                'min_leverage': 1.8,
                 'total_trades': 45,
-                'winning_trades': 28,
-                'losing_trades': 17,
-                'win_rate': 62.22,
-                'sharpe_ratio': 1.85,
+                'winning_trades': 31,
+                'losing_trades': 14,
+                'win_rate': 68.9,
+                'sharpe_ratio': 1.95,
                 'max_drawdown': 8.5,
                 'created_at': '2025-01-11T14:30:00',
                 'ml_optimized': True,
-                'ml_params': {'rsi_period': 14, 'macd_fast': 12, 'macd_slow': 26}
+                'ml_params': {'rsi_period': 14, 'macd_fast': 12, 'macd_slow': 26},
+                'split_trades': {
+                    'total_splits': 18,
+                    'split_success_rate': 89.3,
+                    'avg_split_count': 2.1
+                }
             },
             {
                 'id': 2,
@@ -307,16 +316,25 @@ def get_backtest_results():
                 'start_date': '2024-12-11',
                 'end_date': '2025-01-11',
                 'initial_capital': 10000000,
-                'final_value': 10800000,
-                'leverage': 1,
+                'final_value': 11820000,
+                'leverage': '동적 (평균 1.8x)',
+                'dynamic_leverage': True,
+                'avg_leverage': 1.8,
+                'max_leverage': 2.5,
+                'min_leverage': 1.2,
                 'total_trades': 78,
-                'winning_trades': 42,
-                'losing_trades': 36,
-                'win_rate': 53.85,
-                'sharpe_ratio': 1.12,
+                'winning_trades': 46,
+                'losing_trades': 32,
+                'win_rate': 58.9,
+                'sharpe_ratio': 1.32,
                 'max_drawdown': 12.3,
                 'created_at': '2025-01-11T13:15:00',
-                'ml_optimized': False
+                'ml_optimized': False,
+                'split_trades': {
+                    'total_splits': 12,
+                    'split_success_rate': 75.4,
+                    'avg_split_count': 1.8
+                }
             },
             {
                 'id': 3,
@@ -326,17 +344,84 @@ def get_backtest_results():
                 'start_date': '2024-12-11',
                 'end_date': '2025-01-11',
                 'initial_capital': 10000000,
-                'final_value': 11200000,
-                'leverage': 3,
+                'final_value': 12210000,
+                'leverage': '동적 (평균 2.1x)',
+                'dynamic_leverage': True,
+                'avg_leverage': 2.1,
+                'max_leverage': 2.8,
+                'min_leverage': 1.5,
                 'total_trades': 32,
-                'winning_trades': 19,
-                'losing_trades': 13,
-                'win_rate': 59.38,
-                'sharpe_ratio': 1.45,
+                'winning_trades': 20,
+                'losing_trades': 12,
+                'win_rate': 62.5,
+                'sharpe_ratio': 1.65,
                 'max_drawdown': 15.2,
                 'created_at': '2025-01-11T12:00:00',
                 'ml_optimized': True,
-                'ml_params': {'macd_fast': 8, 'macd_slow': 21, 'signal': 9}
+                'ml_params': {'macd_fast': 8, 'macd_slow': 21, 'signal': 9},
+                'split_trades': {
+                    'total_splits': 8,
+                    'split_success_rate': 87.5,
+                    'avg_split_count': 2.3
+                }
+            },
+            {
+                'id': 4,
+                'strategy_name': '모멘텀 전략',
+                'symbol': 'SOL/USDT',
+                'timeframe': '4h',
+                'start_date': '2024-12-11',
+                'end_date': '2025-01-11',
+                'initial_capital': 10000000,
+                'final_value': 13180000,
+                'leverage': '동적 (평균 3.2x)',
+                'dynamic_leverage': True,
+                'avg_leverage': 3.2,
+                'max_leverage': 4.5,
+                'min_leverage': 2.1,
+                'total_trades': 28,
+                'winning_trades': 17,
+                'losing_trades': 11,
+                'win_rate': 60.7,
+                'sharpe_ratio': 2.05,
+                'max_drawdown': 18.7,
+                'created_at': '2025-01-11T11:30:00',
+                'ml_optimized': True,
+                'ml_params': {'momentum_period': 20, 'threshold': 0.05},
+                'split_trades': {
+                    'total_splits': 15,
+                    'split_success_rate': 93.3,
+                    'avg_split_count': 2.7
+                }
+            },
+            {
+                'id': 5,
+                'strategy_name': 'ML 앙상블 전략',
+                'symbol': 'AVAX/USDT',
+                'timeframe': '1h',
+                'start_date': '2024-12-11',
+                'end_date': '2025-01-11',
+                'initial_capital': 10000000,
+                'final_value': 12860000,
+                'leverage': '동적 (평균 2.8x)',
+                'dynamic_leverage': True,
+                'avg_leverage': 2.8,
+                'max_leverage': 3.5,
+                'min_leverage': 1.9,
+                'total_trades': 52,
+                'winning_trades': 37,
+                'losing_trades': 15,
+                'win_rate': 71.2,
+                'sharpe_ratio': 2.15,
+                'max_drawdown': 11.4,
+                'created_at': '2025-01-11T10:45:00',
+                'ml_optimized': True,
+                'ml_params': {'ensemble_models': ['XGBoost', 'RandomForest', 'LSTM']},
+                'split_trades': {
+                    'total_splits': 22,
+                    'split_success_rate': 90.9,
+                    'avg_split_count': 2.5
+                }
             }
         ]
         
@@ -350,40 +435,71 @@ def stream_backtest_log():
     def generate_log_stream():
         import time
         import json
+        import random
         
-        # 더미 로그 데이터
-        log_messages = [
-            "백테스트 시작...",
-            "데이터 로딩 중...",
-            "BTC/USDT 데이터 로드 완료",
-            "전략 초기화 중...",
-            "트리플 콤보 전략 설정 완료",
-            "백테스트 진행 중... 10%",
-            "첫 번째 매수 신호 발생",
-            "포지션 진입: BTC/USDT LONG",
-            "백테스트 진행 중... 25%",
-            "이익 실현: +3.2%",
-            "백테스트 진행 중... 50%",
-            "새로운 매수 신호 발생",
-            "포지션 진입: BTC/USDT LONG",
-            "백테스트 진행 중... 75%",
-            "손실 제한: -1.5%",
-            "백테스트 진행 중... 90%",
-            "백테스트 완료!",
-            "최종 수익률: +25.0%",
-            "총 거래 횟수: 45회",
-            "승률: 62.22%"
+        # 상세한 매매 시뮬레이션 로그
+        log_events = [
+            # 초기화 단계
+            {"message": "🚀 백테스트 시작", "type": "system", "progress": 0},
+            {"message": "📊 BTC/USDT 데이터 로딩 중...", "type": "data", "progress": 5},
+            {"message": "✅ 2024-12-11 ~ 2025-01-11 (1개월) 데이터 로드 완료", "type": "data", "progress": 10},
+            {"message": "🔧 트리플 콤보 전략 초기화", "type": "strategy", "progress": 15},
+            {"message": "⚙️ 동적 레버리지 시스템 활성화", "type": "system", "progress": 20},
+            {"message": "🎯 초기 자본: 10,000,000원 | 기본 비중: 6%", "type": "capital", "progress": 25},
+            
+            # 시장 분석 단계
+            {"message": "📈 시장 분석 중... 현재 BTC 가격: $43,250", "type": "market", "progress": 30},
+            {"message": "🔍 시장 국면 분석: 상승 추세 (RSI: 58.4, MACD: 양수)", "type": "analysis", "progress": 35},
+            {"message": "⚡ 동적 레버리지 계산: 현재 변동성 12.5% → 레버리지 2.3x", "type": "leverage", "progress": 40},
+            
+            # 첫 번째 매수 신호
+            {"message": "🎯 매수 신호 발생! RSI(52.1) + MACD 골든크로스 + 볼린저 하단 터치", "type": "signal", "progress": 45},
+            {"message": "💰 기본 매수 진입: 2% 비중 (200,000원) | 가격: $43,180", "type": "buy", "progress": 50},
+            {"message": "📊 포지션 정보: LONG 0.0046 BTC | 예상 수익률: +8.5%", "type": "position", "progress": 52},
+            
+            # 분할매수 시나리오
+            {"message": "⚠️ 가격 하락 감지: $43,180 → $42,850 (-0.76%)", "type": "price", "progress": 55},
+            {"message": "🔄 분할매수 1차: 2% 추가 비중 (200,000원) | 가격: $42,850", "type": "buy_add", "progress": 58},
+            {"message": "📈 누적 포지션: 0.0093 BTC | 평균 단가: $43,015", "type": "position", "progress": 60},
+            
+            {"message": "⚠️ 추가 하락: $42,850 → $42,520 (-0.77%)", "type": "price", "progress": 62},
+            {"message": "🔄 분할매수 2차 (최종): 2% 추가 비중 (200,000원) | 가격: $42,520", "type": "buy_add", "progress": 65},
+            {"message": "📊 최종 포지션: 0.0140 BTC | 평균 단가: $42,850 | 총 투입: 600,000원", "type": "position", "progress": 68},
+            
+            # 수익 전환 및 매도
+            {"message": "🚀 반등 시작! $42,520 → $43,820 (+3.06%)", "type": "price", "progress": 70},
+            {"message": "💚 수익 전환: +$13,580 (+2.26%)", "type": "profit", "progress": 72},
+            {"message": "🎯 분할매도 1차: 33% 물량 매도 | 가격: $43,820", "type": "sell", "progress": 75},
+            {"message": "💰 부분 이익실현: +$4,526 | 잔여 포지션: 0.0093 BTC", "type": "profit", "progress": 78},
+            
+            # 추가 상승 및 완전 매도
+            {"message": "📈 지속 상승: $43,820 → $44,250 (+0.98%)", "type": "price", "progress": 80},
+            {"message": "🎯 분할매도 2차: 50% 물량 매도 | 가격: $44,180", "type": "sell", "progress": 85},
+            {"message": "🎯 분할매도 3차 (완전청산): 잔여 물량 매도 | 가격: $44,320", "type": "sell", "progress": 90},
+            {"message": "✅ 포지션 완전 청산 | 총 수익: +$18,240 (+3.04%)", "type": "profit", "progress": 92},
+            
+            # 두 번째 매매 사이클
+            {"message": "🔍 새로운 기회 탐색 중...", "type": "analysis", "progress": 94},
+            {"message": "⚡ 레버리지 재계산: 변동성 감소 → 레버리지 2.8x", "type": "leverage", "progress": 95},
+            {"message": "🎯 새로운 매수 신호: ETH/USDT 진입", "type": "signal", "progress": 96},
+            
+            # 최종 결과
+            {"message": "📊 백테스트 완료!", "type": "system", "progress": 100},
+            {"message": "🏆 최종 성과: +25.4% (45회 거래, 승률 68.9%)", "type": "result", "progress": 100},
+            {"message": "💎 최적 레버리지 활용: 평균 2.4x", "type": "result", "progress": 100},
+            {"message": "🎯 분할매매 성공률: 89.3%", "type": "result", "progress": 100}
         ]
         
-        for i, message in enumerate(log_messages):
-            progress = int((i + 1) / len(log_messages) * 100)
+        for event in log_events:
+            # 로그 타입별 색상 및 아이콘 추가
             log_data = {
-                'message': message,
+                'message': event['message'],
+                'type': event['type'],
                 'timestamp': time.time(),
-                'progress': progress
+                'progress': event['progress']
             }
             yield f"data: {json.dumps(log_data)}\n\n"
-            time.sleep(0.5)  # 0.5초 간격으로 로그 전송
+            time.sleep(random.uniform(0.3, 0.8))  # 랜덤 간격으로 실제감 증대
         
         # 완료 신호
         yield f"data: {json.dumps({'type': 'end'})}\n\n"
