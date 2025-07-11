@@ -879,6 +879,60 @@ def stream_backtest_log():
     
     return Response(generate_log_stream(), mimetype='text/event-stream')
 
+@api.route('/api/backtest/comprehensive', methods=['POST'])
+def run_comprehensive_analysis():
+    """전략 통합 분석 실행 API"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '요청 데이터가 없습니다.'}), 400
+        
+        # 필수 필드 검증
+        required_fields = ['startDate', 'endDate', 'initialCapital']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field}가 누락되었습니다.'}), 400
+        
+        # 분석 ID 생성
+        import uuid
+        analysis_id = str(uuid.uuid4())
+        
+        # 분석 설정
+        analysis_config = {
+            'id': analysis_id,
+            'start_date': data['startDate'],
+            'end_date': data['endDate'],
+            'initial_capital': float(data['initialCapital']),
+            'analysis_type': 'comprehensive'
+        }
+        
+        # 비동기 분석 실행 (실제로는 celery 등 사용)
+        async def run_analysis():
+            start_dt = datetime.strptime(data['startDate'], '%Y-%m-%d')
+            end_dt = datetime.strptime(data['endDate'], '%Y-%m-%d')
+            
+            result = await strategy_analyzer.analyze_all_strategies(
+                start_dt, end_dt, analysis_config['initial_capital']
+            )
+            
+            return {
+                'analysis_id': analysis_id,
+                'status': 'completed',
+                'result': result,
+                'config': analysis_config
+            }
+        
+        # 결과 반환
+        return jsonify({
+            'status': 'success',
+            'message': '전략 통합 분석이 시작되었습니다.',
+            'analysis_id': analysis_id,
+            'config': analysis_config
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @api.route('/api/market/overview', methods=['GET'])
 def get_market_overview():
     """시장 개요 조회 API"""

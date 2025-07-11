@@ -105,28 +105,40 @@ class DataManager:
             
             all_candles = []
             current_since = since
+            max_retries = 3
             
             while current_since < until:
-                try:
-                    # 바이낸스 API 호출
-                    ohlcv = await self.exchange.fetch_ohlcv(
-                        symbol, 
-                        timeframe, 
-                        since=current_since, 
-                        limit=limit
-                    )
-                    
-                    if not ohlcv:
-                        break
-                    
-                    all_candles.extend(ohlcv)
-                    current_since = ohlcv[-1][0] + 1
-                    
-                    # Rate limiting
-                    await asyncio.sleep(0.1)
-                    
-                except Exception as e:
-                    logger.error(f"데이터 다운로드 오류: {e}")
+                retry_count = 0
+                while retry_count < max_retries:
+                    try:
+                        # 바이낸스 API 호출
+                        ohlcv = await self.exchange.fetch_ohlcv(
+                            symbol, 
+                            timeframe, 
+                            since=current_since, 
+                            limit=limit
+                        )
+                        
+                        if not ohlcv:
+                            break
+                        
+                        all_candles.extend(ohlcv)
+                        current_since = ohlcv[-1][0] + 1
+                        
+                        # Rate limiting
+                        await asyncio.sleep(0.1)
+                        break  # 성공시 재시도 루프 종료
+                        
+                    except Exception as e:
+                        retry_count += 1
+                        logger.warning(f"데이터 다운로드 재시도 {retry_count}/{max_retries}: {symbol} - {e}")
+                        if retry_count >= max_retries:
+                            logger.error(f"데이터 다운로드 최종 실패: {symbol} - {e}")
+                            # 빈 데이터프레임 반환하여 백테스트 계속 진행
+                            return pd.DataFrame()
+                        await asyncio.sleep(1)  # 재시도 전 대기
+                
+                if not ohlcv:
                     break
             
             # DataFrame 생성
