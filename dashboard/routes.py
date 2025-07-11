@@ -332,6 +332,11 @@ def stop_backtest():
 def get_backtest_results():
     """백테스트 결과 조회 API"""
     try:
+        # 쿼리 파라미터에서 필터링 조건 가져오기
+        symbol_filter = request.args.get('symbol', 'all')
+        strategy_filter = request.args.get('strategy', 'all')
+        period_filter = request.args.get('period', 'all')
+        
         # 더미 백테스트 결과 데이터 (동적 레버리지 반영)
         results = [
             {
@@ -481,6 +486,151 @@ def get_backtest_results():
         ]
         
         return jsonify({'results': results})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api.route('/api/backtest/results', methods=['POST'])
+def save_backtest_result():
+    """백테스트 결과 저장 API"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '결과 데이터가 없습니다.'}), 400
+        
+        # 결과 저장 로직 (실제로는 데이터베이스에 저장)
+        # 여기서는 성공 응답만 반환
+        result_id = len(get_backtest_results()['results']) + 1
+        
+        # 결과 데이터 구조 예시
+        saved_result = {
+            'id': result_id,
+            'strategy_name': data.get('strategy_name'),
+            'symbol': data.get('symbol'),
+            'timeframe': data.get('timeframe'),
+            'start_date': data.get('start_date'),
+            'end_date': data.get('end_date'),
+            'initial_capital': data.get('initial_capital'),
+            'final_value': data.get('final_value'),
+            'total_return': data.get('total_return'),
+            'sharpe_ratio': data.get('sharpe_ratio'),
+            'max_drawdown': data.get('max_drawdown'),
+            'win_rate': data.get('win_rate'),
+            'total_trades': data.get('total_trades'),
+            'created_at': datetime.now().isoformat(),
+            'dynamic_leverage': data.get('dynamic_leverage', True),
+            'avg_leverage': data.get('avg_leverage', 2.0),
+            'ml_optimized': data.get('ml_optimized', False)
+        }
+        
+        return jsonify({
+            'status': 'success',
+            'message': '백테스트 결과가 저장되었습니다.',
+            'result_id': result_id,
+            'result': saved_result
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api.route('/api/backtest/results/reset', methods=['POST'])
+def reset_backtest_results():
+    """백테스트 결과 초기화 API"""
+    try:
+        # 실제로는 데이터베이스의 백테스트 결과를 모두 삭제
+        # 여기서는 성공 응답만 반환
+        return jsonify({
+            'status': 'success',
+            'message': '모든 백테스트 결과가 초기화되었습니다.',
+            'reset_count': 0  # 실제로는 삭제된 결과 수
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@api.route('/api/backtest/statistics', methods=['GET'])
+def get_backtest_statistics():
+    """백테스트 통계 조회 API"""
+    try:
+        # 전략별 통계 계산
+        strategy_stats = {
+            '트리플 콤보 전략': {
+                'total_tests': 12,
+                'avg_return': 18.7,
+                'avg_sharpe': 1.65,
+                'avg_drawdown': 11.2,
+                'win_rate': 67.5,
+                'best_symbol': 'BTC/USDT',
+                'worst_symbol': 'DOGE/USDT'
+            },
+            'RSI 전략': {
+                'total_tests': 8,
+                'avg_return': 12.4,
+                'avg_sharpe': 1.32,
+                'avg_drawdown': 15.8,
+                'win_rate': 58.3,
+                'best_symbol': 'ETH/USDT',
+                'worst_symbol': 'ADA/USDT'
+            },
+            'MACD 전략': {
+                'total_tests': 6,
+                'avg_return': 15.2,
+                'avg_sharpe': 1.48,
+                'avg_drawdown': 12.9,
+                'win_rate': 62.1,
+                'best_symbol': 'BNB/USDT',
+                'worst_symbol': 'XRP/USDT'
+            }
+        }
+        
+        # 심볼별 통계
+        symbol_stats = {
+            'BTC/USDT': {
+                'total_tests': 15,
+                'avg_return': 19.8,
+                'best_strategy': '트리플 콤보 전략',
+                'worst_strategy': 'RSI 전략'
+            },
+            'ETH/USDT': {
+                'total_tests': 12,
+                'avg_return': 16.2,
+                'best_strategy': 'RSI 전략',
+                'worst_strategy': 'MACD 전략'
+            },
+            'BNB/USDT': {
+                'total_tests': 8,
+                'avg_return': 14.7,
+                'best_strategy': 'MACD 전략',
+                'worst_strategy': 'RSI 전략'
+            }
+        }
+        
+        # 기간별 통계
+        period_stats = {
+            '1개월': {
+                'total_tests': 20,
+                'avg_return': 8.5,
+                'volatility': 'High'
+            },
+            '3개월': {
+                'total_tests': 10,
+                'avg_return': 22.3,
+                'volatility': 'Medium'
+            },
+            '6개월': {
+                'total_tests': 5,
+                'avg_return': 41.2,
+                'volatility': 'Low'
+            }
+        }
+        
+        return jsonify({
+            'strategy_stats': strategy_stats,
+            'symbol_stats': symbol_stats,
+            'period_stats': period_stats,
+            'total_tests': 35,
+            'last_updated': datetime.now().isoformat()
+        })
+        
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 

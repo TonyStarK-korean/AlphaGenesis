@@ -307,6 +307,24 @@
             transform: translateX(5px);
         }
 
+        /* 서브 로그 항목 스타일 (들여쓰기된 항목) - 더 나은 가독성 */
+        .log-entry.log-sub {
+            margin-left: 2rem;
+            padding: 0.5rem 0.75rem;
+            margin-bottom: 0.2rem;
+            font-size: 0.85rem;
+            border-left-width: 2px;
+            background: rgba(255, 255, 255, 0.01);
+            opacity: 0.9;
+            border-radius: 4px;
+        }
+
+        .log-entry.log-sub:hover {
+            transform: translateX(3px);
+            opacity: 1;
+            background: rgba(255, 255, 255, 0.03);
+        }
+
         .log-system { 
             color: #00d4ff; 
             border-left-color: #00d4ff;
@@ -729,6 +747,8 @@
                 <div class="btn-group">
                     <button class="btn" id="compareBtn">성과 비교</button>
                     <button class="btn" id="exportBtn">엑셀 다운로드</button>
+                    <button class="btn" id="resetBtn" style="background: #e74c3c;">결과 초기화</button>
+                    <button class="btn" id="statsBtn" style="background: #9b59b6;">통계 보기</button>
                 </div>
             </div>
 
@@ -943,14 +963,17 @@
             // 정지 버튼
             document.getElementById('stopBtn').addEventListener('click', stopBacktest);
 
-            // 초기화 버튼
-            document.getElementById('resetBtn').addEventListener('click', resetForm);
-
             // 비교 버튼
             document.getElementById('compareBtn').addEventListener('click', showComparison);
 
             // 엑셀 다운로드 버튼
             document.getElementById('exportBtn').addEventListener('click', exportToExcel);
+
+            // 결과 초기화 버튼
+            document.getElementById('resetBtn').addEventListener('click', resetBacktestResults);
+
+            // 통계 보기 버튼
+            document.getElementById('statsBtn').addEventListener('click', showStatistics);
 
             // 모달 닫기
             document.querySelector('.close').addEventListener('click', function() {
@@ -1067,11 +1090,17 @@
                     return;
                 }
 
-                // 로그 추가 (타입별 색상 적용)
+                // 로그 추가 (타입별 색상 적용 + 서브 로그 감지)
                 const logContainer = document.getElementById('logContainer');
                 const logEntry = document.createElement('div');
-                logEntry.className = `log-entry log-${data.type || 'system'}`;
-                logEntry.textContent = data.message || event.data;
+                const message = data.message || event.data;
+                
+                // 서브 로그 감지 (들여쓰기된 항목)
+                const isSubLog = message.includes('└─');
+                const baseClass = `log-entry log-${data.type || 'system'}`;
+                logEntry.className = isSubLog ? `${baseClass} log-sub` : baseClass;
+                logEntry.textContent = message;
+                
                 logContainer.appendChild(logEntry);
                 logContainer.scrollTop = logContainer.scrollHeight;
 
@@ -1415,9 +1444,271 @@
         }
 
         // 성과 비교 표시
-        function showComparison() {
-            // 구현 예정
-            alert('성과 비교 기능은 준비 중입니다.');
+        async function showComparison() {
+            try {
+                // 백테스트 결과 로드
+                const response = await fetch('/api/backtest/results');
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                const results = data.results || [];
+                if (results.length === 0) {
+                    alert('비교할 백테스트 결과가 없습니다.');
+                    return;
+                }
+
+                // 전략별 성과 비교 섹션 표시
+                const comparisonSection = document.querySelector('.comparison-section');
+                comparisonSection.style.display = 'block';
+
+                // 전략별 데이터 그룹화
+                const strategyData = {};
+                results.forEach(result => {
+                    const strategyName = result.strategy_name;
+                    if (!strategyData[strategyName]) {
+                        strategyData[strategyName] = {
+                            returns: [],
+                            sharpe: [],
+                            drawdown: [],
+                            winRate: [],
+                            totalTrades: 0,
+                            avgLeverage: 0,
+                            count: 0
+                        };
+                    }
+                    
+                    const totalReturn = ((result.final_value - result.initial_capital) / result.initial_capital * 100);
+                    strategyData[strategyName].returns.push(totalReturn);
+                    strategyData[strategyName].sharpe.push(result.sharpe_ratio);
+                    strategyData[strategyName].drawdown.push(result.max_drawdown);
+                    strategyData[strategyName].winRate.push(result.win_rate);
+                    strategyData[strategyName].totalTrades += result.total_trades;
+                    strategyData[strategyName].avgLeverage += result.avg_leverage;
+                    strategyData[strategyName].count++;
+                });
+
+                // 전략 비교 차트 생성
+                createStrategyComparisonChart(strategyData);
+                createRiskReturnChart(strategyData);
+                
+                // 전략 비교 테이블 업데이트
+                updateStrategyComparisonTable(strategyData);
+                
+                // 성과 차트 업데이트
+                updatePerformanceChart(results);
+
+                // 부드럽게 스크롤
+                comparisonSection.scrollIntoView({ behavior: 'smooth' });
+
+            } catch (error) {
+                console.error('성과 비교 실패:', error);
+                alert('❌ 성과 비교에 실패했습니다: ' + error.message);
+            }
+        }
+
+        // 전략 비교 차트 생성
+        function createStrategyComparisonChart(strategyData) {
+            const ctx = document.getElementById('strategyComparisonChart').getContext('2d');
+            
+            // 기존 차트 제거
+            if (window.strategyComparisonChart) {
+                window.strategyComparisonChart.destroy();
+            }
+
+            const strategies = Object.keys(strategyData);
+            const avgReturns = strategies.map(strategy => {
+                const returns = strategyData[strategy].returns;
+                return returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
+            });
+
+            window.strategyComparisonChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: strategies,
+                    datasets: [{
+                        label: '평균 수익률 (%)',
+                        data: avgReturns,
+                        backgroundColor: ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6'],
+                        borderColor: ['#2980b9', '#c0392b', '#27ae60', '#e67e22', '#8e44ad'],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '전략별 평균 수익률 비교'
+                        },
+                        legend: {
+                            display: false
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 위험-수익률 차트 생성
+        function createRiskReturnChart(strategyData) {
+            const ctx = document.getElementById('riskReturnChart').getContext('2d');
+            
+            // 기존 차트 제거
+            if (window.riskReturnChart) {
+                window.riskReturnChart.destroy();
+            }
+
+            const datasets = Object.keys(strategyData).map((strategy, index) => {
+                const data = strategyData[strategy];
+                const avgReturn = data.returns.reduce((sum, ret) => sum + ret, 0) / data.returns.length;
+                const avgDrawdown = data.drawdown.reduce((sum, dd) => sum + dd, 0) / data.drawdown.length;
+                
+                return {
+                    label: strategy,
+                    data: [{ x: avgDrawdown, y: avgReturn }],
+                    backgroundColor: ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6'][index],
+                    borderColor: ['#2980b9', '#c0392b', '#27ae60', '#e67e22', '#8e44ad'][index],
+                    pointRadius: 8,
+                    pointHoverRadius: 10
+                };
+            });
+
+            window.riskReturnChart = new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: datasets
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '위험 대비 수익률 (낙폭 vs 수익률)'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: '평균 최대 낙폭 (%)'
+                            }
+                        },
+                        y: {
+                            display: true,
+                            title: {
+                                display: true,
+                                text: '평균 수익률 (%)'
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 전략 비교 테이블 업데이트
+        function updateStrategyComparisonTable(strategyData) {
+            const tbody = document.getElementById('strategyComparisonBody');
+            tbody.innerHTML = '';
+
+            Object.keys(strategyData).forEach(strategy => {
+                const data = strategyData[strategy];
+                const avgReturn = (data.returns.reduce((sum, ret) => sum + ret, 0) / data.returns.length).toFixed(2);
+                const avgSharpe = (data.sharpe.reduce((sum, sh) => sum + sh, 0) / data.sharpe.length).toFixed(2);
+                const avgDrawdown = (data.drawdown.reduce((sum, dd) => sum + dd, 0) / data.drawdown.length).toFixed(2);
+                const avgWinRate = (data.winRate.reduce((sum, wr) => sum + wr, 0) / data.winRate.length).toFixed(2);
+                const avgLeverage = (data.avgLeverage / data.count).toFixed(2);
+
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${strategy}</td>
+                    <td class="positive">+${avgReturn}%</td>
+                    <td>${avgSharpe}</td>
+                    <td class="negative">-${avgDrawdown}%</td>
+                    <td>${avgWinRate}%</td>
+                    <td>${data.totalTrades}</td>
+                    <td>${avgLeverage}x</td>
+                    <td>${avgReturn > 15 ? '높음' : avgReturn > 8 ? '중간' : '낮음'}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        // 성과 차트 업데이트
+        function updatePerformanceChart(results) {
+            const ctx = document.getElementById('performanceChart').getContext('2d');
+            
+            // 기존 차트 제거
+            if (window.performanceChart) {
+                window.performanceChart.destroy();
+            }
+
+            // 날짜별 누적 수익률 계산
+            const chartData = results.slice(-10).map(result => {
+                const totalReturn = ((result.final_value - result.initial_capital) / result.initial_capital * 100);
+                return {
+                    x: new Date(result.created_at).toLocaleDateString(),
+                    y: totalReturn
+                };
+            });
+
+            window.performanceChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    datasets: [{
+                        label: '백테스트 수익률',
+                        data: chartData,
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: '최근 백테스트 성과 추이'
+                        }
+                    },
+                    scales: {
+                        x: {
+                            type: 'category',
+                            title: {
+                                display: true,
+                                text: '테스트 날짜'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: '수익률 (%)'
+                            },
+                            ticks: {
+                                callback: function(value) {
+                                    return value + '%';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
         }
 
         // 엑셀 다운로드
@@ -1430,6 +1721,121 @@
         function exportResultToExcel(resultId) {
             // 구현 예정
             alert('개별 결과 엑셀 다운로드 기능은 준비 중입니다.');
+        }
+
+        // 백테스트 결과 초기화
+        async function resetBacktestResults() {
+            if (!confirm('⚠️ 모든 백테스트 결과를 초기화하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/backtest/results/reset', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
+                // 결과 그리드 초기화
+                const resultsGrid = document.getElementById('resultsGrid');
+                resultsGrid.innerHTML = '<div class="no-results">백테스트 결과가 없습니다. 백테스트를 실행해보세요.</div>';
+
+                // 통계 초기화
+                document.getElementById('totalReturn').textContent = '+0.0%';
+                document.getElementById('totalTrades').textContent = '0';
+                document.getElementById('winRate').textContent = '0.0%';
+                document.getElementById('sharpeRatio').textContent = '0.0';
+                document.getElementById('maxDrawdown').textContent = '0.0%';
+                document.getElementById('avgLeverage').textContent = '0.0x';
+
+                alert('✅ 모든 백테스트 결과가 초기화되었습니다.');
+                
+            } catch (error) {
+                console.error('백테스트 결과 초기화 실패:', error);
+                alert('❌ 백테스트 결과 초기화에 실패했습니다: ' + error.message);
+            }
+        }
+
+        // 통계 보기
+        async function showStatistics() {
+            try {
+                const response = await fetch('/api/backtest/statistics');
+                const stats = await response.json();
+                
+                if (stats.error) {
+                    throw new Error(stats.error);
+                }
+
+                // 통계 모달 HTML 생성
+                const statsHtml = `
+                    <div class="stats-section">
+                        <h3>📊 전략별 통계</h3>
+                        <div class="stats-grid">
+                            ${Object.entries(stats.strategy_stats).map(([strategy, data]) => `
+                                <div class="stat-card">
+                                    <h4>${strategy}</h4>
+                                    <p>테스트 수: ${data.total_tests}회</p>
+                                    <p>평균 수익률: <span class="positive">+${data.avg_return}%</span></p>
+                                    <p>평균 샤프 비율: ${data.avg_sharpe}</p>
+                                    <p>평균 낙폭: <span class="negative">-${data.avg_drawdown}%</span></p>
+                                    <p>승률: ${data.win_rate}%</p>
+                                    <p>최적 심볼: ${data.best_symbol}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="stats-section">
+                        <h3>💰 심볼별 통계</h3>
+                        <div class="stats-grid">
+                            ${Object.entries(stats.symbol_stats).map(([symbol, data]) => `
+                                <div class="stat-card">
+                                    <h4>${symbol}</h4>
+                                    <p>테스트 수: ${data.total_tests}회</p>
+                                    <p>평균 수익률: <span class="positive">+${data.avg_return}%</span></p>
+                                    <p>최적 전략: ${data.best_strategy}</p>
+                                    <p>최악 전략: ${data.worst_strategy}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="stats-section">
+                        <h3>📅 기간별 통계</h3>
+                        <div class="stats-grid">
+                            ${Object.entries(stats.period_stats).map(([period, data]) => `
+                                <div class="stat-card">
+                                    <h4>${period}</h4>
+                                    <p>테스트 수: ${data.total_tests}회</p>
+                                    <p>평균 수익률: <span class="positive">+${data.avg_return}%</span></p>
+                                    <p>변동성: ${data.volatility}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="stats-summary">
+                        <h3>📈 전체 요약</h3>
+                        <p>총 백테스트 수: <strong>${stats.total_tests}</strong>회</p>
+                        <p>마지막 업데이트: ${new Date(stats.last_updated).toLocaleString()}</p>
+                    </div>
+                `;
+
+                // 모달에 통계 표시
+                document.getElementById('detailContent').innerHTML = statsHtml;
+                document.getElementById('detailModal').style.display = 'block';
+                
+            } catch (error) {
+                console.error('통계 로드 실패:', error);
+                alert('❌ 통계 로드에 실패했습니다: ' + error.message);
+            }
         }
     </script>
 </body>
