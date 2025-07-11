@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>실전매매 - AlphaGenesis</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/live_trading.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="trading-container">
+        <!-- 상단 네비게이션 -->
+        <nav class="nav-bar">
+            <div class="nav-content">
+                <div class="nav-left">
+                    <a href="/" class="logo">
+                        <i class="fas fa-chart-line"></i>
+                        <span>AlphaGenesis</span>
+                    </a>
+                    <div class="nav-links">
+                        <a href="/"><i class="fas fa-home"></i> 홈</a>
+                        <a href="/backtest"><i class="fas fa-chart-bar"></i> 백테스트</a>
+                        <span class="nav-active"><i class="fas fa-rocket"></i> 실전매매</span>
+                    </div>
+                </div>
+                <div class="nav-right">
+                    <div class="trading-status" id="tradingStatus">
+                        <i class="fas fa-circle status-icon"></i>
+                        <span>대기 중</span>
+                    </div>
+                    <button class="emergency-stop" id="emergencyStop">
+                        <i class="fas fa-stop"></i>
+                        긴급 정지
+                    </button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 메인 컨텐츠 -->
+        <main class="main-content">
+            <!-- 거래 제어 패널 -->
+            <div class="control-panel">
+                <div class="panel-header">
+                    <h2><i class="fas fa-cog"></i> 거래 제어</h2>
+                    <div class="panel-actions">
+                        <button class="btn btn-primary" id="startTrading">
+                            <i class="fas fa-play"></i>
+                            거래 시작
+                        </button>
+                        <button class="btn btn-secondary" id="stopTrading" disabled>
+                            <i class="fas fa-pause"></i>
+                            거래 정지
+                        </button>
+                    </div>
+                </div>
+
+                <!-- 거래 설정 -->
+                <div class="trading-settings">
+                    <div class="setting-group">
+                        <h3>기본 설정</h3>
+                        <div class="setting-row">
+                            <label>초기 자본:</label>
+                            <input type="number" id="initialCapital" value="10000000" min="1000000" max="1000000000">
+                            <span>원</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>최대 포지션:</label>
+                            <input type="number" id="maxPosition" value="10" min="1" max="50">
+                            <span>%</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>레버리지:</label>
+                            <select id="leverage">
+                                <option value="1">1배</option>
+                                <option value="2" selected>2배</option>
+                                <option value="3">3배</option>
+                                <option value="5">5배</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h3>리스크 관리</h3>
+                        <div class="setting-row">
+                            <label>손절 설정:</label>
+                            <input type="number" id="stopLoss" value="2" min="0.5" max="10" step="0.1">
+                            <span>%</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>익절 설정:</label>
+                            <input type="number" id="takeProfit" value="5" min="1" max="20" step="0.1">
+                            <span>%</span>
+                        </div>
+                        <div class="setting-row">
+                            <label>일일 최대 손실:</label>
+                            <input type="number" id="dailyMaxLoss" value="5" min="1" max="15" step="0.1">
+                            <span>%</span>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <h3>전략 설정</h3>
+                        <div class="setting-row">
+                            <label>전략 선택:</label>
+                            <select id="strategy">
+                                <option value="triple_combo" selected>트리플 콤보</option>
+                                <option value="ml_enhanced">ML 강화</option>
+                                <option value="scalping">스캘핑</option>
+                            </select>
+                        </div>
+                        <div class="setting-row">
+                            <label>신뢰도 임계값:</label>
+                            <input type="number" id="confidenceThreshold" value="0.6" min="0.1" max="1" step="0.1">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 거래 현황 -->
+            <div class="trading-dashboard">
+                <div class="dashboard-header">
+                    <h2><i class="fas fa-chart-line"></i> 거래 현황</h2>
+                    <div class="refresh-btn" id="refreshData">
+                        <i class="fas fa-sync-alt"></i>
+                        새로고침
+                    </div>
+                </div>
+
+                <!-- 포트폴리오 요약 -->
+                <div class="portfolio-summary">
+                    <div class="summary-card">
+                        <h3>총 자산</h3>
+                        <div class="value" id="totalAsset">₩10,000,000</div>
+                        <div class="change positive" id="totalChange">+0.00%</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>실현 손익</h3>
+                        <div class="value" id="realizedPnl">₩0</div>
+                        <div class="change" id="realizedChange">+0.00%</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>미실현 손익</h3>
+                        <div class="value" id="unrealizedPnl">₩0</div>
+                        <div class="change" id="unrealizedChange">+0.00%</div>
+                    </div>
+                    <div class="summary-card">
+                        <h3>활성 포지션</h3>
+                        <div class="value" id="activePositions">0</div>
+                        <div class="change" id="positionChange">개</div>
+                    </div>
+                </div>
+
+                <!-- 활성 포지션 -->
+                <div class="active-positions">
+                    <h3>활성 포지션</h3>
+                    <div class="positions-table">
+                        <table id="positionsTable">
+                            <thead>
+                                <tr>
+                                    <th>심볼</th>
+                                    <th>방향</th>
+                                    <th>수량</th>
+                                    <th>진입가</th>
+                                    <th>현재가</th>
+                                    <th>손익</th>
+                                    <th>손익률</th>
+                                    <th>액션</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr class="no-data">
+                                    <td colspan="8">활성 포지션이 없습니다.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 거래 로그 -->
+            <div class="trading-log">
+                <div class="log-header">
+                    <h3><i class="fas fa-list"></i> 거래 로그</h3>
+                    <div class="log-controls">
+                        <button class="btn btn-small" id="clearLog">로그 지우기</button>
+                        <button class="btn btn-small" id="exportLog">로그 내보내기</button>
+                    </div>
+                </div>
+                <div class="log-content" id="logContent">
+                    <div class="log-item">
+                        <span class="log-time">2025-01-11 14:30:00</span>
+                        <span class="log-type info">INFO</span>
+                        <span class="log-message">실전매매 시스템 초기화 완료</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 시장 분석 -->
+            <div class="market-analysis">
+                <div class="analysis-header">
+                    <h3><i class="fas fa-brain"></i> 시장 분석</h3>
+                    <div class="analysis-time" id="analysisTime">마지막 업데이트: 방금 전</div>
+                </div>
+                <div class="analysis-content">
+                    <div class="analysis-card">
+                        <h4>시장 상태</h4>
+                        <div class="market-status" id="marketStatus">
+                            <span class="status-badge trending">상승 추세</span>
+                            <p>현재 시장은 강한 상승 추세를 보이고 있습니다.</p>
+                        </div>
+                    </div>
+                    <div class="analysis-card">
+                        <h4>추천 전략</h4>
+                        <div class="strategy-recommendation" id="strategyRecommendation">
+                            <span class="strategy-name">트리플 콤보</span>
+                            <p>현재 시장 상황에 가장 적합한 전략입니다.</p>
+                        </div>
+                    </div>
+                    <div class="analysis-card">
+                        <h4>위험도 평가</h4>
+                        <div class="risk-assessment" id="riskAssessment">
+                            <span class="risk-level medium">중위험</span>
+                            <p>적절한 리스크 관리가 필요합니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 사이드바 -->
+        <aside class="sidebar">
+            <div class="sidebar-content">
+                <!-- 시장 현황 -->
+                <div class="market-overview">
+                    <h4>시장 현황</h4>
+                    <div class="market-items" id="marketItems">
+                        <div class="market-item">
+                            <div class="symbol">BTC/USDT</div>
+                            <div class="price">$43,250</div>
+                            <div class="change positive">+2.34%</div>
+                        </div>
+                        <div class="market-item">
+                            <div class="symbol">ETH/USDT</div>
+                            <div class="price">$2,580</div>
+                            <div class="change positive">+1.87%</div>
+                        </div>
+                        <div class="market-item">
+                            <div class="symbol">BNB/USDT</div>
+                            <div class="price">$315</div>
+                            <div class="change negative">-0.45%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 알림 설정 -->
+                <div class="notification-settings">
+                    <h4>알림 설정</h4>
+                    <div class="notification-options">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="notifyTrades" checked>
+                            <span>거래 실행 알림</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="notifyProfit" checked>
+                            <span>손익 알림</span>
+                        </label>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="notifyError">
+                            <span>오류 알림</span>
+                        </label>
+                    </div>
+                </div>
+
+                <!-- 빠른 액션 -->
+                <div class="quick-actions">
+                    <h4>빠른 액션</h4>
+                    <div class="action-buttons">
+                        <button class="action-btn" id="closeAllPositions">
+                            <i class="fas fa-times-circle"></i>
+                            모든 포지션 청산
+                        </button>
+                        <button class="action-btn" id="pauseTrading">
+                            <i class="fas fa-pause-circle"></i>
+                            거래 일시정지
+                        </button>
+                        <button class="action-btn" id="rebalancePortfolio">
+                            <i class="fas fa-balance-scale"></i>
+                            포트폴리오 리밸런싱
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <!-- 확인 모달 -->
+    <div class="modal" id="confirmModal">
+        <div class="modal-content">
+            <h3>확인</h3>
+            <p id="confirmMessage">이 작업을 수행하시겠습니까?</p>
+            <div class="modal-buttons">
+                <button class="btn btn-primary" id="confirmYes">예</button>
+                <button class="btn btn-secondary" id="confirmNo">아니요</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/live_trading.js') }}"></script>
+</body>
+</html>

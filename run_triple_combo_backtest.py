@@ -596,7 +596,7 @@ def main():
         
         # 3. ML 모델 훈련
         print("🤖 강화된 ML 모델 훈련 중...")
-        model = PricePredictionModel(top_n_features=args.ml_features)
+        model = PricePredictionModel(n_splits=5)  # top_n_features 파라미터 제거
         model.fit(df)
         
         # 4. 트리플 콤보 전략 초기화

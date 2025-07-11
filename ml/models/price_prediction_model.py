@@ -152,6 +152,7 @@ class PricePredictionModel:
         self.cv_report = {}
         self.feature_names = None
         self.sklearn_available = SKLEARN_AVAILABLE
+        self.is_fitted = False  # 추가: 모델 훈련 상태 추적
 
     def save_model(self, path):
         if SKLEARN_AVAILABLE:
@@ -191,6 +192,7 @@ class PricePredictionModel:
             self.models = {'dummy': SimpleDummyModel()}
             if len(df) > 0:
                 self.models['dummy'].fit(None, df[target_col].values)
+            self.is_fitted = True  # 더미 모델 훈련 완료 표시
             return True
             
         # 최소 데이터 요구사항 체크
@@ -251,6 +253,7 @@ class PricePredictionModel:
             print("[ML 모델] 사용 가능한 ML 라이브러리가 없습니다. 더미 모델을 사용합니다.")
             self.models = {'dummy': SimpleDummyModel()}
             self.models['dummy'].fit(None, y)
+            self.is_fitted = True  # 더미 모델 훈련 완료 표시
             return True
 
         # 하이퍼파라미터 튜닝 (Optuna) - 데이터가 충분한 경우에만
@@ -286,6 +289,7 @@ class PricePredictionModel:
             tscv = TimeSeriesSplit(n_splits=min(3, len(X)//10))  # fold 수 축소
         else:
             # 더미 모델은 이미 훈련되었으므로 성공 리턴
+            self.is_fitted = True  # 더미 모델 훈련 완료 표시
             return True
         for name, model in self.models.items():
             fold_rmse, fold_mae, fold_r2 = [], [], []
@@ -307,9 +311,11 @@ class PricePredictionModel:
                 print(f"[ML 모델] {name} 모델 훈련 완료 - RMSE: {np.mean(fold_rmse):.2f}, R²: {np.mean(fold_r2):.3f}")
             else:
                 print(f"[ML 모델] {name} 모델 훈련 실패")
+                self.is_fitted = False  # 훈련 실패 표시
                 return False
         
         print(f"[ML 모델] 모든 모델 훈련 완료 - 데이터: {len(X)}개, 피처: {len(self.feature_names)}개")
+        self.is_fitted = True  # 훈련 완료 표시
         return True
 
     def predict(self, df):

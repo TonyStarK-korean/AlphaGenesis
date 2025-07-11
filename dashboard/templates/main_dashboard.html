@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlphaGenesis - 통합 트레이딩 시스템</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/main_dashboard.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="main-container">
+        <!-- 헤더 -->
+        <header class="header">
+            <div class="header-content">
+                <div class="logo">
+                    <i class="fas fa-chart-line"></i>
+                    <h1>AlphaGenesis</h1>
+                    <span class="version">v3.0</span>
+                </div>
+                <div class="server-status">
+                    <div class="status-indicator" id="serverStatus">
+                        <i class="fas fa-circle"></i>
+                        <span>서버 연결됨</span>
+                    </div>
+                    <div class="server-info">
+                        <span>GVS Server: 34.47.77.230:9000</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- 메인 컨텐츠 -->
+        <main class="main-content">
+            <div class="welcome-section">
+                <h2>AI 기반 암호화폐 트레이딩 시스템</h2>
+                <p>머신러닝 최적화와 실시간 분석을 통한 전문 트레이딩 플랫폼</p>
+            </div>
+
+            <!-- 메인 선택 카드 -->
+            <div class="cards-container">
+                <!-- 백테스트 카드 -->
+                <div class="main-card" onclick="navigateToBacktest()">
+                    <div class="card-icon backtest-icon">
+                        <i class="fas fa-chart-bar"></i>
+                    </div>
+                    <h3>백테스트</h3>
+                    <p>과거 데이터로 전략 성능 검증</p>
+                    <div class="card-features">
+                        <div class="feature">
+                            <i class="fas fa-brain"></i>
+                            <span>ML 최적화</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-coins"></i>
+                            <span>전체 USDT.P</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>실시간 분석</span>
+                        </div>
+                    </div>
+                    <div class="card-button">
+                        <span>백테스트 시작</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+
+                <!-- 실전매매 카드 -->
+                <div class="main-card" onclick="navigateToLiveTrading()">
+                    <div class="card-icon live-icon">
+                        <i class="fas fa-rocket"></i>
+                    </div>
+                    <h3>실전매매</h3>
+                    <p>실시간 자동 트레이딩 시스템</p>
+                    <div class="card-features">
+                        <div class="feature">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>리스크 관리</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-clock"></i>
+                            <span>24/7 운영</span>
+                        </div>
+                        <div class="feature">
+                            <i class="fas fa-bell"></i>
+                            <span>실시간 알림</span>
+                        </div>
+                    </div>
+                    <div class="card-button live-button">
+                        <span>실전매매 시작</span>
+                        <i class="fas fa-arrow-right"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 시스템 상태 -->
+            <div class="system-status">
+                <h3>시스템 상태</h3>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-icon">
+                            <i class="fas fa-database"></i>
+                        </div>
+                        <div class="status-info">
+                            <h4>데이터 상태</h4>
+                            <p id="dataStatus">실시간 업데이트 중</p>
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">
+                            <i class="fas fa-exchange-alt"></i>
+                        </div>
+                        <div class="status-info">
+                            <h4>바이낸스 연결</h4>
+                            <p id="binanceStatus">연결됨</p>
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">
+                            <i class="fas fa-cpu"></i>
+                        </div>
+                        <div class="status-info">
+                            <h4>ML 모델</h4>
+                            <p id="mlStatus">최적화 완료</p>
+                        </div>
+                    </div>
+                    <div class="status-item">
+                        <div class="status-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="status-info">
+                            <h4>활성 전략</h4>
+                            <p id="strategyStatus">트리플 콤보</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 최근 성과 -->
+            <div class="recent-performance">
+                <h3>최근 성과</h3>
+                <div class="performance-grid">
+                    <div class="performance-item">
+                        <div class="performance-label">오늘 수익률</div>
+                        <div class="performance-value positive" id="todayReturn">+2.34%</div>
+                    </div>
+                    <div class="performance-item">
+                        <div class="performance-label">주간 수익률</div>
+                        <div class="performance-value positive" id="weekReturn">+8.76%</div>
+                    </div>
+                    <div class="performance-item">
+                        <div class="performance-label">최대 낙폭</div>
+                        <div class="performance-value" id="maxDrawdown">-3.21%</div>
+                    </div>
+                    <div class="performance-item">
+                        <div class="performance-label">샤프 비율</div>
+                        <div class="performance-value" id="sharpeRatio">2.41</div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <!-- 푸터 -->
+        <footer class="footer">
+            <div class="footer-content">
+                <div class="footer-info">
+                    <p>&copy; 2025 AlphaGenesis. 모든 권리 보유.</p>
+                    <p>고급 암호화폐 트레이딩 시스템</p>
+                </div>
+                <div class="footer-links">
+                    <a href="#" onclick="showSystemInfo()">시스템 정보</a>
+                    <a href="#" onclick="showHelp()">도움말</a>
+                    <a href="#" onclick="showSettings()">설정</a>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 모달 -->
+    <div class="modal" id="systemModal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2>시스템 정보</h2>
+            <div class="system-info">
+                <p><strong>버전:</strong> 3.0.0</p>
+                <p><strong>서버:</strong> 34.47.77.230:9000</p>
+                <p><strong>업타임:</strong> <span id="uptime">24시간 7분</span></p>
+                <p><strong>메모리 사용량:</strong> <span id="memoryUsage">68%</span></p>
+                <p><strong>CPU 사용량:</strong> <span id="cpuUsage">23%</span></p>
+            </div>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/main_dashboard.js') }}"></script>
+</body>
+</html>
