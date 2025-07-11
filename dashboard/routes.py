@@ -181,90 +181,21 @@ def get_binance_symbols():
 
 @api.route('/api/strategies', methods=['GET'])
 def get_strategies():
-    """전략 목록 조회 API"""
+    """전략 목록 조회 API - 백테스트 엔진에서 실제 전략 로드"""
     try:
-        strategies = [
-            {
-                'id': 'triple_combo',
-                'name': '트리플 콤보 전략',
-                'description': 'RSI, MACD, 볼린저 밴드를 결합한 종합 전략',
-                'timeframe': '1h',
+        # 백테스트 엔진의 실제 전략 목록을 가져오기
+        engine_strategies = backtest_engine.strategies
+        
+        strategies = []
+        for strategy_id, strategy_info in engine_strategies.items():
+            strategies.append({
+                'id': strategy_id,
+                'name': strategy_info.get('name', strategy_id),
+                'description': strategy_info.get('description', ''),
+                'timeframe': strategy_info.get('timeframe', '1h'),
                 'category': 'technical',
                 'risk_level': 'medium'
-            },
-            {
-                'id': 'simple_triple_combo',
-                'name': '심플 트리플 콤보',
-                'description': '간단한 트리플 콤보 전략',
-                'timeframe': '1h',
-                'category': 'technical',
-                'risk_level': 'medium'
-            },
-            {
-                'id': 'rsi_strategy',
-                'name': 'RSI 전략',
-                'description': 'RSI 지표를 활용한 역추세 전략',
-                'timeframe': '15m',
-                'category': 'technical',
-                'risk_level': 'low'
-            },
-            {
-                'id': 'macd_strategy',
-                'name': 'MACD 전략',
-                'description': 'MACD 크로스오버 전략',
-                'timeframe': '30m',
-                'category': 'technical',
-                'risk_level': 'medium'
-            },
-            {
-                'id': 'bollinger_strategy',
-                'name': '볼린저 밴드 전략',
-                'description': '볼린저 밴드 돌파 전략',
-                'timeframe': '1h',
-                'category': 'technical',
-                'risk_level': 'medium'
-            },
-            {
-                'id': 'momentum_strategy',
-                'name': '모멘텀 전략',
-                'description': '가격 모멘텀 기반 추세 추종 전략',
-                'timeframe': '4h',
-                'category': 'trend',
-                'risk_level': 'high'
-            },
-            {
-                'id': 'mean_reversion',
-                'name': '평균 회귀 전략',
-                'description': '가격의 평균 회귀 특성을 활용한 전략',
-                'timeframe': '1h',
-                'category': 'statistical',
-                'risk_level': 'medium'
-            },
-            {
-                'id': 'ml_ensemble',
-                'name': 'ML 앙상블 전략',
-                'description': '머신러닝 앙상블 모델 기반 예측 전략',
-                'timeframe': '1h',
-                'category': 'machine_learning',
-                'risk_level': 'high'
-            },
-            {
-                'id': 'grid_trading',
-                'name': '그리드 트레이딩',
-                'description': '격자 매매 전략',
-                'timeframe': '5m',
-                'category': 'algorithmic',
-                'risk_level': 'medium'
-            },
-            {
-                'id': 'arbitrage',
-                'name': '차익거래 전략',
-                'description': '시장 간 가격 차이를 활용한 무위험 수익 전략',
-                'timeframe': '1m',
-                'category': 'arbitrage',
-                'risk_level': 'low'
-            }
-        ]
+            })
         
         return jsonify({'strategies': strategies})
     except Exception as e:

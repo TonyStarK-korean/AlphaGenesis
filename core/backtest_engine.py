@@ -247,10 +247,28 @@ class RealBacktestEngine:
             if log_callback:
                 log_callback(f"📊 {symbol} 데이터 다운로드 중...", "data", 10)
             
-            # 실제 데이터 다운로드
-            data = await self.data_manager.download_historical_data(
-                symbol, timeframe, start_date, end_date
-            )
+            # 실제 데이터 다운로드 시도
+            try:
+                data = await self.data_manager.download_historical_data(
+                    symbol, timeframe, start_date, end_date
+                )
+            except Exception as download_error:
+                if log_callback:
+                    log_callback(f"⚠️ 실시간 데이터 실패, 로컬 데이터 사용: {str(download_error)}", "warning", 12)
+                
+                # 로컬 데이터 시도
+                try:
+                    data = self.data_manager.load_market_data(symbol, timeframe)
+                    if not data.empty:
+                        # 날짜 범위 필터링
+                        if 'timestamp' in data.columns:
+                            data = data[(data['timestamp'] >= start_date) & (data['timestamp'] <= end_date)]
+                        if log_callback:
+                            log_callback(f"✅ {symbol} 로컬 데이터 사용 ({len(data)} 캔들)", "data", 14)
+                except Exception as local_error:
+                    if log_callback:
+                        log_callback(f"❌ 로컬 데이터도 실패: {str(local_error)}", "error", 15)
+                    data = pd.DataFrame()
             
             if data.empty:
                 raise ValueError(f"데이터 다운로드 실패: {symbol}")
@@ -265,6 +283,8 @@ class RealBacktestEngine:
             
         except Exception as e:
             logger.error(f"심볼 데이터 다운로드 실패: {e}")
+            if log_callback:
+                log_callback(f"❌ {symbol} 데이터 로드 실패: {str(e)}", "error", 0)
             raise e
     
     async def download_market_data(

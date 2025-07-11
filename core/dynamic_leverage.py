@@ -376,6 +376,47 @@ class DynamicLeverageManager:
         except Exception as e:
             logger.error(f"변동성 계산 실패: {e}")
             return 0.2
+    
+    def _calculate_trend_strength_safe(self, data: pd.DataFrame) -> float:
+        """트렌드 강도 계산 - 안전한 버전"""
+        try:
+            if data.empty or len(data) < 2:
+                return 0.0
+            
+            # 간단한 트렌드 강도 계산
+            close_prices = data['close']
+            if len(close_prices) < 2:
+                return 0.0
+            
+            # 선형 회귀를 이용한 트렌드 강도
+            x = np.arange(len(close_prices))
+            y = close_prices.values
+            
+            # 상관계수를 이용한 트렌드 강도
+            correlation = np.corrcoef(x, y)[0, 1] if len(x) > 1 else 0
+            
+            return abs(correlation) if not np.isnan(correlation) else 0.0
+            
+        except Exception as e:
+            logger.error(f"트렌드 강도 계산 실패: {e}")
+            return 0.0
+    
+    def _assess_risk_level_safe(self, leverage: float, volatility: float, trend_strength: float) -> str:
+        """리스크 레벨 평가 - 안전한 버전"""
+        try:
+            # 리스크 점수 계산 (간단한 버전)
+            risk_score = (leverage - 1.0) * 10 + volatility * 100 + (1 - trend_strength) * 20
+            
+            if risk_score < 30:
+                return 'low'
+            elif risk_score < 60:
+                return 'medium'
+            else:
+                return 'high'
+                
+        except Exception as e:
+            logger.error(f"리스크 레벨 평가 실패: {e}")
+            return 'medium'
 
 class SmartPositionManager:
     """지능형 포지션 관리자"""

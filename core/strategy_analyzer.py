@@ -165,13 +165,27 @@ class StrategyAnalyzer:
             if log_callback:
                 log_callback("📊 시장 국면 분석 중...", "analysis", 10)
             
-            # BTC 데이터로 시장 국면 분석
-            btc_data = await self.backtest_engine.data_manager.download_historical_data(
-                'BTC/USDT', '1h', start_date, end_date
-            )
+            # BTC 데이터로 시장 국면 분석 - 로컬 데이터 사용
+            try:
+                btc_data = await self.backtest_engine.data_manager.download_historical_data(
+                    'BTC/USDT', '1h', start_date, end_date
+                )
+            except Exception as e:
+                if log_callback:
+                    log_callback(f"⚠️ 실시간 데이터 로드 실패, 로컬 데이터 사용: {str(e)}", "warning", 12)
+                
+                # 로컬 데이터 사용
+                try:
+                    btc_data = self.backtest_engine.data_manager.load_market_data('BTC/USDT', '1h')
+                except Exception as local_error:
+                    if log_callback:
+                        log_callback(f"⚠️ 로컬 데이터도 실패, 기본값 사용: {str(local_error)}", "warning", 15)
+                    btc_data = pd.DataFrame()
             
             if btc_data.empty:
                 # 데이터가 없으면 기본값 반환
+                if log_callback:
+                    log_callback("📊 데이터 부족으로 기본 시장 국면 사용", "warning", 15)
                 return MarketRegimeAnalysis(
                     regime_type='sideways',
                     volatility_level='medium',
