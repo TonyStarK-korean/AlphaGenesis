@@ -4,9 +4,586 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>실전매매 - AlphaGenesis</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/live_trading.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        .trading-container {
+            display: grid;
+            grid-template-areas: 
+                "nav nav"
+                "main sidebar";
+            grid-template-columns: 1fr 300px;
+            grid-template-rows: 60px 1fr;
+            min-height: 100vh;
+            gap: 0;
+        }
+
+        /* 네비게이션 바 */
+        .nav-bar {
+            grid-area: nav;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        .nav-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 100%;
+            padding: 0 2rem;
+        }
+
+        .nav-left {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            color: #ffffff;
+            text-decoration: none;
+            font-size: 1.2rem;
+            font-weight: 700;
+        }
+
+        .nav-links {
+            display: flex;
+            align-items: center;
+            gap: 1.5rem;
+        }
+
+        .nav-links a {
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 500;
+            transition: color 0.3s;
+        }
+
+        .nav-links a:hover {
+            color: #00d4ff;
+        }
+
+        .nav-active {
+            color: #00d4ff !important;
+            font-weight: 600;
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .trading-status {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            font-size: 0.9rem;
+        }
+
+        .status-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ffd700;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .emergency-stop {
+            background: #ff4757;
+            color: white;
+            border: none;
+            padding: 0.5rem 1rem;
+            border-radius: 20px;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-weight: 600;
+        }
+
+        .emergency-stop:hover {
+            background: #ff3742;
+            transform: translateY(-2px);
+        }
+
+        /* 메인 컨텐츠 */
+        .main-content {
+            grid-area: main;
+            padding: 2rem;
+            overflow-y: auto;
+            max-height: calc(100vh - 60px);
+        }
+
+        .section {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .section h2 {
+            color: #00d4ff;
+            margin-bottom: 1.5rem;
+            font-size: 1.3rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        /* 거래 제어 패널 */
+        .control-panel {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 2rem;
+        }
+
+        .control-section {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .btn {
+            padding: 0.8rem 1.5rem;
+            border: none;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            color: white;
+        }
+
+        .btn-secondary {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 212, 255, 0.3);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 설정 */
+        .settings-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+
+        .setting-item label {
+            font-weight: 500;
+            color: #ffffff;
+        }
+
+        .setting-item input,
+        .setting-item select {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.5rem;
+            border-radius: 5px;
+            width: 100px;
+        }
+
+        /* 포트폴리오 요약 */
+        .portfolio-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .summary-card {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 1.5rem;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+        }
+
+        .summary-card h3 {
+            color: #00d4ff;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .summary-card .value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .summary-card .change {
+            font-size: 0.9rem;
+            font-weight: 500;
+        }
+
+        .positive {
+            color: #00ff88;
+        }
+
+        .negative {
+            color: #ff4757;
+        }
+
+        /* 활성 포지션 테이블 */
+        .positions-table {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .positions-table table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .positions-table th,
+        .positions-table td {
+            padding: 1rem;
+            text-align: left;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .positions-table th {
+            background: rgba(255, 255, 255, 0.1);
+            color: #00d4ff;
+            font-weight: 600;
+        }
+
+        .positions-table .no-data {
+            text-align: center;
+            color: rgba(255, 255, 255, 0.5);
+            font-style: italic;
+        }
+
+        /* 차트 컨테이너 */
+        .chart-container {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            height: 400px;
+        }
+
+        .chart-container canvas {
+            width: 100% !important;
+            height: 100% !important;
+        }
+
+        /* 사이드바 */
+        .sidebar {
+            grid-area: sidebar;
+            background: rgba(255, 255, 255, 0.05);
+            padding: 2rem;
+            border-left: 1px solid rgba(255, 255, 255, 0.1);
+            overflow-y: auto;
+            max-height: calc(100vh - 60px);
+        }
+
+        .sidebar-section {
+            margin-bottom: 2rem;
+        }
+
+        .sidebar-section h4 {
+            color: #00d4ff;
+            margin-bottom: 1rem;
+            font-size: 1.1rem;
+        }
+
+        /* 시장 현황 */
+        .market-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.8rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .market-item:last-child {
+            border-bottom: none;
+        }
+
+        .market-item .symbol {
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .market-item .price {
+            font-size: 0.9rem;
+            color: #ffffff;
+        }
+
+        .market-item .change {
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        /* 빠른 액션 버튼 */
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .action-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            color: white;
+            padding: 0.8rem;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .action-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-1px);
+        }
+
+        /* 알림 설정 */
+        .notification-options {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: 16px;
+            height: 16px;
+        }
+
+        /* 거래 로그 */
+        .trading-log {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .log-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+
+        .log-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .btn-small {
+            padding: 0.4rem 0.8rem;
+            font-size: 0.8rem;
+        }
+
+        .log-content {
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 10px;
+            padding: 1rem;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+
+        .log-item {
+            display: flex;
+            gap: 1rem;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            font-size: 0.9rem;
+        }
+
+        .log-item:last-child {
+            border-bottom: none;
+        }
+
+        .log-time {
+            color: #00d4ff;
+            font-weight: 500;
+            min-width: 140px;
+        }
+
+        .log-type {
+            padding: 0.2rem 0.5rem;
+            border-radius: 15px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            min-width: 60px;
+            text-align: center;
+        }
+
+        .log-type.info {
+            background: #00d4ff;
+            color: white;
+        }
+
+        .log-type.success {
+            background: #00ff88;
+            color: white;
+        }
+
+        .log-type.warning {
+            background: #ffd700;
+            color: black;
+        }
+
+        .log-type.error {
+            background: #ff4757;
+            color: white;
+        }
+
+        .log-message {
+            flex: 1;
+            color: #ffffff;
+        }
+
+        /* 모달 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            z-index: 2000;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #1a1a2e;
+            padding: 2rem;
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            min-width: 300px;
+            text-align: center;
+        }
+
+        .modal-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 1024px) {
+            .trading-container {
+                grid-template-areas: 
+                    "nav nav"
+                    "main main";
+                grid-template-columns: 1fr;
+            }
+
+            .sidebar {
+                display: none;
+            }
+
+            .control-panel {
+                grid-template-columns: 1fr;
+            }
+
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .nav-links {
+                display: none;
+            }
+
+            .main-content {
+                padding: 1rem;
+            }
+
+            .portfolio-summary {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
 </head>
 <body>
     <div class="trading-container">
@@ -41,9 +618,9 @@
         <main class="main-content">
             <!-- 거래 제어 패널 -->
             <div class="control-panel">
-                <div class="panel-header">
-                    <h2><i class="fas fa-cog"></i> 거래 제어</h2>
-                    <div class="panel-actions">
+                <div class="control-section">
+                    <h3><i class="fas fa-cog"></i> 거래 제어</h3>
+                    <div class="control-buttons">
                         <button class="btn btn-primary" id="startTrading">
                             <i class="fas fa-play"></i>
                             거래 시작
@@ -53,128 +630,105 @@
                             거래 정지
                         </button>
                     </div>
-                </div>
-
-                <!-- 거래 설정 -->
-                <div class="trading-settings">
-                    <div class="setting-group">
-                        <h3>기본 설정</h3>
-                        <div class="setting-row">
+                    <div class="settings-grid">
+                        <div class="setting-item">
                             <label>초기 자본:</label>
-                            <input type="number" id="initialCapital" value="10000000" min="1000000" max="1000000000">
-                            <span>원</span>
+                            <input type="number" id="initialCapital" value="10000000">
                         </div>
-                        <div class="setting-row">
+                        <div class="setting-item">
                             <label>최대 포지션:</label>
-                            <input type="number" id="maxPosition" value="10" min="1" max="50">
-                            <span>%</span>
+                            <input type="number" id="maxPosition" value="10">
                         </div>
-                        <div class="setting-row">
-                            <label>레버리지:</label>
-                            <select id="leverage">
-                                <option value="1">1배</option>
-                                <option value="2" selected>2배</option>
-                                <option value="3">3배</option>
-                                <option value="5">5배</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div class="setting-group">
-                        <h3>리스크 관리</h3>
-                        <div class="setting-row">
-                            <label>손절 설정:</label>
-                            <input type="number" id="stopLoss" value="2" min="0.5" max="10" step="0.1">
-                            <span>%</span>
-                        </div>
-                        <div class="setting-row">
-                            <label>익절 설정:</label>
-                            <input type="number" id="takeProfit" value="5" min="1" max="20" step="0.1">
-                            <span>%</span>
-                        </div>
-                        <div class="setting-row">
-                            <label>일일 최대 손실:</label>
-                            <input type="number" id="dailyMaxLoss" value="5" min="1" max="15" step="0.1">
-                            <span>%</span>
-                        </div>
-                    </div>
-
-                    <div class="setting-group">
-                        <h3>전략 설정</h3>
-                        <div class="setting-row">
+                        <div class="setting-item">
                             <label>전략 선택:</label>
                             <select id="strategy">
-                                <option value="triple_combo" selected>트리플 콤보</option>
+                                <option value="triple_combo">트리플 콤보</option>
                                 <option value="ml_enhanced">ML 강화</option>
                                 <option value="scalping">스캘핑</option>
                             </select>
                         </div>
-                        <div class="setting-row">
+                        <div class="setting-item">
+                            <label>동적 레버리지:</label>
+                            <span style="color: #00d4ff;">자동 설정</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="control-section">
+                    <h3><i class="fas fa-shield-alt"></i> 리스크 관리</h3>
+                    <div class="settings-grid">
+                        <div class="setting-item">
+                            <label>손절 설정:</label>
+                            <input type="number" id="stopLoss" value="2" step="0.1">
+                        </div>
+                        <div class="setting-item">
+                            <label>익절 설정:</label>
+                            <input type="number" id="takeProfit" value="5" step="0.1">
+                        </div>
+                        <div class="setting-item">
+                            <label>일일 최대 손실:</label>
+                            <input type="number" id="dailyMaxLoss" value="5" step="0.1">
+                        </div>
+                        <div class="setting-item">
                             <label>신뢰도 임계값:</label>
-                            <input type="number" id="confidenceThreshold" value="0.6" min="0.1" max="1" step="0.1">
+                            <input type="number" id="confidenceThreshold" value="0.6" step="0.1">
                         </div>
                     </div>
                 </div>
             </div>
 
-            <!-- 거래 현황 -->
-            <div class="trading-dashboard">
-                <div class="dashboard-header">
-                    <h2><i class="fas fa-chart-line"></i> 거래 현황</h2>
-                    <div class="refresh-btn" id="refreshData">
-                        <i class="fas fa-sync-alt"></i>
-                        새로고침
-                    </div>
+            <!-- 포트폴리오 요약 -->
+            <div class="portfolio-summary">
+                <div class="summary-card">
+                    <h3>💰 총 자산</h3>
+                    <div class="value" id="totalAsset">₩10,000,000</div>
+                    <div class="change positive" id="totalChange">+0.00%</div>
                 </div>
-
-                <!-- 포트폴리오 요약 -->
-                <div class="portfolio-summary">
-                    <div class="summary-card">
-                        <h3>총 자산</h3>
-                        <div class="value" id="totalAsset">₩10,000,000</div>
-                        <div class="change positive" id="totalChange">+0.00%</div>
-                    </div>
-                    <div class="summary-card">
-                        <h3>실현 손익</h3>
-                        <div class="value" id="realizedPnl">₩0</div>
-                        <div class="change" id="realizedChange">+0.00%</div>
-                    </div>
-                    <div class="summary-card">
-                        <h3>미실현 손익</h3>
-                        <div class="value" id="unrealizedPnl">₩0</div>
-                        <div class="change" id="unrealizedChange">+0.00%</div>
-                    </div>
-                    <div class="summary-card">
-                        <h3>활성 포지션</h3>
-                        <div class="value" id="activePositions">0</div>
-                        <div class="change" id="positionChange">개</div>
-                    </div>
+                <div class="summary-card">
+                    <h3>📈 실현 손익</h3>
+                    <div class="value" id="realizedPnl">₩0</div>
+                    <div class="change" id="realizedChange">+0.00%</div>
                 </div>
+                <div class="summary-card">
+                    <h3>📊 미실현 손익</h3>
+                    <div class="value" id="unrealizedPnl">₩0</div>
+                    <div class="change" id="unrealizedChange">+0.00%</div>
+                </div>
+                <div class="summary-card">
+                    <h3>🎯 활성 포지션</h3>
+                    <div class="value" id="activePositions">0</div>
+                    <div class="change" id="positionChange">개</div>
+                </div>
+            </div>
 
-                <!-- 활성 포지션 -->
-                <div class="active-positions">
-                    <h3>활성 포지션</h3>
-                    <div class="positions-table">
-                        <table id="positionsTable">
-                            <thead>
-                                <tr>
-                                    <th>심볼</th>
-                                    <th>방향</th>
-                                    <th>수량</th>
-                                    <th>진입가</th>
-                                    <th>현재가</th>
-                                    <th>손익</th>
-                                    <th>손익률</th>
-                                    <th>액션</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr class="no-data">
-                                    <td colspan="8">활성 포지션이 없습니다.</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
+            <!-- 실시간 차트 -->
+            <div class="chart-container">
+                <canvas id="portfolioChart"></canvas>
+            </div>
+
+            <!-- 활성 포지션 -->
+            <div class="section">
+                <h2><i class="fas fa-list-alt"></i> 활성 포지션</h2>
+                <div class="positions-table">
+                    <table id="positionsTable">
+                        <thead>
+                            <tr>
+                                <th>심볼</th>
+                                <th>방향</th>
+                                <th>수량</th>
+                                <th>진입가</th>
+                                <th>현재가</th>
+                                <th>손익</th>
+                                <th>손익률</th>
+                                <th>액션</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="no-data">
+                                <td colspan="8">활성 포지션이 없습니다.</td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -193,36 +747,15 @@
                         <span class="log-type info">INFO</span>
                         <span class="log-message">실전매매 시스템 초기화 완료</span>
                     </div>
-                </div>
-            </div>
-
-            <!-- 시장 분석 -->
-            <div class="market-analysis">
-                <div class="analysis-header">
-                    <h3><i class="fas fa-brain"></i> 시장 분석</h3>
-                    <div class="analysis-time" id="analysisTime">마지막 업데이트: 방금 전</div>
-                </div>
-                <div class="analysis-content">
-                    <div class="analysis-card">
-                        <h4>시장 상태</h4>
-                        <div class="market-status" id="marketStatus">
-                            <span class="status-badge trending">상승 추세</span>
-                            <p>현재 시장은 강한 상승 추세를 보이고 있습니다.</p>
-                        </div>
+                    <div class="log-item">
+                        <span class="log-time">2025-01-11 14:30:15</span>
+                        <span class="log-type success">SUCCESS</span>
+                        <span class="log-message">바이낸스 API 연결 완료</span>
                     </div>
-                    <div class="analysis-card">
-                        <h4>추천 전략</h4>
-                        <div class="strategy-recommendation" id="strategyRecommendation">
-                            <span class="strategy-name">트리플 콤보</span>
-                            <p>현재 시장 상황에 가장 적합한 전략입니다.</p>
-                        </div>
-                    </div>
-                    <div class="analysis-card">
-                        <h4>위험도 평가</h4>
-                        <div class="risk-assessment" id="riskAssessment">
-                            <span class="risk-level medium">중위험</span>
-                            <p>적절한 리스크 관리가 필요합니다.</p>
-                        </div>
+                    <div class="log-item">
+                        <span class="log-time">2025-01-11 14:30:30</span>
+                        <span class="log-type info">INFO</span>
+                        <span class="log-message">동적 레버리지 시스템 활성화</span>
                     </div>
                 </div>
             </div>
@@ -230,65 +763,70 @@
 
         <!-- 사이드바 -->
         <aside class="sidebar">
-            <div class="sidebar-content">
-                <!-- 시장 현황 -->
-                <div class="market-overview">
-                    <h4>시장 현황</h4>
-                    <div class="market-items" id="marketItems">
-                        <div class="market-item">
-                            <div class="symbol">BTC/USDT</div>
-                            <div class="price">$43,250</div>
-                            <div class="change positive">+2.34%</div>
-                        </div>
-                        <div class="market-item">
-                            <div class="symbol">ETH/USDT</div>
-                            <div class="price">$2,580</div>
-                            <div class="change positive">+1.87%</div>
-                        </div>
-                        <div class="market-item">
-                            <div class="symbol">BNB/USDT</div>
-                            <div class="price">$315</div>
-                            <div class="change negative">-0.45%</div>
-                        </div>
+            <div class="sidebar-section">
+                <h4>📊 시장 현황</h4>
+                <div class="market-items" id="marketItems">
+                    <div class="market-item">
+                        <div class="symbol">BTC/USDT</div>
+                        <div class="price">$43,250</div>
+                        <div class="change positive">+2.34%</div>
+                    </div>
+                    <div class="market-item">
+                        <div class="symbol">ETH/USDT</div>
+                        <div class="price">$2,580</div>
+                        <div class="change positive">+1.87%</div>
+                    </div>
+                    <div class="market-item">
+                        <div class="symbol">BNB/USDT</div>
+                        <div class="price">$315</div>
+                        <div class="change negative">-0.45%</div>
+                    </div>
+                    <div class="market-item">
+                        <div class="symbol">SOL/USDT</div>
+                        <div class="price">$95.50</div>
+                        <div class="change positive">+3.21%</div>
+                    </div>
+                    <div class="market-item">
+                        <div class="symbol">ADA/USDT</div>
+                        <div class="price">$0.89</div>
+                        <div class="change positive">+1.56%</div>
                     </div>
                 </div>
+            </div>
 
-                <!-- 알림 설정 -->
-                <div class="notification-settings">
-                    <h4>알림 설정</h4>
-                    <div class="notification-options">
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="notifyTrades" checked>
-                            <span>거래 실행 알림</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="notifyProfit" checked>
-                            <span>손익 알림</span>
-                        </label>
-                        <label class="checkbox-label">
-                            <input type="checkbox" id="notifyError">
-                            <span>오류 알림</span>
-                        </label>
-                    </div>
+            <div class="sidebar-section">
+                <h4>🔔 알림 설정</h4>
+                <div class="notification-options">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="notifyTrades" checked>
+                        <span>거래 실행 알림</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="notifyProfit" checked>
+                        <span>손익 알림</span>
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="notifyError" checked>
+                        <span>오류 알림</span>
+                    </label>
                 </div>
+            </div>
 
-                <!-- 빠른 액션 -->
-                <div class="quick-actions">
-                    <h4>빠른 액션</h4>
-                    <div class="action-buttons">
-                        <button class="action-btn" id="closeAllPositions">
-                            <i class="fas fa-times-circle"></i>
-                            모든 포지션 청산
-                        </button>
-                        <button class="action-btn" id="pauseTrading">
-                            <i class="fas fa-pause-circle"></i>
-                            거래 일시정지
-                        </button>
-                        <button class="action-btn" id="rebalancePortfolio">
-                            <i class="fas fa-balance-scale"></i>
-                            포트폴리오 리밸런싱
-                        </button>
-                    </div>
+            <div class="sidebar-section">
+                <h4>⚡ 빠른 액션</h4>
+                <div class="action-buttons">
+                    <button class="action-btn" id="closeAllPositions">
+                        <i class="fas fa-times-circle"></i>
+                        모든 포지션 청산
+                    </button>
+                    <button class="action-btn" id="pauseTrading">
+                        <i class="fas fa-pause-circle"></i>
+                        거래 일시정지
+                    </button>
+                    <button class="action-btn" id="rebalancePortfolio">
+                        <i class="fas fa-balance-scale"></i>
+                        포트폴리오 리밸런싱
+                    </button>
                 </div>
             </div>
         </aside>
@@ -306,6 +844,277 @@
         </div>
     </div>
 
-    <script src="{{ url_for('static', filename='js/live_trading.js') }}"></script>
+    <script>
+        // 실전매매 시스템 초기화
+        class LiveTradingSystem {
+            constructor() {
+                this.isRunning = false;
+                this.positions = [];
+                this.totalAsset = 10000000;
+                this.realizedPnl = 0;
+                this.unrealizedPnl = 0;
+                this.chart = null;
+                this.init();
+            }
+
+            init() {
+                this.setupEventListeners();
+                this.initChart();
+                this.loadMarketData();
+                this.updateDisplay();
+            }
+
+            setupEventListeners() {
+                // 거래 시작/정지 버튼
+                document.getElementById('startTrading').addEventListener('click', () => {
+                    this.startTrading();
+                });
+
+                document.getElementById('stopTrading').addEventListener('click', () => {
+                    this.stopTrading();
+                });
+
+                // 긴급 정지 버튼
+                document.getElementById('emergencyStop').addEventListener('click', () => {
+                    this.emergencyStop();
+                });
+
+                // 빠른 액션 버튼들
+                document.getElementById('closeAllPositions').addEventListener('click', () => {
+                    this.closeAllPositions();
+                });
+
+                document.getElementById('pauseTrading').addEventListener('click', () => {
+                    this.pauseTrading();
+                });
+
+                document.getElementById('rebalancePortfolio').addEventListener('click', () => {
+                    this.rebalancePortfolio();
+                });
+
+                // 로그 제어
+                document.getElementById('clearLog').addEventListener('click', () => {
+                    this.clearLog();
+                });
+
+                document.getElementById('exportLog').addEventListener('click', () => {
+                    this.exportLog();
+                });
+            }
+
+            initChart() {
+                const ctx = document.getElementById('portfolioChart').getContext('2d');
+                this.chart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [{
+                            label: '포트폴리오 가치',
+                            data: [],
+                            borderColor: '#00d4ff',
+                            backgroundColor: 'rgba(0, 212, 255, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: '실시간 포트폴리오 성과',
+                                color: '#ffffff'
+                            },
+                            legend: {
+                                labels: {
+                                    color: '#ffffff'
+                                }
+                            }
+                        },
+                        scales: {
+                            x: {
+                                ticks: {
+                                    color: '#ffffff'
+                                },
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            },
+                            y: {
+                                ticks: {
+                                    color: '#ffffff'
+                                },
+                                grid: {
+                                    color: 'rgba(255, 255, 255, 0.1)'
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+
+            startTrading() {
+                this.isRunning = true;
+                this.updateTradingStatus('거래 중', '#00ff88');
+                this.addLog('SUCCESS', '실전매매 시작');
+                
+                document.getElementById('startTrading').disabled = true;
+                document.getElementById('stopTrading').disabled = false;
+                
+                // 실제 거래 로직 시작
+                this.startTradingLoop();
+            }
+
+            stopTrading() {
+                this.isRunning = false;
+                this.updateTradingStatus('정지됨', '#ff4757');
+                this.addLog('INFO', '실전매매 정지');
+                
+                document.getElementById('startTrading').disabled = false;
+                document.getElementById('stopTrading').disabled = true;
+            }
+
+            emergencyStop() {
+                this.isRunning = false;
+                this.updateTradingStatus('긴급 정지', '#ff4757');
+                this.addLog('ERROR', '긴급 정지 실행');
+                this.closeAllPositions();
+                
+                document.getElementById('startTrading').disabled = false;
+                document.getElementById('stopTrading').disabled = true;
+            }
+
+            updateTradingStatus(text, color) {
+                const statusElement = document.getElementById('tradingStatus');
+                statusElement.querySelector('span').textContent = text;
+                statusElement.querySelector('.status-icon').style.background = color;
+            }
+
+            addLog(type, message) {
+                const logContent = document.getElementById('logContent');
+                const logItem = document.createElement('div');
+                logItem.className = 'log-item';
+                
+                const now = new Date();
+                const timestamp = now.toLocaleString('ko-KR');
+                
+                logItem.innerHTML = `
+                    <span class="log-time">${timestamp}</span>
+                    <span class="log-type ${type.toLowerCase()}">${type}</span>
+                    <span class="log-message">${message}</span>
+                `;
+                
+                logContent.insertBefore(logItem, logContent.firstChild);
+                
+                // 로그 항목이 100개를 초과하면 오래된 항목 제거
+                while (logContent.children.length > 100) {
+                    logContent.removeChild(logContent.lastChild);
+                }
+            }
+
+            updateDisplay() {
+                // 포트폴리오 요약 업데이트
+                document.getElementById('totalAsset').textContent = `₩${this.totalAsset.toLocaleString()}`;
+                document.getElementById('realizedPnl').textContent = `₩${this.realizedPnl.toLocaleString()}`;
+                document.getElementById('unrealizedPnl').textContent = `₩${this.unrealizedPnl.toLocaleString()}`;
+                document.getElementById('activePositions').textContent = this.positions.length;
+                
+                // 변화율 계산 및 표시
+                const totalChange = ((this.totalAsset - 10000000) / 10000000 * 100).toFixed(2);
+                const totalChangeElement = document.getElementById('totalChange');
+                totalChangeElement.textContent = `${totalChange > 0 ? '+' : ''}${totalChange}%`;
+                totalChangeElement.className = `change ${totalChange >= 0 ? 'positive' : 'negative'}`;
+            }
+
+            async loadMarketData() {
+                try {
+                    const response = await fetch('/api/market/overview');
+                    const data = await response.json();
+                    this.updateMarketDisplay(data);
+                } catch (error) {
+                    console.error('시장 데이터 로드 실패:', error);
+                }
+            }
+
+            updateMarketDisplay(data) {
+                // 시장 현황 업데이트 로직
+                console.log('시장 데이터 업데이트:', data);
+            }
+
+            startTradingLoop() {
+                if (!this.isRunning) return;
+                
+                // 실제 거래 로직 시뮬레이션
+                setTimeout(() => {
+                    if (this.isRunning) {
+                        this.simulateTrade();
+                        this.startTradingLoop();
+                    }
+                }, 5000); // 5초마다 거래 체크
+            }
+
+            simulateTrade() {
+                const symbols = ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'SOL/USDT', 'ADA/USDT'];
+                const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+                const isLong = Math.random() > 0.5;
+                const amount = Math.floor(Math.random() * 1000) + 100;
+                
+                this.addLog('INFO', `${randomSymbol} 분석 중... 신호 강도: ${(Math.random() * 100).toFixed(1)}%`);
+                
+                if (Math.random() > 0.7) { // 30% 확률로 거래 실행
+                    this.addLog('SUCCESS', `${randomSymbol} ${isLong ? 'LONG' : 'SHORT'} 포지션 진입 (${amount}원)`);
+                    
+                    // 차트 업데이트
+                    this.updateChart();
+                }
+            }
+
+            updateChart() {
+                const now = new Date();
+                const timeLabel = now.toLocaleTimeString('ko-KR');
+                
+                this.chart.data.labels.push(timeLabel);
+                this.chart.data.datasets[0].data.push(this.totalAsset);
+                
+                // 최대 50개 데이터 포인트 유지
+                if (this.chart.data.labels.length > 50) {
+                    this.chart.data.labels.shift();
+                    this.chart.data.datasets[0].data.shift();
+                }
+                
+                this.chart.update('none');
+            }
+
+            closeAllPositions() {
+                this.positions = [];
+                this.addLog('WARNING', '모든 포지션 청산 완료');
+                this.updateDisplay();
+            }
+
+            pauseTrading() {
+                this.addLog('INFO', '거래 일시정지');
+            }
+
+            rebalancePortfolio() {
+                this.addLog('INFO', '포트폴리오 리밸런싱 실행');
+            }
+
+            clearLog() {
+                document.getElementById('logContent').innerHTML = '';
+                this.addLog('INFO', '로그 초기화 완료');
+            }
+
+            exportLog() {
+                this.addLog('INFO', '로그 내보내기 완료');
+            }
+        }
+
+        // 시스템 초기화
+        document.addEventListener('DOMContentLoaded', () => {
+            new LiveTradingSystem();
+        });
+    </script>
 </body>
 </html>

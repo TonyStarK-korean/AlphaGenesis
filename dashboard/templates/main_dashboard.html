@@ -1,13 +1,443 @@
-<<<<<<< HEAD
 <!DOCTYPE html>
 <html lang="ko">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AlphaGenesis - 통합 트레이딩 시스템</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/main_dashboard.css') }}">
+    <title>AlphaGenesis - AI 트레이딩 플랫폼</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+            overflow-x: hidden;
+        }
+
+        .main-container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 2rem;
+        }
+
+        /* 헤더 */
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1.5rem 0;
+            margin-bottom: 2rem;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-top: 2rem;
+        }
+
+        .header-content {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 2rem;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .logo i {
+            font-size: 2.5rem;
+            color: #667eea;
+        }
+
+        .logo h1 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: #2c3e50;
+        }
+
+        .version {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+        }
+
+        .server-status {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 0.5rem;
+        }
+
+        .status-indicator {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.75rem 1.5rem;
+            background: rgba(46, 204, 113, 0.1);
+            border-radius: 25px;
+            border: 1px solid rgba(46, 204, 113, 0.3);
+        }
+
+        .status-indicator i {
+            color: #2ecc71;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        .server-info {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+            font-weight: 500;
+        }
+
+        /* 웰컴 섹션 */
+        .welcome-section {
+            text-align: center;
+            margin-bottom: 3rem;
+            padding: 2rem;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .welcome-section h2 {
+            font-size: 3rem;
+            font-weight: 700;
+            color: white;
+            margin-bottom: 1rem;
+            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+        }
+
+        .welcome-section p {
+            font-size: 1.2rem;
+            color: rgba(255, 255, 255, 0.9);
+            font-weight: 300;
+        }
+
+        /* 메인 카드 */
+        .cards-container {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .main-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .main-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+        }
+
+        .card-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 2.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .backtest-icon {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
+        }
+
+        .live-icon {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+            color: white;
+        }
+
+        .main-card h3 {
+            font-size: 1.8rem;
+            font-weight: 600;
+            color: #2c3e50;
+            margin-bottom: 1rem;
+        }
+
+        .main-card p {
+            color: #7f8c8d;
+            font-size: 1.1rem;
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .card-features {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            color: #34495e;
+        }
+
+        .feature i {
+            width: 20px;
+            text-align: center;
+            color: #3498db;
+        }
+
+        .card-button {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 1rem 1.5rem;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            color: white;
+            border-radius: 15px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .live-button {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .card-button:hover {
+            transform: translateX(5px);
+        }
+
+        /* 통합 시스템 상태 */
+        .system-overview {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin-bottom: 3rem;
+        }
+
+        .status-card {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .status-card h3 {
+            color: #2c3e50;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 1rem;
+        }
+
+        .status-item {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.5);
+            border-radius: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .status-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #2c3e50;
+            margin-bottom: 0.5rem;
+        }
+
+        .status-label {
+            font-size: 0.9rem;
+            color: #7f8c8d;
+        }
+
+        .positive { color: #2ecc71; }
+        .negative { color: #e74c3c; }
+        .warning { color: #f39c12; }
+
+        /* 실시간 트레이딩 연결 */
+        .realtime-section {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 3rem;
+        }
+
+        .realtime-section h3 {
+            color: #2c3e50;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .trading-actions {
+            display: flex;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 200px;
+            padding: 1rem 1.5rem;
+            border: none;
+            border-radius: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            text-decoration: none;
+            color: white;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #2ecc71, #27ae60);
+        }
+
+        /* 차트 컨테이너 */
+        .chart-container {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            margin-bottom: 3rem;
+        }
+
+        .chart-container h3 {
+            color: #2c3e50;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .chart-wrapper {
+            height: 400px;
+            position: relative;
+        }
+
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            .main-container {
+                padding: 0 1rem;
+            }
+
+            .header-content {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .welcome-section h2 {
+                font-size: 2rem;
+            }
+
+            .cards-container {
+                grid-template-columns: 1fr;
+            }
+
+            .system-overview {
+                grid-template-columns: 1fr;
+            }
+
+            .trading-actions {
+                flex-direction: column;
+            }
+
+            .action-btn {
+                min-width: auto;
+            }
+        }
+
+        /* 로딩 애니메이션 */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #ffffff;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 푸터 */
+        .footer {
+            text-align: center;
+            padding: 2rem;
+            color: rgba(255, 255, 255, 0.7);
+            font-size: 0.9rem;
+        }
+
+        .footer a {
+            color: rgba(255, 255, 255, 0.9);
+            text-decoration: none;
+        }
+
+        .footer a:hover {
+            color: white;
+        }
+    </style>
 </head>
 <body>
     <div class="main-container">
@@ -31,552 +461,359 @@
             </div>
         </header>
 
-        <!-- 메인 컨텐츠 -->
-        <main class="main-content">
-            <div class="welcome-section">
-                <h2>AI 기반 암호화폐 트레이딩 시스템</h2>
-                <p>머신러닝 최적화와 실시간 분석을 통한 전문 트레이딩 플랫폼</p>
-            </div>
+        <!-- 웰컴 섹션 -->
+        <div class="welcome-section">
+            <h2>🤖 AI 트레이딩 플랫폼</h2>
+            <p>머신러닝 최적화와 실시간 분석을 통한 차세대 암호화폐 트레이딩 시스템</p>
+        </div>
 
-            <!-- 메인 선택 카드 -->
-            <div class="cards-container">
-                <!-- 백테스트 카드 -->
-                <div class="main-card" onclick="navigateToBacktest()">
-                    <div class="card-icon backtest-icon">
-                        <i class="fas fa-chart-bar"></i>
+        <!-- 메인 카드 -->
+        <div class="cards-container">
+            <!-- 백테스트 카드 -->
+            <div class="main-card" onclick="navigateToBacktest()">
+                <div class="card-icon backtest-icon">
+                    <i class="fas fa-chart-bar"></i>
+                </div>
+                <h3>📊 백테스트</h3>
+                <p>과거 데이터로 전략 성능을 검증하고 최적화하세요</p>
+                <div class="card-features">
+                    <div class="feature">
+                        <i class="fas fa-brain"></i>
+                        <span>ML 최적화</span>
                     </div>
-                    <h3>백테스트</h3>
-                    <p>과거 데이터로 전략 성능 검증</p>
-                    <div class="card-features">
-                        <div class="feature">
-                            <i class="fas fa-brain"></i>
-                            <span>ML 최적화</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-coins"></i>
-                            <span>전체 USDT.P</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-tachometer-alt"></i>
-                            <span>실시간 분석</span>
-                        </div>
+                    <div class="feature">
+                        <i class="fas fa-coins"></i>
+                        <span>전체 USDT.P 지원</span>
                     </div>
-                    <div class="card-button">
-                        <span>백테스트 시작</span>
-                        <i class="fas fa-arrow-right"></i>
+                    <div class="feature">
+                        <i class="fas fa-tachometer-alt"></i>
+                        <span>실시간 분석</span>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-download"></i>
+                        <span>엑셀 리포트</span>
                     </div>
                 </div>
-
-                <!-- 실전매매 카드 -->
-                <div class="main-card" onclick="navigateToLiveTrading()">
-                    <div class="card-icon live-icon">
-                        <i class="fas fa-rocket"></i>
-                    </div>
-                    <h3>실전매매</h3>
-                    <p>실시간 자동 트레이딩 시스템</p>
-                    <div class="card-features">
-                        <div class="feature">
-                            <i class="fas fa-shield-alt"></i>
-                            <span>리스크 관리</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-clock"></i>
-                            <span>24/7 운영</span>
-                        </div>
-                        <div class="feature">
-                            <i class="fas fa-bell"></i>
-                            <span>실시간 알림</span>
-                        </div>
-                    </div>
-                    <div class="card-button live-button">
-                        <span>실전매매 시작</span>
-                        <i class="fas fa-arrow-right"></i>
-                    </div>
+                <div class="card-button">
+                    <span>백테스트 시작</span>
+                    <i class="fas fa-arrow-right"></i>
                 </div>
             </div>
 
-            <!-- 시스템 상태 -->
-            <div class="system-status">
-                <h3>시스템 상태</h3>
+            <!-- 실전매매 카드 -->
+            <div class="main-card" onclick="navigateToLiveTrading()">
+                <div class="card-icon live-icon">
+                    <i class="fas fa-rocket"></i>
+                </div>
+                <h3>🚀 실전매매</h3>
+                <p>실시간 자동 트레이딩으로 수익을 극대화하세요</p>
+                <div class="card-features">
+                    <div class="feature">
+                        <i class="fas fa-shield-alt"></i>
+                        <span>동적 리스크 관리</span>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-clock"></i>
+                        <span>24/7 무인 운영</span>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-bell"></i>
+                        <span>실시간 알림</span>
+                    </div>
+                    <div class="feature">
+                        <i class="fas fa-chart-line"></i>
+                        <span>실시간 포트폴리오</span>
+                    </div>
+                </div>
+                <div class="card-button live-button">
+                    <span>실전매매 시작</span>
+                    <i class="fas fa-arrow-right"></i>
+                </div>
+            </div>
+        </div>
+
+        <!-- 통합 시스템 상태 -->
+        <div class="system-overview">
+            <div class="status-card">
+                <h3><i class="fas fa-server"></i> 시스템 상태</h3>
                 <div class="status-grid">
                     <div class="status-item">
-                        <div class="status-icon">
-                            <i class="fas fa-database"></i>
-                        </div>
-                        <div class="status-info">
-                            <h4>데이터 상태</h4>
-                            <p id="dataStatus">실시간 업데이트 중</p>
-                        </div>
+                        <div class="status-value positive" id="systemUptime">99.9%</div>
+                        <div class="status-label">가동율</div>
                     </div>
                     <div class="status-item">
-                        <div class="status-icon">
-                            <i class="fas fa-exchange-alt"></i>
-                        </div>
-                        <div class="status-info">
-                            <h4>바이낸스 연결</h4>
-                            <p id="binanceStatus">연결됨</p>
-                        </div>
+                        <div class="status-value" id="activeStrategies">8</div>
+                        <div class="status-label">활성 전략</div>
                     </div>
                     <div class="status-item">
-                        <div class="status-icon">
-                            <i class="fas fa-cpu"></i>
-                        </div>
-                        <div class="status-info">
-                            <h4>ML 모델</h4>
-                            <p id="mlStatus">최적화 완료</p>
-                        </div>
+                        <div class="status-value" id="totalSymbols">200+</div>
+                        <div class="status-label">지원 심볼</div>
                     </div>
                     <div class="status-item">
-                        <div class="status-icon">
-                            <i class="fas fa-chart-line"></i>
-                        </div>
-                        <div class="status-info">
-                            <h4>활성 전략</h4>
-                            <p id="strategyStatus">트리플 콤보</p>
-                        </div>
+                        <div class="status-value positive" id="mlOptimization">활성화</div>
+                        <div class="status-label">ML 최적화</div>
                     </div>
                 </div>
             </div>
 
-            <!-- 최근 성과 -->
-            <div class="recent-performance">
-                <h3>최근 성과</h3>
-                <div class="performance-grid">
-                    <div class="performance-item">
-                        <div class="performance-label">오늘 수익률</div>
-                        <div class="performance-value positive" id="todayReturn">+2.34%</div>
+            <div class="status-card">
+                <h3><i class="fas fa-chart-line"></i> 실시간 지표</h3>
+                <div class="status-grid">
+                    <div class="status-item">
+                        <div class="status-value" id="marketCap">$2.1T</div>
+                        <div class="status-label">시가총액</div>
                     </div>
-                    <div class="performance-item">
-                        <div class="performance-label">주간 수익률</div>
-                        <div class="performance-value positive" id="weekReturn">+8.76%</div>
+                    <div class="status-item">
+                        <div class="status-value positive" id="btcPrice">$43,250</div>
+                        <div class="status-label">BTC 가격</div>
                     </div>
-                    <div class="performance-item">
-                        <div class="performance-label">최대 낙폭</div>
-                        <div class="performance-value" id="maxDrawdown">-3.21%</div>
+                    <div class="status-item">
+                        <div class="status-value" id="fearGreed">65</div>
+                        <div class="status-label">공포탐욕지수</div>
                     </div>
-                    <div class="performance-item">
-                        <div class="performance-label">샤프 비율</div>
-                        <div class="performance-value" id="sharpeRatio">2.41</div>
+                    <div class="status-item">
+                        <div class="status-value positive" id="marketStatus">상승</div>
+                        <div class="status-label">시장 상태</div>
                     </div>
                 </div>
             </div>
-        </main>
+        </div>
+
+        <!-- 실시간 트레이딩 액션 -->
+        <div class="realtime-section">
+            <h3><i class="fas fa-bolt"></i> 빠른 액션</h3>
+            <div class="trading-actions">
+                <a href="/live-trading" class="action-btn btn-primary">
+                    <i class="fas fa-play"></i>
+                    실전매매 시작
+                </a>
+                <a href="/backtest" class="action-btn btn-success">
+                    <i class="fas fa-chart-bar"></i>
+                    백테스트 실행
+                </a>
+                <button class="action-btn btn-danger" onclick="emergencyStop()">
+                    <i class="fas fa-stop"></i>
+                    긴급 정지
+                </button>
+            </div>
+        </div>
+
+        <!-- 성과 차트 -->
+        <div class="chart-container">
+            <h3><i class="fas fa-chart-area"></i> 실시간 시장 동향</h3>
+            <div class="chart-wrapper">
+                <canvas id="marketChart"></canvas>
+            </div>
+        </div>
 
         <!-- 푸터 -->
-        <footer class="footer">
-            <div class="footer-content">
-                <div class="footer-info">
-                    <p>&copy; 2025 AlphaGenesis. 모든 권리 보유.</p>
-                    <p>고급 암호화폐 트레이딩 시스템</p>
-                </div>
-                <div class="footer-links">
-                    <a href="#" onclick="showSystemInfo()">시스템 정보</a>
-                    <a href="#" onclick="showHelp()">도움말</a>
-                    <a href="#" onclick="showSettings()">설정</a>
-                </div>
-            </div>
-        </footer>
-    </div>
-
-    <!-- 모달 -->
-    <div class="modal" id="systemModal">
-        <div class="modal-content">
-            <span class="close" onclick="closeModal()">&times;</span>
-            <h2>시스템 정보</h2>
-            <div class="system-info">
-                <p><strong>버전:</strong> 3.0.0</p>
-                <p><strong>서버:</strong> 34.47.77.230:9000</p>
-                <p><strong>업타임:</strong> <span id="uptime">24시간 7분</span></p>
-                <p><strong>메모리 사용량:</strong> <span id="memoryUsage">68%</span></p>
-                <p><strong>CPU 사용량:</strong> <span id="cpuUsage">23%</span></p>
-            </div>
+        <div class="footer">
+            <p>&copy; 2025 AlphaGenesis. AI 기반 트레이딩 플랫폼. 
+            <a href="https://github.com/TonyStarK-korean/AlphaGenesis" target="_blank">
+                <i class="fab fa-github"></i> GitHub
+            </a>
+            </p>
         </div>
     </div>
-
-    <script src="{{ url_for('static', filename='js/main_dashboard.js') }}"></script>
-</body>
-</html>
-=======
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-    <meta http-equiv="Pragma" content="no-cache">
-    <meta http-equiv="Expires" content="0">
-    <title>🚀 AlphaGenesis 메인 대시보드</title>
-    
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Font Awesome -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
-    
-    <style>
-        body {
-            background: linear-gradient(135deg, #0a0e1a 0%, #1a1a2e 50%, #16213e 100%);
-            color: #ffffff;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            min-height: 100vh;
-        }
-        
-        .main-header {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            padding: 40px 0;
-            margin-bottom: 40px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-        }
-        
-        .dashboard-card {
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 20px;
-            padding: 40px;
-            margin-bottom: 30px;
-            backdrop-filter: blur(15px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            text-align: center;
-            transition: all 0.4s ease;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-        }
-        
-        .dashboard-card:hover {
-            transform: translateY(-15px) scale(1.02);
-            box-shadow: 0 20px 60px rgba(102, 126, 234, 0.4);
-            background: rgba(255, 255, 255, 0.12);
-        }
-        
-        .dashboard-icon {
-            font-size: 4rem;
-            margin-bottom: 25px;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        .dashboard-title {
-            font-size: 1.8rem;
-            font-weight: 700;
-            margin-bottom: 20px;
-            color: #ffffff;
-        }
-        
-        .dashboard-description {
-            color: #b0b7c3;
-            margin-bottom: 30px;
-            line-height: 1.6;
-            font-size: 1.1rem;
-        }
-        
-        .btn-gradient {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            border: none;
-            border-radius: 30px;
-            padding: 15px 35px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: white;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 20px rgba(102, 126, 234, 0.3);
-        }
-        
-        .btn-gradient:hover {
-            background: linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%);
-            transform: translateY(-3px);
-            box-shadow: 0 8px 30px rgba(102, 126, 234, 0.5);
-            color: white;
-        }
-        
-        .btn-secondary-gradient {
-            background: linear-gradient(135deg, #ff7b7b 0%, #667eea 100%);
-            border: none;
-            border-radius: 30px;
-            padding: 15px 35px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: white;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 20px rgba(255, 123, 123, 0.3);
-        }
-        
-        .btn-secondary-gradient:hover {
-            background: linear-gradient(135deg, #ff6b6b 0%, #5a6fd8 100%);
-            transform: translateY(-3px);
-            box-shadow: 0 8px 30px rgba(255, 123, 123, 0.5);
-            color: white;
-        }
-        
-        .status-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            text-align: center;
-        }
-        
-        .status-value {
-            font-size: 1.5rem;
-            font-weight: bold;
-            margin-bottom: 10px;
-            color: #28a745;
-        }
-        
-        .status-label {
-            color: #a0a0a0;
-            font-size: 0.9rem;
-        }
-        
-        .feature-card {
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 15px;
-            padding: 25px;
-            margin-bottom: 20px;
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            transition: transform 0.3s ease;
-        }
-        
-        .feature-card:hover {
-            transform: translateY(-5px);
-            background: rgba(255, 255, 255, 0.08);
-        }
-        
-        .status-indicator {
-            display: inline-block;
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            margin-right: 8px;
-            animation: pulse 2s infinite;
-        }
-        
-        .status-online { background-color: #28a745; }
-        .status-warning { background-color: #ffc107; }
-        .status-error { background-color: #dc3545; }
-        
-        @keyframes pulse {
-            0% { opacity: 1; transform: scale(1); }
-            50% { opacity: 0.7; transform: scale(1.1); }
-            100% { opacity: 1; transform: scale(1); }
-        }
-        
-        .main-title {
-            font-size: 3.5rem;
-            font-weight: 900;
-            margin-bottom: 20px;
-            text-shadow: 2px 4px 8px rgba(0, 0, 0, 0.3);
-        }
-        
-        .main-subtitle {
-            font-size: 1.3rem;
-            opacity: 0.9;
-            margin-bottom: 0;
-        }
-    </style>
-</head>
-<body>
-    <!-- 메인 헤더 -->
-    <div class="main-header">
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-8">
-                    <h1 class="main-title">
-                        <i class="fas fa-rocket"></i> AlphaGenesis
-                    </h1>
-                    <p class="main-subtitle">상위 0.01%급 ML 기반 자동매매 시스템</p>
-                </div>
-                <div class="col-md-4 text-end">
-                    <div class="mb-2">
-                        <span class="status-indicator status-online"></span>
-                        <span id="system-status">시스템 온라인</span>
-                    </div>
-                    <div>
-                        <small>현재 시간: <span id="current-time">-</span></small>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="container">
-        <!-- 대시보드 메뉴 -->
-        <div class="row mb-5">
-            <div class="col-md-6">
-                <div class="dashboard-card">
-                    <div class="dashboard-icon">
-                        <i class="fas fa-history"></i>
-                    </div>
-                    <div class="dashboard-title">백테스트 대시보드</div>
-                    <div class="dashboard-description">
-                        과거 데이터를 활용한 전략 검증 및 성과 분석<br>
-                        <strong>• ML 모델 기반 백테스트</strong><br>
-                        <strong>• 실시간 결과 시각화</strong><br>
-                        <strong>• 상세 성과 리포트</strong>
-                    </div>
-                    <a href="/backtest" class="btn btn-gradient">
-                        <i class="fas fa-play"></i> 백테스트 시작
-                    </a>
-                </div>
-            </div>
-            <div class="col-md-6">
-                <div class="dashboard-card">
-                    <div class="dashboard-icon">
-                        <i class="fas fa-broadcast-tower"></i>
-                    </div>
-                    <div class="dashboard-title">실시간 트레이딩</div>
-                    <div class="dashboard-description">
-                        라이브 시장 데이터 기반 실시간 자동매매<br>
-                        <strong>• 실시간 포지션 모니터링</strong><br>
-                        <strong>• 동적 리스크 관리</strong><br>
-                        <strong>• 실시간 수익률 추적</strong>
-                    </div>
-                    <button class="btn btn-secondary-gradient" onclick="showComingSoon()">
-                        <i class="fas fa-rocket"></i> 실시간 트레이딩
-                    </button>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 시스템 상태 요약 -->
-        <div class="row mb-5">
-            <div class="col-12">
-                <h3 class="text-center mb-4">
-                    <i class="fas fa-server"></i> 시스템 상태
-                </h3>
-            </div>
-            <div class="col-md-3">
-                <div class="status-card">
-                    <div class="status-value" id="trading-engine-status">ONLINE</div>
-                    <div class="status-label">트레이딩 엔진</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="status-card">
-                    <div class="status-value" id="ml-model-status">READY</div>
-                    <div class="status-label">ML 모델</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="status-card">
-                    <div class="status-value" id="data-connection">CONNECTED</div>
-                    <div class="status-label">데이터 연결</div>
-                </div>
-            </div>
-            <div class="col-md-3">
-                <div class="status-card">
-                    <div class="status-value" id="last-backtest">-</div>
-                    <div class="status-label">최근 백테스트</div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 주요 기능 -->
-        <div class="row">
-            <div class="col-12">
-                <h3 class="text-center mb-4">
-                    <i class="fas fa-star"></i> 시스템 주요 기능
-                </h3>
-            </div>
-            <div class="col-md-4">
-                <div class="feature-card">
-                    <h5><i class="fas fa-brain text-primary"></i> AI/ML 예측</h5>
-                    <p class="text-muted">딥러닝 기반 가격 예측 및 시장 국면 분석으로 높은 정확도의 트레이딩 신호 생성</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="feature-card">
-                    <h5><i class="fas fa-shield-alt text-success"></i> 리스크 관리</h5>
-                    <p class="text-muted">시장 변동성에 따른 동적 포지션 조절과 손실 제한을 통한 안전한 투자</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="feature-card">
-                    <h5><i class="fas fa-chart-line text-warning"></i> 실시간 모니터링</h5>
-                    <p class="text-muted">포지션, 수익률, 리스크 지표를 실시간으로 추적하고 시각화</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="feature-card">
-                    <h5><i class="fas fa-cogs text-info"></i> 완전 자동화</h5>
-                    <p class="text-muted">24시간 무인 자동매매로 감정에 의한 실수 없는 체계적 투자</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="feature-card">
-                    <h5><i class="fas fa-database text-secondary"></i> 빅데이터 분석</h5>
-                    <p class="text-muted">다양한 시장 데이터와 지표를 통합 분석하여 최적의 투자 결정</p>
-                </div>
-            </div>
-            <div class="col-md-4">
-                <div class="feature-card">
-                    <h5><i class="fas fa-mobile-alt text-primary"></i> 언제 어디서나</h5>
-                    <p class="text-muted">모바일 지원 웹 대시보드로 언제 어디서나 시스템 모니터링 가능</p>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // 현재 시간 업데이트
-        function updateTime() {
-            const now = new Date();
-            document.getElementById('current-time').textContent = now.toLocaleString('ko-KR');
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeSystem();
+            loadMarketData();
+            initializeChart();
+            
+            // 실시간 업데이트 시작
+            setInterval(updateRealTimeData, 30000); // 30초마다 업데이트
+        });
+
+        // 시스템 초기화
+        function initializeSystem() {
+            checkServerStatus();
+            updateSystemStats();
         }
-        
-        // 시스템 상태 확인
-        async function checkSystemStatus() {
+
+        // 서버 상태 확인
+        async function checkServerStatus() {
             try {
-                const response = await fetch('http://34.47.77.230:5001/api/system-status');
-                if (response.ok) {
-                    document.getElementById('trading-engine-status').textContent = '온라인';
-                    document.getElementById('ml-model-status').textContent = '준비됨';
-                    document.getElementById('data-connection').textContent = '연결됨';
+                const response = await fetch('/api/health');
+                const data = await response.json();
+                
+                if (data.status === 'ok') {
+                    updateServerStatus(true);
+                } else {
+                    updateServerStatus(false);
                 }
             } catch (error) {
-                document.getElementById('trading-engine-status').textContent = '오프라인';
-                document.getElementById('ml-model-status').textContent = '대기중';
-                document.getElementById('data-connection').textContent = '연결끊김';
+                console.error('서버 상태 확인 실패:', error);
+                updateServerStatus(false);
             }
         }
-        
-        // Coming Soon 알림
-        function showComingSoon() {
-            const modal = `
-                <div class="alert alert-info alert-dismissible fade show" role="alert" style="position: fixed; top: 20px; right: 20px; z-index: 9999; min-width: 300px;">
-                    <h6><i class="fas fa-info-circle"></i> 개발 중인 기능</h6>
-                    실시간 트레이딩 기능은 현재 개발 중입니다!<br>
-                    <strong>백테스트 기능</strong>을 먼저 체험해 보세요.
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            `;
-            document.body.insertAdjacentHTML('beforeend', modal);
+
+        // 서버 상태 업데이트
+        function updateServerStatus(isOnline) {
+            const statusElement = document.getElementById('serverStatus');
+            const icon = statusElement.querySelector('i');
+            const text = statusElement.querySelector('span');
             
-            // 5초 후 자동으로 사라지게 하기
-            setTimeout(() => {
-                const alertElement = document.querySelector('.alert');
-                if (alertElement) {
-                    alertElement.remove();
-                }
-            }, 5000);
+            if (isOnline) {
+                icon.style.color = '#2ecc71';
+                text.textContent = '서버 연결됨';
+                statusElement.style.background = 'rgba(46, 204, 113, 0.1)';
+                statusElement.style.borderColor = 'rgba(46, 204, 113, 0.3)';
+            } else {
+                icon.style.color = '#e74c3c';
+                text.textContent = '서버 연결 끊김';
+                statusElement.style.background = 'rgba(231, 76, 60, 0.1)';
+                statusElement.style.borderColor = 'rgba(231, 76, 60, 0.3)';
+            }
         }
-        
-        // 초기화
-        document.addEventListener('DOMContentLoaded', function() {
-            updateTime();
-            checkSystemStatus();
+
+        // 시스템 통계 업데이트
+        function updateSystemStats() {
+            // 더미 데이터 업데이트 (실제로는 API에서 가져옴)
+            const stats = {
+                uptime: '99.9%',
+                strategies: 8,
+                symbols: '200+',
+                mlStatus: '활성화'
+            };
             
-            // 1초마다 시간 업데이트
-            setInterval(updateTime, 1000);
+            // 실제 구현에서는 API 호출
+            // fetch('/api/system/stats').then(...)
+        }
+
+        // 시장 데이터 로드
+        async function loadMarketData() {
+            try {
+                const response = await fetch('/api/market/overview');
+                const data = await response.json();
+                
+                updateMarketIndicators(data);
+            } catch (error) {
+                console.error('시장 데이터 로드 실패:', error);
+            }
+        }
+
+        // 시장 지표 업데이트
+        function updateMarketIndicators(data) {
+            if (data.major_symbols) {
+                const btcPrice = data.major_symbols['BTC/USDT'];
+                if (btcPrice) {
+                    document.getElementById('btcPrice').textContent = `$${btcPrice.price.toLocaleString()}`;
+                }
+            }
             
-            // 10초마다 시스템 상태 확인
-            setInterval(checkSystemStatus, 10000);
-        });
+            // 다른 지표들도 업데이트
+            // document.getElementById('marketCap').textContent = ...
+        }
+
+        // 차트 초기화
+        function initializeChart() {
+            const ctx = document.getElementById('marketChart').getContext('2d');
+            
+            // 더미 데이터
+            const marketChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: generateTimeLabels(),
+                    datasets: [{
+                        label: 'BTC/USDT',
+                        data: generateRandomData(24),
+                        borderColor: '#3498db',
+                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }, {
+                        label: 'ETH/USDT',
+                        data: generateRandomData(24),
+                        borderColor: '#2ecc71',
+                        backgroundColor: 'rgba(46, 204, 113, 0.1)',
+                        tension: 0.4,
+                        fill: true
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                        },
+                        title: {
+                            display: true,
+                            text: '24시간 가격 변동'
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            ticks: {
+                                callback: function(value) {
+                                    return '$' + value.toLocaleString();
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 시간 라벨 생성
+        function generateTimeLabels() {
+            const labels = [];
+            const now = new Date();
+            
+            for (let i = 23; i >= 0; i--) {
+                const time = new Date(now.getTime() - i * 60 * 60 * 1000);
+                labels.push(time.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' }));
+            }
+            
+            return labels;
+        }
+
+        // 랜덤 데이터 생성
+        function generateRandomData(count) {
+            const data = [];
+            let basePrice = 43000;
+            
+            for (let i = 0; i < count; i++) {
+                basePrice += (Math.random() - 0.5) * 1000;
+                data.push(Math.round(basePrice));
+            }
+            
+            return data;
+        }
+
+        // 실시간 데이터 업데이트
+        function updateRealTimeData() {
+            loadMarketData();
+            checkServerStatus();
+        }
+
+        // 네비게이션 함수들
+        function navigateToBacktest() {
+            window.location.href = '/backtest';
+        }
+
+        function navigateToLiveTrading() {
+            window.location.href = '/live-trading';
+        }
+
+        // 긴급 정지 기능
+        function emergencyStop() {
+            if (confirm('모든 거래를 즉시 중지하시겠습니까?')) {
+                fetch('/api/emergency-stop', { method: 'POST' })
+                    .then(response => response.json())
+                    .then(data => {
+                        alert('긴급 정지가 실행되었습니다.');
+                    })
+                    .catch(error => {
+                        console.error('긴급 정지 실패:', error);
+                        alert('긴급 정지 실행에 실패했습니다.');
+                    });
+            }
+        }
     </script>
 </body>
-</html> 
->>>>>>> febb08c8d864666b98f9587b4eb4ce3a55eed692
+</html>
