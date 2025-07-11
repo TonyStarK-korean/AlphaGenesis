@@ -43,7 +43,8 @@ class DataManager:
                 'enableRateLimit': True,
                 'options': {
                     'defaultType': 'future',  # 선물 거래
-                }
+                },
+                'asyncio': False  # 비동기 모드 비활성화
             })
             logger.info("바이낸스 거래소 초기화 완료")
         except Exception as e:
@@ -54,7 +55,8 @@ class DataManager:
                 'enableRateLimit': True,
                 'options': {
                     'defaultType': 'future',
-                }
+                },
+                'asyncio': False
             })
     
     async def download_historical_data(
@@ -112,12 +114,17 @@ class DataManager:
                 while retry_count < max_retries:
                     try:
                         # 바이낸스 API 호출
-                        ohlcv = await self.exchange.fetch_ohlcv(
-                            symbol, 
-                            timeframe, 
-                            since=current_since, 
-                            limit=limit
-                        )
+                        if hasattr(self.exchange, 'fetch_ohlcv') and callable(self.exchange.fetch_ohlcv):
+                            # 동기 방식으로 호출
+                            ohlcv = self.exchange.fetch_ohlcv(
+                                symbol, 
+                                timeframe, 
+                                since=current_since, 
+                                limit=limit
+                            )
+                        else:
+                            # 백업 방식
+                            ohlcv = []
                         
                         if not ohlcv:
                             break
@@ -352,7 +359,7 @@ class DataManager:
                     return symbols
             
             # 바이낸스에서 모든 마켓 정보 가져오기
-            markets = await self.exchange.load_markets()
+            markets = self.exchange.load_markets()
             
             # USDT 선물 심볼만 필터링
             usdt_futures = []
