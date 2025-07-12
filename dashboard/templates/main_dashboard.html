@@ -598,6 +598,15 @@
             </div>
         </div>
 
+        <!-- 핫 선물 리스트 -->
+        <div class="hot-futures-container">
+            <h3><i class="fas fa-fire"></i> 실시간 가장 핫한 선물 (상승률 순)</h3>
+            <div class="hot-futures-list" id="hotFuturesList">
+                <!-- 동적으로 생성될 리스트 -->
+                <div class="loading">로딩 중...</div>
+            </div>
+        </div>
+
         <!-- 성과 차트 -->
         <div class="chart-container">
             <h3><i class="fas fa-chart-area"></i> 실시간 시장 동향</h3>
@@ -623,9 +632,10 @@
             initializeSystem();
             // loadMarketData(); // 자동 로드 비활성화
             initializeChart();
+            loadHotFutures(); // 핫 선물 리스트 로드
             
-            // 실시간 업데이트 비활성화
-            // setInterval(updateRealTimeData, 30000); // 30초마다 업데이트
+            // 실시간 업데이트 활성화
+            setInterval(loadHotFutures, 30000); // 30초마다 업데이트
             
             // 수동 로드 버튼 추가
             addManualLoadButton();
@@ -787,6 +797,53 @@
             }
             
             return data;
+        }
+
+        // 핫 선물 리스트 로드
+        async function loadHotFutures() {
+            try {
+                const response = await fetch('/api/hot-coins');
+                const data = await response.json();
+                
+                const listContainer = document.getElementById('hotFuturesList');
+                listContainer.innerHTML = ''; // 기존 내용 제거
+                
+                // 모든 종목을 상승률 순으로 표시
+                data.forEach((coin, index) => {
+                    const item = document.createElement('div');
+                    item.className = 'hot-future-item';
+                    
+                    const changeClass = coin.change_24h >= 0 ? 'positive' : 'negative';
+                    const changePrefix = coin.change_24h >= 0 ? '+' : '';
+                    
+                    item.innerHTML = `
+                        <div class="hot-future-rank">${index + 1}</div>
+                        <div class="hot-future-info">
+                            <div class="hot-future-symbol">${coin.symbol}</div>
+                            <div class="hot-future-price">$${coin.price.toLocaleString()}</div>
+                        </div>
+                        <div class="hot-future-change ${changeClass}">${changePrefix}${coin.change_24h.toFixed(2)}%</div>
+                        <div class="hot-future-volume">Vol: ${formatVolume(coin.volume)}</div>
+                    `;
+                    
+                    listContainer.appendChild(item);
+                });
+            } catch (error) {
+                console.error('핫 선물 리스트 로드 실패:', error);
+                document.getElementById('hotFuturesList').innerHTML = '<p style="color: #e74c3c;">데이터 로드 실패</p>';
+            }
+        }
+
+        // 거래량 포맷팅
+        function formatVolume(volume) {
+            if (volume >= 1e9) {
+                return (volume / 1e9).toFixed(2) + 'B';
+            } else if (volume >= 1e6) {
+                return (volume / 1e6).toFixed(2) + 'M';
+            } else if (volume >= 1e3) {
+                return (volume / 1e3).toFixed(2) + 'K';
+            }
+            return volume.toFixed(2);
         }
 
         // 수동 로드 버튼 추가

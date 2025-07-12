@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-🚀 트리플 콤보 전략 시스템
-3가지 핵심 전략의 완벽한 조합으로 모든 시장 상황에 대응
+🚀 1시간봉 기반 고급 트레이딩 전략 시스템
+두 가지 핵심 전략으로 급등 초입을 정확히 포착
 """
 
 import pandas as pd
@@ -10,636 +10,236 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# 새로운 1시간봉 전략 모듈 임포트
+from hourly_strategy import HourlyTradingStrategy
+
 # ==============================================
-# 🚀 트리플 콤보 전략 클래스들 (메인 전략 엔진)
+# 🚀 1시간봉 전략 시스템 (메인 전략 엔진)
 # ==============================================
 
-class TrendFollowingStrategy:
+class HourlyStrategyWrapper:
     """
-    📈 전략 1: 추세 순응형 R/R 극대화 전략
-    - 목표: 상승/하락장에서 큰 추세를 따라가며 손실은 짧게, 수익은 길게
-    - 예상 승률: 55-65%
-    - 예상 손익비: 1:2.5 이상
+    1시간봉 기반 전략 래퍼
+    HourlyTradingStrategy를 기존 시스템과 통합
     """
     
     def __init__(self, params=None):
-        self.name = "TrendFollowing_RR"
-        self.params = params or {
-            'ma_short': 20,
-            'ma_long': 50,
-            'rsi_period': 14,
-            'rsi_overbought': 70,
-            'rsi_oversold': 30,
-            'atr_period': 14,
-            'stop_loss_atr': 1.5,
-            'take_profit_atr': 3.0,
-            'min_trend_strength': 0.6,
-            'obv_confirmation_period': 10
-        }
-        
-    def detect_trend(self, df):
-        """추세 방향 감지"""
-        try:
-            ma_short = df['close'].rolling(self.params['ma_short']).mean()
-            ma_long = df['close'].rolling(self.params['ma_long']).mean()
-            
-            # 추세 방향 (1: 상승, -1: 하락, 0: 횡보)
-            trend = np.where(ma_short > ma_long, 1, 
-                           np.where(ma_short < ma_long, -1, 0))
-            
-            # 추세 강도 (이동평균선 간 거리로 측정)
-            trend_strength = abs(ma_short - ma_long) / ma_long
-            
-            return pd.Series(trend, index=df.index), pd.Series(trend_strength, index=df.index)
-            
-        except Exception as e:
-            print(f"추세 감지 오류: {e}")
-            return pd.Series(0, index=df.index), pd.Series(0, index=df.index)
+        self.hourly_strategy = HourlyTradingStrategy()
+        self.name = "HourlyStrategy"
+        self.params = params or {}
     
-    def generate_signal(self, row, ml_pred, market_condition):
-        """추세 순응형 신호 생성"""
-        try:
-            signal = {
-                'signal': 0,
-                'confidence': 0.0,
-                'stop_loss': 0.0,
-                'take_profit': 0.0,
-                'leverage_suggestion': 1.0,
-                'strategy': self.name
-            }
-            
-            # 기본 데이터 추출
-            close = row['close']
-            rsi = row.get('rsi_14', 50)
-            atr = row.get('atr_14', close * 0.02)
-            
-            # 추세 정보 (이미 계산되어 있다고 가정)
-            trend = row.get('trend_direction', 0)
-            trend_strength = row.get('trend_strength', 0)
-            
-            # === 1. 추세 필터 ===
-            if trend == 0 or trend_strength < self.params['min_trend_strength']:
-                return signal  # 추세가 없으면 신호 없음
-            
-            # === 2. 진입 조건 확인 ===
-            entry_conditions = []
-            
-            # 상승 추세에서의 진입 조건
-            if trend == 1:
-                # 조건 1: RSI 과매도 구간에서 반등 (눌림목 매수)
-                if 20 <= rsi <= 45:
-                    entry_conditions.append(('rsi_pullback', 0.3))
-                
-                # 조건 2: ML 예측 상승 신호
-                if ml_pred > 0.01:
-                    entry_conditions.append(('ml_bullish', 0.25))
-                
-                # 조건 3: 거래량 확인 (OBV 상승)
-                obv_trend = row.get('obv_trend', 0)
-                if obv_trend > 0:
-                    entry_conditions.append(('volume_confirm', 0.2))
-                
-                # 조건 4: 지지선 근처 (볼린저 밴드 하단 근처)
-                bb_position = row.get('bb_position', 0.5)
-                if bb_position < 0.3:
-                    entry_conditions.append(('support_level', 0.25))
-                
-            # 하락 추세에서의 진입 조건
-            elif trend == -1:
-                # 조건 1: RSI 과매수 구간에서 반락 (되돌림 매도)
-                if 55 <= rsi <= 80:
-                    entry_conditions.append(('rsi_pullback', 0.3))
-                
-                # 조건 2: ML 예측 하락 신호
-                if ml_pred < -0.01:
-                    entry_conditions.append(('ml_bearish', 0.25))
-                
-                # 조건 3: 거래량 확인 (OBV 하락)
-                obv_trend = row.get('obv_trend', 0)
-                if obv_trend < 0:
-                    entry_conditions.append(('volume_confirm', 0.2))
-                
-                # 조건 4: 저항선 근처 (볼린저 밴드 상단 근처)
-                bb_position = row.get('bb_position', 0.5)
-                if bb_position > 0.7:
-                    entry_conditions.append(('resistance_level', 0.25))
-            
-            # === 3. 신호 생성 ===
-            if len(entry_conditions) >= 2:  # 최소 2개 조건 만족
-                total_confidence = sum([weight for _, weight in entry_conditions])
-                
-                if total_confidence >= 0.5:
-                    signal['signal'] = trend
-                    signal['confidence'] = min(total_confidence, 1.0)
-                    
-                    # 손익비 설정 (R/R 극대화)
-                    stop_loss_distance = atr * self.params['stop_loss_atr']
-                    take_profit_distance = atr * self.params['take_profit_atr']
-                    
-                    # 추세 강도에 따른 손익비 조정
-                    strength_multiplier = 1.0 + (trend_strength * 2.0)
-                    take_profit_distance *= strength_multiplier
-                    
-                    if trend == 1:  # 롱
-                        signal['stop_loss'] = close - stop_loss_distance
-                        signal['take_profit'] = close + take_profit_distance
-                    else:  # 숏
-                        signal['stop_loss'] = close + stop_loss_distance
-                        signal['take_profit'] = close - take_profit_distance
-                    
-                    # 레버리지 제안 (신뢰도 + 추세 강도 기반)
-                    base_leverage = 2.0 + (signal['confidence'] * 2.0)
-                    signal['leverage_suggestion'] = min(base_leverage * strength_multiplier, 5.0)
-            
-            return signal
-            
-        except Exception as e:
-            print(f"추세 신호 생성 오류: {e}")
-            return {'signal': 0, 'confidence': 0.0, 'stop_loss': 0.0, 'take_profit': 0.0, 'leverage_suggestion': 1.0, 'strategy': self.name}
+    def generate_signals(self, df):
+        """새로운 1시간봉 전략으로 신호 생성"""
+        return self.hourly_strategy.generate_signals(df)
+    
+    def backtest(self, df, initial_capital=10000, commission=0.0004):
+        """백테스트 실행"""
+        return self.hourly_strategy.backtest(df, initial_capital, commission)
 
-
-class CVDScalpingStrategy:
-    """
-    🔄 전략 2: CVD 기반 스캘핑 전략
-    - 목표: 횡보장에서 매수/매도 압력 분석으로 짧은 수익 반복
-    - 예상 승률: 70-80%
-    - 예상 손익비: 1:1.2
-    """
+class TrendFollowingStrategy(HourlyStrategyWrapper):
+    """기존 TrendFollowingStrategy를 1시간봉 전략으로 대체"""
     
     def __init__(self, params=None):
-        self.name = "CVD_Scalping"
-        self.params = params or {
-            'cvd_threshold': 0.3,
-            'rsi_period': 14,
-            'rsi_scalp_buy': 45,
-            'rsi_scalp_sell': 55,
-            'atr_period': 14,
-            'scalp_target_atr': 0.8,
-            'scalp_stop_atr': 0.6,
-            'volume_spike_threshold': 1.5,
-            'max_hold_periods': 5
-        }
-        
-    def detect_sideways_market(self, df):
-        """횡보장 감지"""
-        try:
-            # ADX로 추세 강도 측정
-            adx = df.get('adx_14', pd.Series(25, index=df.index))
-            
-            # 볼린저 밴드 폭으로 변동성 측정
-            bb_width = df.get('bb_width', pd.Series(0.05, index=df.index))
-            
-            # 횡보 조건: ADX < 25 and 낮은 변동성
-            is_sideways = (adx < 25) & (bb_width < 0.04)
-            
-            return is_sideways
-            
-        except Exception as e:
-            print(f"횡보장 감지 오류: {e}")
-            return pd.Series(False, index=df.index)
-    
-    def generate_signal(self, row, ml_pred, market_condition):
-        """CVD 기반 스캘핑 신호 생성"""
-        try:
-            signal = {
-                'signal': 0,
-                'confidence': 0.0,
-                'stop_loss': 0.0,
-                'take_profit': 0.0,
-                'leverage_suggestion': 1.0,
-                'strategy': self.name
-            }
-            
-            # 기본 데이터 추출
-            close = row['close']
-            rsi = row.get('rsi_14', 50)
-            atr = row.get('atr_14', close * 0.02)
-            
-            # CVD 관련 데이터
-            cvd = row.get('cvd', 0)
-            cvd_sma = row.get('cvd_sma', 0)
-            volume_ratio = row.get('volume_ratio', 1.0)
-            
-            # === 1. 횡보장 필터 ===
-            is_sideways = row.get('is_sideways', False)
-            if not is_sideways:
-                return signal  # 횡보장이 아니면 스캘핑 안함
-            
-            # === 2. CVD 분석 ===
-            cvd_momentum = cvd - cvd_sma
-            cvd_strength = abs(cvd_momentum) / (abs(cvd_sma) + 1e-8)
-            
-            # === 3. 진입 조건 확인 ===
-            entry_conditions = []
-            
-            # 매수 신호 조건들
-            if cvd_momentum > self.params['cvd_threshold'] and cvd_strength > 0.2:
-                # 조건 1: 강한 매수 압력
-                entry_conditions.append(('cvd_bullish', 0.4))
-                
-                # 조건 2: RSI 과매도 구간
-                if rsi < self.params['rsi_scalp_buy']:
-                    entry_conditions.append(('rsi_oversold', 0.3))
-                
-                # 조건 3: 거래량 급증
-                if volume_ratio > self.params['volume_spike_threshold']:
-                    entry_conditions.append(('volume_spike', 0.2))
-                
-                # 조건 4: ML 예측 지지
-                if ml_pred > 0:
-                    entry_conditions.append(('ml_support', 0.1))
-                
-                potential_signal = 1
-                
-            # 매도 신호 조건들
-            elif cvd_momentum < -self.params['cvd_threshold'] and cvd_strength > 0.2:
-                # 조건 1: 강한 매도 압력
-                entry_conditions.append(('cvd_bearish', 0.4))
-                
-                # 조건 2: RSI 과매수 구간
-                if rsi > self.params['rsi_scalp_sell']:
-                    entry_conditions.append(('rsi_overbought', 0.3))
-                
-                # 조건 3: 거래량 급증
-                if volume_ratio > self.params['volume_spike_threshold']:
-                    entry_conditions.append(('volume_spike', 0.2))
-                
-                # 조건 4: ML 예측 지지
-                if ml_pred < 0:
-                    entry_conditions.append(('ml_support', 0.1))
-                
-                potential_signal = -1
-            else:
-                return signal
-            
-            # === 4. 신호 생성 ===
-            if len(entry_conditions) >= 2:  # 최소 2개 조건 만족
-                total_confidence = sum([weight for _, weight in entry_conditions])
-                
-                if total_confidence >= 0.6:  # 스캘핑은 높은 확신 필요
-                    signal['signal'] = potential_signal
-                    signal['confidence'] = min(total_confidence, 1.0)
-                    
-                    # 타이트한 손익비 설정 (스캘핑 특성)
-                    stop_distance = atr * self.params['scalp_stop_atr']
-                    target_distance = atr * self.params['scalp_target_atr']
-                    
-                    if potential_signal == 1:  # 롱
-                        signal['stop_loss'] = close - stop_distance
-                        signal['take_profit'] = close + target_distance
-                    else:  # 숏
-                        signal['stop_loss'] = close + stop_distance
-                        signal['take_profit'] = close - target_distance
-                    
-                    # 높은 레버리지 (높은 승률 + 타이트한 손절)
-                    signal['leverage_suggestion'] = min(3.0 + signal['confidence'], 5.0)
-            
-            return signal
-            
-        except Exception as e:
-            print(f"CVD 스캘핑 신호 생성 오류: {e}")
-            return {'signal': 0, 'confidence': 0.0, 'stop_loss': 0.0, 'take_profit': 0.0, 'leverage_suggestion': 1.0, 'strategy': self.name}
+        super().__init__(params)
+        self.name = "TrendFollowing_Hourly"
 
-
-class VolatilityBreakoutStrategy:
-    """
-    💥 전략 3: 변동성 돌파 전략
-    - 목표: 급등/급락장 초입에서 변동성 폭발을 포착
-    - 예상 승률: 45-55%
-    - 예상 손익비: 1:3.0 이상
-    """
+class CVDScalpingStrategy(HourlyStrategyWrapper):
+    """기존 CVDScalpingStrategy를 1시간봉 전략으로 대체"""
     
     def __init__(self, params=None):
-        self.name = "Volatility_Breakout"
-        self.params = params or {
-            'bb_period': 20,
-            'bb_std': 2.0,
-            'squeeze_threshold': 0.02,  # 볼린저 밴드 폭 임계값
-            'squeeze_duration': 10,      # 최소 수축 기간
-            'breakout_strength': 0.5,    # 돌파 강도
-            'atr_period': 14,
-            'stop_loss_atr': 2.0,
-            'take_profit_atr': 4.0,
-            'volume_confirmation': 1.5
-        }
-        
-    def detect_squeeze(self, df):
-        """변동성 수축 (Squeeze) 감지"""
-        try:
-            # 볼린저 밴드 폭 계산
-            bb_width = df.get('bb_width', pd.Series(0.05, index=df.index))
-            
-            # 변동성 수축 조건
-            is_squeeze = bb_width < self.params['squeeze_threshold']
-            
-            # 수축 지속 기간 계산
-            squeeze_duration = is_squeeze.rolling(window=self.params['squeeze_duration']).sum()
-            
-            # 충분한 기간 동안 수축된 상태
-            valid_squeeze = squeeze_duration >= self.params['squeeze_duration']
-            
-            return valid_squeeze
-            
-        except Exception as e:
-            print(f"변동성 수축 감지 오류: {e}")
-            return pd.Series(False, index=df.index)
-    
-    def generate_signal(self, row, ml_pred, market_condition):
-        """변동성 돌파 신호 생성"""
-        try:
-            signal = {
-                'signal': 0,
-                'confidence': 0.0,
-                'stop_loss': 0.0,
-                'take_profit': 0.0,
-                'leverage_suggestion': 1.0,
-                'strategy': self.name
-            }
-            
-            # 기본 데이터 추출
-            close = row['close']
-            high = row['high']
-            low = row['low']
-            atr = row.get('atr_14', close * 0.02)
-            volume_ratio = row.get('volume_ratio', 1.0)
-            
-            # 볼린저 밴드 정보
-            bb_upper = row.get('bb_upper', close * 1.02)
-            bb_lower = row.get('bb_lower', close * 0.98)
-            bb_width = row.get('bb_width', 0.05)
-            
-            # === 1. 변동성 수축 조건 확인 ===
-            was_squeezed = row.get('was_squeezed', False)
-            if not was_squeezed:
-                return signal  # 사전 수축이 없었으면 돌파 신호 없음
-            
-            # === 2. 돌파 강도 계산 ===
-            upper_breakout_strength = max(0, (close - bb_upper) / bb_upper)
-            lower_breakout_strength = max(0, (bb_lower - close) / bb_lower)
-            
-            # === 3. 진입 조건 확인 ===
-            entry_conditions = []
-            potential_signal = 0
-            
-            # 상향 돌파 조건들
-            if upper_breakout_strength > self.params['breakout_strength']:
-                entry_conditions.append(('upper_breakout', 0.4))
-                potential_signal = 1
-                
-                # 추가 확인 조건들
-                if volume_ratio > self.params['volume_confirmation']:
-                    entry_conditions.append(('volume_confirm', 0.3))
-                
-                if ml_pred > 0.02:
-                    entry_conditions.append(('ml_bullish', 0.2))
-                
-                # 캔들 패턴 확인 (강한 상승 캔들)
-                if (close - row['open']) / row['open'] > 0.01:
-                    entry_conditions.append(('strong_candle', 0.1))
-            
-            # 하향 돌파 조건들
-            elif lower_breakout_strength > self.params['breakout_strength']:
-                entry_conditions.append(('lower_breakout', 0.4))
-                potential_signal = -1
-                
-                # 추가 확인 조건들
-                if volume_ratio > self.params['volume_confirmation']:
-                    entry_conditions.append(('volume_confirm', 0.3))
-                
-                if ml_pred < -0.02:
-                    entry_conditions.append(('ml_bearish', 0.2))
-                
-                # 캔들 패턴 확인 (강한 하락 캔들)
-                if (row['open'] - close) / row['open'] > 0.01:
-                    entry_conditions.append(('strong_candle', 0.1))
-            
-                # === 급락장 성공률 향상을 위한 필터링 조건 추가 ===
-                # 1. 하락 추세 확인 (단기 이평선이 장기 이평선 아래에 있는지)
-                if row.get('ma_20', close) > row.get('ma_50', close):
-                    # 상승 추세 중의 일시적 하락 돌파는 무시
-                    return signal
-                # 2. 음봉 캔들 확인 (돌파 캔들이 음봉이어야 함)
-                if close > row['open']:
-                    # 양봉 돌파는 신뢰도가 낮으므로 무시
-                    return signal
-            
-            # === 4. 신호 생성 ===
-            if len(entry_conditions) >= 2:  # 최소 2개 조건 만족
-                total_confidence = sum([weight for _, weight in entry_conditions])
-                
-                if total_confidence >= 0.6:
-                    signal['signal'] = potential_signal
-                    signal['confidence'] = min(total_confidence, 1.0)
-                    
-                    # 넓은 손익비 설정 (홈런 전략)
-                    stop_distance = atr * self.params['stop_loss_atr']
-                    target_distance = atr * self.params['take_profit_atr']
-                    
-                    # 돌파 강도에 따른 손익비 조정
-                    breakout_strength = max(upper_breakout_strength, lower_breakout_strength)
-                    strength_multiplier = 1.0 + (breakout_strength * 3.0)
-                    target_distance *= strength_multiplier
-                    
-                    if potential_signal == 1:  # 롱
-                        signal['stop_loss'] = close - stop_distance
-                        signal['take_profit'] = close + target_distance
-                    else:  # 숏
-                        signal['stop_loss'] = close + stop_distance
-                        signal['take_profit'] = close - target_distance
-                    
-                    # 보수적 레버리지 (낮은 승률 보상)
-                    signal['leverage_suggestion'] = min(2.0 + signal['confidence'], 4.0)
-            
-            return signal
-            
-        except Exception as e:
-            print(f"변동성 돌파 신호 생성 오류: {e}")
-            return {'signal': 0, 'confidence': 0.0, 'stop_loss': 0.0, 'take_profit': 0.0, 'leverage_suggestion': 1.0, 'strategy': self.name}
+        super().__init__(params)
+        self.name = "CVDScalping_Hourly"
 
+class VolatilityBreakoutStrategy(HourlyStrategyWrapper):
+    """기존 VolatilityBreakoutStrategy를 1시간봉 전략으로 대체"""
+    
+    def __init__(self, params=None):
+        super().__init__(params)
+        self.name = "VolatilityBreakout_Hourly"
 
 class TripleComboStrategy:
     """
-    🚀 트리플 콤보 전략 매니저
-    - 3가지 전략을 시장 상황에 따라 자동 선택
-    - 각 전략의 신호를 종합하여 최적의 매매 결정
+    🚀 통합 전략 관리자
+    1시간봉 기반 전략들을 통합 관리
     """
     
-    def __init__(self, params=None):
-        self.name = "Triple_Combo"
-        self.strategies = {
-            'trend': TrendFollowingStrategy(),
-            'scalping': CVDScalpingStrategy(), 
-            'breakout': VolatilityBreakoutStrategy()
-        }
-        self.params = params or {
-            'trend_priority': 0.5,      # 추세 전략 우선순위
-            'scalping_priority': 0.3,   # 스캘핑 전략 우선순위
-            'breakout_priority': 0.2,   # 돌파 전략 우선순위
-            'min_confidence': 0.6,      # 최소 신뢰도
-            'max_concurrent_signals': 2  # 동시 신호 최대 개수
-        }
-        self.last_strategy = "unknown"
+    def __init__(self, symbol="BTC/USDT", initial_capital=10000, max_risk_per_trade=0.02):
+        self.symbol = symbol
+        self.initial_capital = initial_capital
+        self.max_risk_per_trade = max_risk_per_trade
         
-    def analyze_market_phase(self, row, df_recent):
-        """시장 국면 분석"""
-        try:
-            # 추세 강도
-            trend_strength = row.get('trend_strength', 0)
-            
-            # 변동성 수준
-            volatility = row.get('volatility_20', 0.05)
-            
-            # ADX (추세 강도)
-            adx = row.get('adx_14', 25)
-            
-            # 시장 국면 판단
-            if adx > 30 and trend_strength > 0.3:
-                return 'trending'  # 추세장
-            elif volatility < 0.03 and adx < 20:
-                return 'sideways'  # 횡보장
-            elif volatility > 0.08:
-                return 'volatile'  # 변동성 장
-            else:
-                return 'mixed'     # 복합적
-                
-        except Exception as e:
-            print(f"시장 국면 분석 오류: {e}")
-            return 'mixed'
+        # 1시간봉 전략 초기화
+        self.strategies = {
+            "trend_following": TrendFollowingStrategy(),
+            "cvd_scalping": CVDScalpingStrategy(), 
+            "volatility_breakout": VolatilityBreakoutStrategy()
+        }
+        
+        # 전략별 가중치
+        self.strategy_weights = {
+            "trend_following": 0.4,
+            "cvd_scalping": 0.3,
+            "volatility_breakout": 0.3
+        }
+        
+        # 포트폴리오 상태
+        self.portfolio = {
+            'cash': initial_capital,
+            'positions': {},
+            'total_value': initial_capital,
+            'trade_history': []
+        }
     
-    def generate_signal(self, row, ml_pred, market_condition, df_recent=None):
-        """통합 신호 생성"""
+    def generate_combined_signal(self, df):
+        """
+        모든 전략의 신호를 결합하여 최종 신호 생성
+        """
         try:
-            # 각 전략별 신호 생성
-            signals = {}
+            # 각 전략별 신호 수집
+            strategy_signals = {}
             
-            # 시장 국면 분석
-            market_phase = self.analyze_market_phase(row, df_recent)
+            for strategy_name, strategy in self.strategies.items():
+                signals = strategy.generate_signals(df)
+                strategy_signals[strategy_name] = signals
             
-            # 추세 전략 신호
-            trend_signal = self.strategies['trend'].generate_signal(row, ml_pred, market_condition)
-            if trend_signal['signal'] != 0:
-                signals['trend'] = trend_signal
+            # 신호 결합 로직
+            combined_signals = pd.DataFrame(index=df.index)
+            combined_signals['signal'] = 0
+            combined_signals['confidence'] = 0.0
+            combined_signals['strategy'] = 'None'
             
-            # 스캘핑 전략 신호
-            scalping_signal = self.strategies['scalping'].generate_signal(row, ml_pred, market_condition)
-            if scalping_signal['signal'] != 0:
-                signals['scalping'] = scalping_signal
-            
-            # 돌파 전략 신호
-            breakout_signal = self.strategies['breakout'].generate_signal(row, ml_pred, market_condition)
-            if breakout_signal['signal'] != 0:
-                signals['breakout'] = breakout_signal
-            
-            # 신호 없음
-            if len(signals) == 0:
-                return {'signal': 0, 'confidence': 0.0, 'stop_loss': 0.0, 'take_profit': 0.0, 'leverage_suggestion': 1.0, 'strategy': self.name}
-            
-            # 시장 국면에 따른 전략 우선순위 조정
-            priorities = self.params.copy()
-            if market_phase == 'trending':
-                priorities['trend_priority'] = 0.6
-                priorities['scalping_priority'] = 0.2
-                priorities['breakout_priority'] = 0.2
-            elif market_phase == 'sideways':
-                priorities['trend_priority'] = 0.2
-                priorities['scalping_priority'] = 0.6
-                priorities['breakout_priority'] = 0.2
-            elif market_phase == 'volatile':
-                priorities['trend_priority'] = 0.3
-                priorities['scalping_priority'] = 0.2
-                priorities['breakout_priority'] = 0.5
-            
-            # 최고 신뢰도 신호 선택
-            best_signal = None
-            best_score = 0
-            
-            for strategy_name, signal in signals.items():
-                priority = priorities.get(f'{strategy_name}_priority', 0.33)
-                score = signal['confidence'] * priority
+            for i in range(len(df)):
+                total_signal = 0
+                total_confidence = 0
+                active_strategies = []
                 
-                if score > best_score and signal['confidence'] >= self.params['min_confidence']:
-                    best_score = score
-                    best_signal = signal.copy()
-                    best_signal['strategy'] = f"{self.name}_{strategy_name}"
-                    best_signal['market_phase'] = market_phase
-                    self.last_strategy = strategy_name
+                for strategy_name, signals in strategy_signals.items():
+                    if i < len(signals) and signals['signal'].iloc[i] != 0:
+                        weight = self.strategy_weights[strategy_name]
+                        total_signal += signals['signal'].iloc[i] * weight
+                        total_confidence += signals['confidence'].iloc[i] * weight
+                        active_strategies.append(strategy_name)
+                
+                # 최종 신호 결정
+                if abs(total_signal) > 0.5:  # 임계값 이상일 때만 신호 발생
+                    combined_signals.loc[df.index[i], 'signal'] = 1 if total_signal > 0 else -1
+                    combined_signals.loc[df.index[i], 'confidence'] = min(total_confidence, 1.0)
+                    combined_signals.loc[df.index[i], 'strategy'] = '+'.join(active_strategies)
             
-            if best_signal is None:
-                return {'signal': 0, 'confidence': 0.0, 'stop_loss': 0.0, 'take_profit': 0.0, 'leverage_suggestion': 1.0, 'strategy': self.name}
-            
-            return best_signal
+            return combined_signals
             
         except Exception as e:
-            print(f"트리플 콤보 신호 생성 오류: {e}")
-            return {'signal': 0, 'confidence': 0.0, 'stop_loss': 0.0, 'take_profit': 0.0, 'leverage_suggestion': 1.0, 'strategy': self.name}
-
-
-# ==============================================
-# 🎯 트리플 콤보 백테스트 엔진
-# ==============================================
-
-def check_position_exit(row, position, entry_price, stop_loss, take_profit):
-    """포지션 청산 조건 확인"""
-    current_price = row['close']
+            print(f"신호 결합 오류: {e}")
+            return pd.DataFrame(index=df.index, columns=['signal', 'confidence', 'strategy']).fillna(0)
     
-    # 손절매 확인
-    if position == 1 and current_price <= stop_loss:
-        return True, "stop_loss"
-    elif position == -1 and current_price >= stop_loss:
-        return True, "stop_loss"
-    
-    # 익절매 확인
-    if position == 1 and current_price >= take_profit:
-        return True, "take_profit"
-    elif position == -1 and current_price <= take_profit:
-        return True, "take_profit"
-    
-    return False, None
+    def backtest_combined_strategy(self, df, commission=0.0004):
+        """
+        통합 전략 백테스트
+        """
+        try:
+            signals = self.generate_combined_signal(df)
+            
+            capital = self.initial_capital
+            position = 0
+            trades = []
+            
+            for i in range(len(df)):
+                current_price = df['close'].iloc[i]
+                
+                if signals['signal'].iloc[i] == 1 and position == 0:
+                    # 매수 신호
+                    risk_amount = capital * self.max_risk_per_trade
+                    position_size = risk_amount / current_price
+                    
+                    capital -= position_size * current_price
+                    capital -= position_size * current_price * commission
+                    position = position_size
+                    
+                    entry_info = {
+                        'entry_time': df.index[i],
+                        'entry_price': current_price,
+                        'position_size': position_size,
+                        'confidence': signals['confidence'].iloc[i],
+                        'strategy': signals['strategy'].iloc[i]
+                    }
+                
+                elif position > 0:
+                    # 매도 조건 확인 (간단한 예시)
+                    # 실제로는 더 복잡한 exit 전략 사용
+                    should_exit = False
+                    exit_reason = ""
+                    
+                    # 5% 손절 또는 10% 익절
+                    profit_pct = ((current_price - entry_info['entry_price']) / entry_info['entry_price']) * 100
+                    
+                    if profit_pct <= -5:
+                        should_exit = True
+                        exit_reason = "stop_loss"
+                    elif profit_pct >= 10:
+                        should_exit = True
+                        exit_reason = "take_profit"
+                    
+                    if should_exit:
+                        capital += position * current_price
+                        capital -= position * current_price * commission
+                        
+                        trades.append({
+                            'entry_time': entry_info['entry_time'],
+                            'exit_time': df.index[i],
+                            'entry_price': entry_info['entry_price'],
+                            'exit_price': current_price,
+                            'profit_pct': profit_pct,
+                            'exit_reason': exit_reason,
+                            'confidence': entry_info['confidence'],
+                            'strategy': entry_info['strategy']
+                        })
+                        
+                        position = 0
+            
+            # 결과 계산
+            total_return = ((capital - self.initial_capital) / self.initial_capital) * 100
+            
+            return {
+                'total_return': total_return,
+                'final_capital': capital,
+                'total_trades': len(trades),
+                'winning_trades': len([t for t in trades if t['profit_pct'] > 0]),
+                'average_profit': np.mean([t['profit_pct'] for t in trades]) if trades else 0,
+                'trades': trades
+            }
+            
+        except Exception as e:
+            print(f"백테스트 오류: {e}")
+            return {
+                'total_return': 0,
+                'final_capital': self.initial_capital,
+                'total_trades': 0,
+                'winning_trades': 0,
+                'average_profit': 0,
+                'trades': []
+            }
 
+# 기존 시스템과의 호환성을 위한 별칭
+TrendFollowing = TrendFollowingStrategy
+CVDScalping = CVDScalpingStrategy  
+VolatilityBreakout = VolatilityBreakoutStrategy
 
-def calculate_pnl(position, entry_price, exit_price, position_size, leverage):
-    """손익 계산"""
-    if position == 1:  # 롱
-        price_change = (exit_price - entry_price) / entry_price
-    else:  # 숏
-        price_change = (entry_price - exit_price) / entry_price
-    
-    return position_size * price_change * leverage
-
-
-def print_detailed_trade_log(trade_record):
-    """상세 거래 로그 출력"""
-    print(f"\n{'='*60}")
-    print(f"📋 거래 상세 로그")
-    print(f"{'='*60}")
-    print(f"⏰ 진입 시간: {trade_record['entry_time']}")
-    print(f"⏰ 청산 시간: {trade_record['exit_time']}")
-    print(f"🎯 전략: {trade_record['strategy']}")
-    print(f"📍 포지션: {'롱(매수)' if trade_record['position'] == 1 else '숏(매도)'}")
-    print(f"💰 진입가: {trade_record['entry_price']:.4f}")
-    print(f"💰 청산가: {trade_record['exit_price']:.4f}")
-    print(f"📊 포지션 크기: {trade_record['size']:,.0f}")
-    print(f"⚖️  레버리지: {trade_record['leverage']:.1f}x")
-    print(f"📈 손익(수수료 전): {trade_record['pnl']:,.0f}원")
-    print(f"💸 순손익(수수료 후): {trade_record['net_pnl']:,.0f}원")
-    print(f"🏁 청산 사유: {trade_record['reason']}")
-    
-    # 수익률 계산
-    return_pct = (trade_record['net_pnl'] / trade_record['size']) * 100
-    print(f"📊 수익률: {return_pct:.2f}%")
-    
-    # 성과 판정
-    if trade_record['net_pnl'] > 0:
-        print(f"✅ 결과: 이익 거래")
-    else:
-        print(f"❌ 결과: 손실 거래")
-    
-    print(f"{'='*60}")
-
-
+# 전략 실행 예시
 if __name__ == "__main__":
-    print("🚀 트리플 콤보 전략 시스템 로드 완료!")
-    print("   📈 추세 순응형 R/R 극대화 전략")
-    print("   🔄 CVD 기반 스캘핑 전략") 
-    print("   💥 변동성 돌파 전략")
-    print("   🎯 통합 전략 매니저") 
+    print("🚀 1시간봉 기반 고급 트레이딩 전략 시스템")
+    print("=" * 50)
+    
+    # 전략 시스템 초기화
+    strategy_system = TripleComboStrategy(
+        symbol="BTC/USDT",
+        initial_capital=10000,
+        max_risk_per_trade=0.02
+    )
+    
+    print(f"전략 시스템 초기화 완료:")
+    print(f"- 심볼: {strategy_system.symbol}")
+    print(f"- 초기 자본: ${strategy_system.initial_capital:,}")
+    print(f"- 전략 수: {len(strategy_system.strategies)}")
+    print("- 전략 1: 급등 초입 포착")
+    print("- 전략 2: 작은 눌림목 이후 초급등 초입")
+    print("- 매도 전략: 볼린저밴드 200 상단선 기반 트레일링 스탑")

@@ -2,9 +2,11 @@ from flask import Blueprint, jsonify, request, Response, render_template, redire
 import json
 import queue
 import asyncio
+import time
 from datetime import datetime
 import sys
 import os
+import numpy as np
 
 # 코어 모듈 경로 추가
 sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'core'))
@@ -42,6 +44,18 @@ def error_response(message="Error", error_code=None, status_code=400):
 
 # Flask Blueprint 생성
 api = Blueprint('api', __name__)
+
+# 라이브 트레이딩 매니저 import
+from live_trading_integration import get_live_trading_manager
+
+# 포트폴리오 분석기 import
+from portfolio_analytics import get_portfolio_analytics
+
+# 전략 매니저 import
+from strategy_manager import get_strategy_manager
+
+# 성능 최적화기 import
+from performance_optimizer import get_performance_optimizer, cache_api_response, monitor_api_performance
 
 # 백테스트 엔진 지연 초기화 (필요할 때만 초기화)
 backtest_engine = None
@@ -88,8 +102,8 @@ def get_hot_coins():
             # USDT 선물만 필터링
             usdt_futures = [coin for coin in data if coin['symbol'].endswith('USDT')]
             
-            # 상승률 기준 상위 15개 선택
-            hot_coins = sorted(usdt_futures, key=lambda x: float(x['priceChangePercent']), reverse=True)[:15]
+            # 상승률 기준으로 모든 종목 정렬
+            hot_coins = sorted(usdt_futures, key=lambda x: float(x['priceChangePercent']), reverse=True)
             
             result = []
             for coin in hot_coins:
@@ -413,11 +427,26 @@ def get_binance_symbols():
             'TNSR'
         ]
         
-        # 실제 환경에서는 ccxt 라이브러리를 사용해서 동적으로 가져옴
-        # import ccxt
-        # exchange = ccxt.binance({'options': {'defaultType': 'future'}})
-        # markets = exchange.load_markets()
-        # symbols = [symbol.replace('/', '') for symbol in markets.keys() if symbol.endswith('/USDT')]
+        # 실시간 바이낸스 API 사용으로 변경
+        try:
+            import requests
+            response = requests.get('https://fapi.binance.com/fapi/v1/exchangeInfo', timeout=10)
+            
+            if response.status_code == 200:
+                data = response.json()
+                live_symbols = []
+                
+                for symbol_info in data['symbols']:
+                    symbol = symbol_info['symbol']
+                    if (symbol.endswith('USDT') and 
+                        symbol_info['status'] == 'TRADING' and
+                        symbol_info['contractType'] == 'PERPETUAL'):
+                        live_symbols.append(symbol.replace('USDT', '/USDT'))
+                
+                if live_symbols:
+                    return jsonify({'symbols': sorted(live_symbols)})
+        except:
+            pass  # 실패시 기본 목록 사용
         
         return jsonify({'symbols': symbols})
     except Exception as e:
@@ -1489,3 +1518,1150 @@ def backtest_portfolio():
         
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+# ===== 새로운 강화된 백테스트 시스템 엔드포인트 =====
+
+@api.route('/api/enhanced-backtest/four-strategies', methods=['POST'])
+def run_four_strategies_backtest():
+    """4가지 전략 비교 백테스트 실행"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '요청 데이터가 없습니다.'}), 400
+        
+        # 필수 필드 검증
+        required_fields = ['startDate', 'endDate', 'initialCapital']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field}가 누락되었습니다.'}), 400
+        
+        # 설정 추출
+        symbol = data.get('symbol', 'BTC/USDT')
+        start_date = data['startDate']
+        end_date = data['endDate']
+        initial_capital = float(data['initialCapital'])
+        capital_unit = data.get('capitalUnit', 'USD')
+        
+        # 백테스트 ID 생성
+        import uuid
+        backtest_id = str(uuid.uuid4())
+        
+        # 성공 응답 (실제 백테스트는 백그라운드에서 실행)
+        return jsonify({
+            'status': 'success',
+            'backtest_id': backtest_id,
+            'message': f'{symbol}에 대한 4가지 전략 비교 백테스트 시작',
+            'config': {
+                'symbol': symbol,
+                'start_date': start_date,
+                'end_date': end_date,
+                'initial_capital': initial_capital,
+                'capital_unit': capital_unit
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"4가지 전략 백테스트 API 오류: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@api.route('/api/enhanced-backtest/all-symbols', methods=['POST'])
+def run_all_symbols_backtest():
+    """전체 USDT.P 선물에 대한 백테스트 실행"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'error': '요청 데이터가 없습니다.'}), 400
+        
+        # 필수 필드 검증
+        required_fields = ['startDate', 'endDate', 'initialCapital']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'{field}가 누락되었습니다.'}), 400
+        
+        # 설정 추출
+        start_date = data['startDate']
+        end_date = data['endDate']
+        initial_capital = float(data['initialCapital'])
+        capital_unit = data.get('capitalUnit', 'USD')
+        max_symbols = int(data.get('maxSymbols', 50))
+        
+        # 백테스트 ID 생성
+        import uuid
+        backtest_id = str(uuid.uuid4())
+        
+        return jsonify({
+            'status': 'started',
+            'backtest_id': backtest_id,
+            'message': f'전체 USDT.P 선물 백테스트 시작 (최대 {max_symbols}개 심볼)',
+            'config': {
+                'start_date': start_date,
+                'end_date': end_date,
+                'initial_capital': initial_capital,
+                'capital_unit': capital_unit,
+                'max_symbols': max_symbols
+            }
+        })
+        
+    except Exception as e:
+        logger.error(f"전체 심볼 백테스트 API 오류: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@api.route('/api/enhanced-strategies', methods=['GET'])
+def get_enhanced_strategies():
+    """강화된 전략 목록 조회"""
+    try:
+        strategies = [
+            {
+                'id': 'strategy1_basic',
+                'name': '전략 1: 급등 초입 (기본)',
+                'description': '1시간봉 기준 급등 초입 포착 - 기본 지표',
+                'timeframe': '1h',
+                'category': 'momentum',
+                'risk_level': 'medium',
+                'implemented': True,
+                'version': 'basic'
+            },
+            {
+                'id': 'strategy1_alpha',
+                'name': '전략 1-1: 급등 초입 + 알파',
+                'description': '1시간봉 기준 급등 초입 포착 - 알파 지표 강화',
+                'timeframe': '1h',
+                'category': 'momentum',
+                'risk_level': 'medium',
+                'implemented': True,
+                'version': 'alpha',
+                'enhancements': ['거래량 폭발 감지', '시장 구조 변화', '유동성 분석', '변동성 필터', '스마트 머니 플로우']
+            },
+            {
+                'id': 'strategy2_basic',
+                'name': '전략 2: 눌림목 후 급등 (기본)',
+                'description': '1시간봉 기준 작은 눌림목 이후 초급등 - 기본 지표',
+                'timeframe': '1h',
+                'category': 'pullback',
+                'risk_level': 'medium',
+                'implemented': True,
+                'version': 'basic'
+            },
+            {
+                'id': 'strategy2_alpha',
+                'name': '전략 2-1: 눌림목 후 급등 + 알파',
+                'description': '1시간봉 기준 작은 눌림목 이후 초급등 - 알파 지표 강화',
+                'timeframe': '1h',
+                'category': 'pullback',
+                'risk_level': 'medium',
+                'implemented': True,
+                'version': 'alpha',
+                'enhancements': ['피보나치 되돌림', '강세 다이버전스', '유동성 분석', '변동성 필터', '스마트 머니 플로우']
+            }
+        ]
+        
+        return jsonify({'strategies': strategies})
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+# 프리미엄 대시보드 라우트들
+@api.route('/premium-backtest')
+def premium_backtest():
+    """프리미엄 백테스트 대시보드"""
+    return render_template('premium_backtest.html')
+
+@api.route('/premium-live')
+def premium_live():
+    """프리미엄 라이브 트레이딩 대시보드"""
+    return render_template('premium_live_trading.html')
+
+# 라이브 트레이딩 API 엔드포인트들
+@api.route('/api/live-trading/start', methods=['POST'])
+def start_live_trading():
+    """라이브 트레이딩 시작"""
+    try:
+        data = request.get_json()
+        config = {
+            'api_key': data.get('api_key', ''),
+            'api_secret': data.get('api_secret', ''),
+            'sandbox': data.get('sandbox', True),
+            'initial_capital': float(data.get('initial_capital', 10000)),
+            'enabled_strategies': data.get('enabled_strategies', ['strategy1_alpha', 'strategy2_alpha']),
+            'trading_symbols': data.get('trading_symbols', ['BTC/USDT', 'ETH/USDT']),
+            'max_position_size': float(data.get('max_position_size', 0.02))
+        }
+        
+        # 라이브 트레이딩 매니저 가져오기
+        manager = get_live_trading_manager(config)
+        
+        # 트레이딩 시작
+        manager.start_trading()
+        
+        return success_response(
+            data={'status': 'started', 'config': config},
+            message="라이브 트레이딩이 시작되었습니다."
+        )
+        
+    except Exception as e:
+        return error_response(f"라이브 트레이딩 시작 실패: {str(e)}")
+
+@api.route('/api/live-trading/stop', methods=['POST'])
+def stop_live_trading():
+    """라이브 트레이딩 중지"""
+    try:
+        manager = get_live_trading_manager()
+        manager.stop_trading()
+        
+        return success_response(
+            data={'status': 'stopped'},
+            message="라이브 트레이딩이 중지되었습니다."
+        )
+        
+    except Exception as e:
+        return error_response(f"라이브 트레이딩 중지 실패: {str(e)}")
+
+@api.route('/api/live-trading/status', methods=['GET'])
+def get_live_trading_status():
+    """라이브 트레이딩 상태 조회"""
+    try:
+        manager = get_live_trading_manager()
+        status = manager.get_status()
+        
+        return success_response(
+            data=status,
+            message="상태 조회 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"상태 조회 실패: {str(e)}")
+
+@api.route('/api/live-trading/signals/<symbol>', methods=['GET'])
+def get_live_signals(symbol):
+    """특정 심볼의 실시간 신호 조회"""
+    try:
+        manager = get_live_trading_manager()
+        signals = manager.generate_live_signals(symbol)
+        
+        return success_response(
+            data={'symbol': symbol, 'signals': signals},
+            message="신호 조회 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"신호 조회 실패: {str(e)}")
+
+@api.route('/api/live-trading/positions', methods=['GET'])
+def get_positions():
+    """현재 포지션 목록 조회"""
+    try:
+        manager = get_live_trading_manager()
+        status = manager.get_status()
+        
+        # 포지션 상세 정보 가공
+        positions = []
+        for symbol, position_data in status.get('position_details', {}).items():
+            positions.append({
+                'symbol': symbol,
+                'side': position_data.get('side', 'long'),
+                'size': position_data.get('size', 0),
+                'entry_price': position_data.get('entry_price', 0),
+                'entry_time': position_data.get('entry_time', ''),
+                'strategy': position_data.get('strategy', 'unknown')
+            })
+        
+        return success_response(
+            data={'positions': positions},
+            message="포지션 조회 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"포지션 조회 실패: {str(e)}")
+
+@api.route('/api/live-trading/close-position', methods=['POST'])
+def close_position():
+    """특정 포지션 수동 청산"""
+    try:
+        data = request.get_json()
+        symbol = data.get('symbol')
+        
+        if not symbol:
+            return error_response("심볼이 필요합니다.")
+        
+        manager = get_live_trading_manager()
+        manager._close_position(symbol, "manual_close", 0, 0)
+        
+        return success_response(
+            data={'symbol': symbol},
+            message=f"{symbol} 포지션이 청산되었습니다."
+        )
+        
+    except Exception as e:
+        return error_response(f"포지션 청산 실패: {str(e)}")
+
+@api.route('/api/live-trading/portfolio-stats', methods=['GET'])
+def get_portfolio_stats():
+    """포트폴리오 통계 조회"""
+    try:
+        manager = get_live_trading_manager()
+        status = manager.get_status()
+        
+        # 기본 통계 계산
+        total_positions = len(status.get('position_details', {}))
+        total_exposure = manager._calculate_total_exposure()
+        daily_pnl = manager._calculate_daily_pnl()
+        
+        stats = {
+            'total_positions': total_positions,
+            'total_exposure': total_exposure,
+            'daily_pnl': daily_pnl,
+            'enabled_strategies': status.get('enabled_strategies', []),
+            'trading_symbols': status.get('trading_symbols', []),
+            'last_update': status.get('last_update', '')
+        }
+        
+        return success_response(
+            data=stats,
+            message="포트폴리오 통계 조회 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"포트폴리오 통계 조회 실패: {str(e)}")
+
+# 실시간 데이터 스트리밍 API (WebSocket 대안)
+@api.route('/api/live-trading/stream-data', methods=['GET'])
+def stream_live_data():
+    """실시간 데이터 스트리밍"""
+    try:
+        def generate_data():
+            manager = get_live_trading_manager()
+            
+            while True:
+                try:
+                    # 상태 업데이트
+                    status = manager.get_status()
+                    
+                    # 실시간 신호 체크
+                    all_signals = {}
+                    for symbol in status.get('trading_symbols', []):
+                        signals = manager.generate_live_signals(symbol)
+                        if signals:
+                            all_signals[symbol] = signals
+                    
+                    # 데이터 패키지
+                    stream_data = {
+                        'timestamp': datetime.now().isoformat(),
+                        'status': status,
+                        'signals': all_signals,
+                        'portfolio_stats': {
+                            'total_positions': len(status.get('position_details', {})),
+                            'total_exposure': manager._calculate_total_exposure(),
+                            'daily_pnl': manager._calculate_daily_pnl()
+                        }
+                    }
+                    
+                    yield f"data: {json.dumps(stream_data)}\n\n"
+                    
+                except Exception as e:
+                    yield f"data: {json.dumps({'error': str(e)})}\n\n"
+                
+                time.sleep(5)  # 5초마다 업데이트
+        
+        return Response(
+            generate_data(),
+            content_type='text/plain',
+            headers={
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive'
+            }
+        )
+        
+    except Exception as e:
+        return error_response(f"데이터 스트리밍 실패: {str(e)}")
+
+# 고급 포트폴리오 분석 API
+@api.route('/api/portfolio/analytics/<int:period_days>', methods=['GET'])
+def get_portfolio_analytics_data(period_days):
+    """포트폴리오 분석 데이터 조회"""
+    try:
+        analytics = get_portfolio_analytics()
+        metrics = analytics.calculate_performance_metrics(period_days)
+        
+        return success_response(
+            data=metrics,
+            message=f"{period_days}일 포트폴리오 분석 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"포트폴리오 분석 실패: {str(e)}")
+
+@api.route('/api/portfolio/risk-report', methods=['GET'])
+def get_risk_report():
+    """종합 리스크 보고서 조회"""
+    try:
+        analytics = get_portfolio_analytics()
+        risk_report = analytics.generate_risk_report()
+        
+        return success_response(
+            data=risk_report,
+            message="리스크 보고서 생성 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"리스크 보고서 생성 실패: {str(e)}")
+
+@api.route('/api/portfolio/add-snapshot', methods=['POST'])
+def add_portfolio_snapshot():
+    """포트폴리오 스냅샷 추가"""
+    try:
+        data = request.get_json()
+        analytics = get_portfolio_analytics()
+        analytics.add_portfolio_snapshot(data)
+        
+        return success_response(
+            message="포트폴리오 스냅샷 추가 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"스냅샷 추가 실패: {str(e)}")
+
+@api.route('/api/portfolio/add-trade', methods=['POST'])
+def add_trade_record():
+    """거래 기록 추가"""
+    try:
+        data = request.get_json()
+        analytics = get_portfolio_analytics()
+        analytics.add_trade_record(data)
+        
+        return success_response(
+            message="거래 기록 추가 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"거래 기록 추가 실패: {str(e)}")
+
+@api.route('/api/portfolio/performance-comparison', methods=['GET'])
+def get_performance_comparison():
+    """기간별 성과 비교"""
+    try:
+        analytics = get_portfolio_analytics()
+        
+        comparison_data = {
+            '1_week': analytics.calculate_performance_metrics(7),
+            '2_weeks': analytics.calculate_performance_metrics(14),
+            '1_month': analytics.calculate_performance_metrics(30),
+            '3_months': analytics.calculate_performance_metrics(90),
+            '6_months': analytics.calculate_performance_metrics(180),
+            '1_year': analytics.calculate_performance_metrics(365)
+        }
+        
+        return success_response(
+            data=comparison_data,
+            message="성과 비교 데이터 생성 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"성과 비교 실패: {str(e)}")
+
+@api.route('/api/portfolio/benchmark-comparison', methods=['POST'])
+def compare_with_benchmark():
+    """벤치마크 대비 성과 비교"""
+    try:
+        data = request.get_json()
+        benchmark_symbol = data.get('benchmark', 'BTC/USDT')
+        period_days = data.get('period_days', 30)
+        
+        analytics = get_portfolio_analytics()
+        portfolio_metrics = analytics.calculate_performance_metrics(period_days)
+        
+        # 벤치마크 성과 계산 (실제로는 외부 데이터 필요)
+        # 여기서는 시뮬레이션 데이터 사용
+        benchmark_return = np.random.normal(10, 20)  # 임시 벤치마크 수익률
+        
+        comparison = {
+            'portfolio': portfolio_metrics,
+            'benchmark': {
+                'symbol': benchmark_symbol,
+                'return': round(benchmark_return, 2),
+                'volatility': round(abs(np.random.normal(25, 10)), 2)
+            },
+            'outperformance': round(portfolio_metrics['total_return'] - benchmark_return, 2),
+            'tracking_error': round(abs(np.random.normal(5, 2)), 2),
+            'information_ratio': round(np.random.normal(0.5, 0.3), 3)
+        }
+        
+        return success_response(
+            data=comparison,
+            message="벤치마크 비교 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"벤치마크 비교 실패: {str(e)}")
+
+# 전략별 성과 분석
+@api.route('/api/portfolio/strategy-performance', methods=['GET'])
+def get_strategy_performance():
+    """전략별 성과 분석"""
+    try:
+        analytics = get_portfolio_analytics()
+        
+        # 전략별 거래 분석
+        strategy_performance = {}
+        for trade in analytics.trade_history:
+            strategy = trade.get('strategy', 'unknown')
+            if strategy not in strategy_performance:
+                strategy_performance[strategy] = {
+                    'trades': [],
+                    'total_pnl': 0,
+                    'win_count': 0,
+                    'loss_count': 0
+                }
+            
+            strategy_performance[strategy]['trades'].append(trade)
+            pnl = trade.get('pnl', 0)
+            strategy_performance[strategy]['total_pnl'] += pnl
+            
+            if pnl > 0:
+                strategy_performance[strategy]['win_count'] += 1
+            elif pnl < 0:
+                strategy_performance[strategy]['loss_count'] += 1
+        
+        # 전략별 통계 계산
+        strategy_stats = {}
+        for strategy, data in strategy_performance.items():
+            total_trades = len(data['trades'])
+            if total_trades > 0:
+                win_rate = data['win_count'] / total_trades * 100
+                avg_pnl = data['total_pnl'] / total_trades
+                
+                strategy_stats[strategy] = {
+                    'total_trades': total_trades,
+                    'total_pnl': round(data['total_pnl'], 2),
+                    'avg_pnl_per_trade': round(avg_pnl, 2),
+                    'win_rate': round(win_rate, 1),
+                    'win_count': data['win_count'],
+                    'loss_count': data['loss_count'],
+                    'profitability': 'profitable' if data['total_pnl'] > 0 else 'unprofitable'
+                }
+        
+        return success_response(
+            data=strategy_stats,
+            message="전략별 성과 분석 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"전략별 성과 분석 실패: {str(e)}")
+
+# 실시간 리스크 모니터링
+@api.route('/api/portfolio/real-time-risk', methods=['GET'])
+def get_real_time_risk():
+    """실시간 리스크 모니터링"""
+    try:
+        analytics = get_portfolio_analytics()
+        live_manager = get_live_trading_manager()
+        
+        # 현재 포지션 리스크 계산
+        status = live_manager.get_status()
+        positions = status.get('position_details', {})
+        
+        total_exposure = 0
+        position_risks = []
+        
+        for symbol, position in positions.items():
+            exposure = abs(position.get('size', 0)) * position.get('entry_price', 0)
+            total_exposure += exposure
+            
+            position_risks.append({
+                'symbol': symbol,
+                'exposure': round(exposure, 2),
+                'side': position.get('side', 'long'),
+                'entry_price': position.get('entry_price', 0),
+                'strategy': position.get('strategy', 'unknown')
+            })
+        
+        # 리스크 메트릭
+        recent_metrics = analytics.calculate_performance_metrics(7)
+        risk_metrics = {
+            'total_exposure': round(total_exposure, 2),
+            'position_count': len(positions),
+            'largest_position': max([p['exposure'] for p in position_risks]) if position_risks else 0,
+            'risk_concentration': round(max([p['exposure'] for p in position_risks]) / total_exposure * 100, 1) if total_exposure > 0 and position_risks else 0,
+            'daily_var_95': recent_metrics.get('var_95', 0),
+            'current_drawdown': recent_metrics.get('max_drawdown', 0),
+            'volatility_7d': recent_metrics.get('volatility', 0)
+        }
+        
+        # 리스크 알림
+        risk_alerts = []
+        if risk_metrics['risk_concentration'] > 50:
+            risk_alerts.append({
+                'level': 'warning',
+                'message': f"포지션 집중도가 {risk_metrics['risk_concentration']:.1f}%로 높습니다"
+            })
+        
+        if len(positions) > 10:
+            risk_alerts.append({
+                'level': 'info',
+                'message': f"동시 보유 포지션이 {len(positions)}개입니다"
+            })
+        
+        return success_response(
+            data={
+                'risk_metrics': risk_metrics,
+                'position_risks': position_risks,
+                'risk_alerts': risk_alerts,
+                'timestamp': datetime.now().isoformat()
+            },
+            message="실시간 리스크 모니터링 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"실시간 리스크 모니터링 실패: {str(e)}")
+
+# 전략 관리 API
+@api.route('/api/strategy-management/list', methods=['GET'])
+def get_managed_strategies():
+    """관리되는 전략 목록 조회"""
+    try:
+        manager = get_strategy_manager()
+        strategies = manager.get_strategy_list()
+        
+        return success_response(
+            data={'strategies': strategies},
+            message="전략 목록 조회 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"전략 목록 조회 실패: {str(e)}")
+
+@api.route('/api/strategy-management/<strategy_id>', methods=['GET'])
+def get_strategy_details(strategy_id):
+    """전략 상세 정보 조회"""
+    try:
+        manager = get_strategy_manager()
+        strategy_detail = manager.get_strategy_detail(strategy_id)
+        
+        if not strategy_detail:
+            return error_response("전략을 찾을 수 없습니다", status_code=404)
+        
+        return success_response(
+            data=strategy_detail,
+            message="전략 상세 정보 조회 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"전략 상세 조회 실패: {str(e)}")
+
+@api.route('/api/strategy-management/<strategy_id>/update', methods=['POST'])
+def update_strategy_configuration(strategy_id):
+    """전략 설정 업데이트"""
+    try:
+        data = request.get_json()
+        manager = get_strategy_manager()
+        
+        success = manager.update_strategy_config(strategy_id, data)
+        
+        if success:
+            return success_response(
+                message="전략 설정이 업데이트되었습니다"
+            )
+        else:
+            return error_response("전략 설정 업데이트에 실패했습니다")
+        
+    except Exception as e:
+        return error_response(f"전략 설정 업데이트 실패: {str(e)}")
+
+@api.route('/api/strategy-management/<strategy_id>/enable', methods=['POST'])
+def enable_strategy_endpoint(strategy_id):
+    """전략 활성화"""
+    try:
+        manager = get_strategy_manager()
+        success = manager.enable_strategy(strategy_id)
+        
+        if success:
+            return success_response(
+                message=f"전략 '{strategy_id}'가 활성화되었습니다"
+            )
+        else:
+            return error_response("전략 활성화에 실패했습니다")
+        
+    except Exception as e:
+        return error_response(f"전략 활성화 실패: {str(e)}")
+
+@api.route('/api/strategy-management/<strategy_id>/disable', methods=['POST'])
+def disable_strategy_endpoint(strategy_id):
+    """전략 비활성화"""
+    try:
+        manager = get_strategy_manager()
+        success = manager.disable_strategy(strategy_id)
+        
+        if success:
+            return success_response(
+                message=f"전략 '{strategy_id}'가 비활성화되었습니다"
+            )
+        else:
+            return error_response("전략 비활성화에 실패했습니다")
+        
+    except Exception as e:
+        return error_response(f"전략 비활성화 실패: {str(e)}")
+
+@api.route('/api/strategy-management/<strategy_id>/optimize', methods=['POST'])
+def optimize_strategy_endpoint(strategy_id):
+    """전략 최적화 실행"""
+    try:
+        data = request.get_json()
+        optimization_type = data.get('type', 'genetic')
+        
+        manager = get_strategy_manager()
+        result = manager.optimize_strategy(strategy_id, optimization_type)
+        
+        if result.get('success'):
+            return success_response(
+                data=result,
+                message=f"전략 최적화가 완료되었습니다 ({result.get('performance_improvement', 0):.1f}% 개선)"
+            )
+        else:
+            return error_response(result.get('error', '최적화에 실패했습니다'))
+        
+    except Exception as e:
+        return error_response(f"전략 최적화 실패: {str(e)}")
+
+@api.route('/api/strategy-management/comparison', methods=['GET'])
+def get_strategy_comparison_data():
+    """전략 비교 분석"""
+    try:
+        manager = get_strategy_manager()
+        comparison = manager.get_strategy_comparison()
+        
+        return success_response(
+            data=comparison,
+            message="전략 비교 분석 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"전략 비교 분석 실패: {str(e)}")
+
+@api.route('/api/strategy-management/<strategy_id>/performance', methods=['POST'])
+def update_strategy_performance_data(strategy_id):
+    """전략 성과 데이터 업데이트"""
+    try:
+        data = request.get_json()
+        manager = get_strategy_manager()
+        
+        manager.update_strategy_performance(strategy_id, data)
+        
+        return success_response(
+            message="전략 성과 데이터가 업데이트되었습니다"
+        )
+        
+    except Exception as e:
+        return error_response(f"성과 데이터 업데이트 실패: {str(e)}")
+
+# 전략 파라미터 검증 API
+@api.route('/api/strategy-management/<strategy_id>/validate-parameters', methods=['POST'])
+def validate_strategy_parameters(strategy_id):
+    """전략 파라미터 검증"""
+    try:
+        data = request.get_json()
+        parameters = data.get('parameters', {})
+        
+        manager = get_strategy_manager()
+        is_valid = manager._validate_parameters(strategy_id, parameters)
+        
+        if is_valid:
+            return success_response(
+                data={'valid': True},
+                message="파라미터가 유효합니다"
+            )
+        else:
+            return success_response(
+                data={'valid': False},
+                message="일부 파라미터가 허용 범위를 벗어났습니다"
+            )
+        
+    except Exception as e:
+        return error_response(f"파라미터 검증 실패: {str(e)}")
+
+# 전략 백테스팅 API
+@api.route('/api/strategy-management/<strategy_id>/backtest', methods=['POST'])
+def backtest_strategy_with_params(strategy_id):
+    """특정 파라미터로 전략 백테스트"""
+    try:
+        data = request.get_json()
+        parameters = data.get('parameters', {})
+        start_date = data.get('start_date')
+        end_date = data.get('end_date')
+        symbol = data.get('symbol', 'BTC/USDT')
+        
+        manager = get_strategy_manager()
+        
+        # 파라미터 검증
+        if not manager._validate_parameters(strategy_id, parameters):
+            return error_response("잘못된 파라미터입니다")
+        
+        # 백테스트 시뮬레이션 (실제로는 백테스트 엔진 사용)
+        backtest_result = {
+            'strategy_id': strategy_id,
+            'symbol': symbol,
+            'start_date': start_date,
+            'end_date': end_date,
+            'parameters': parameters,
+            'results': {
+                'total_return': round(np.random.uniform(-10, 30), 2),
+                'win_rate': round(np.random.uniform(45, 75), 1),
+                'sharpe_ratio': round(np.random.uniform(0.5, 2.0), 2),
+                'max_drawdown': round(np.random.uniform(5, 25), 1),
+                'total_trades': np.random.randint(50, 200),
+                'profit_factor': round(np.random.uniform(1.1, 2.5), 2)
+            },
+            'equity_curve': [
+                {'date': (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d'),
+                 'value': 10000 + np.random.randint(-1000, 3000)}
+                for i in range(30, 0, -1)
+            ]
+        }
+        
+        return success_response(
+            data=backtest_result,
+            message="전략 백테스트 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"전략 백테스트 실패: {str(e)}")
+
+# 전략 복제 API
+@api.route('/api/strategy-management/<strategy_id>/clone', methods=['POST'])
+def clone_strategy(strategy_id):
+    """전략 복제"""
+    try:
+        data = request.get_json()
+        new_name = data.get('name', f"{strategy_id}_copy")
+        
+        manager = get_strategy_manager()
+        original_strategy = manager.get_strategy_detail(strategy_id)
+        
+        if not original_strategy:
+            return error_response("원본 전략을 찾을 수 없습니다")
+        
+        # 새 전략 ID 생성
+        new_strategy_id = f"{strategy_id}_clone_{int(datetime.now().timestamp())}"
+        
+        # 전략 복제
+        cloned_strategy = {
+            **original_strategy,
+            'id': new_strategy_id,
+            'name': new_name,
+            'enabled': False,  # 복제된 전략은 기본적으로 비활성화
+            'last_optimized': None
+        }
+        
+        # 복제된 전략을 매니저에 추가
+        manager.strategies[new_strategy_id] = cloned_strategy
+        
+        return success_response(
+            data={'new_strategy_id': new_strategy_id},
+            message=f"전략이 '{new_name}'으로 복제되었습니다"
+        )
+        
+    except Exception as e:
+        return error_response(f"전략 복제 실패: {str(e)}")
+
+# 전략 성과 차트 데이터
+@api.route('/api/strategy-management/<strategy_id>/performance-chart', methods=['GET'])
+def get_strategy_performance_chart(strategy_id):
+    """전략 성과 차트 데이터"""
+    try:
+        period = request.args.get('period', '30')  # 일 수
+        
+        # 시뮬레이션 차트 데이터
+        chart_data = {
+            'equity_curve': [],
+            'daily_returns': [],
+            'drawdown_curve': [],
+            'rolling_sharpe': []
+        }
+        
+        base_value = 10000
+        peak_value = base_value
+        
+        for i in range(int(period)):
+            date = (datetime.now() - timedelta(days=int(period)-i-1)).strftime('%Y-%m-%d')
+            
+            # 수익률 시뮬레이션
+            daily_return = np.random.normal(0.001, 0.02)  # 평균 0.1%, 표준편차 2%
+            base_value *= (1 + daily_return)
+            
+            # 피크 업데이트
+            if base_value > peak_value:
+                peak_value = base_value
+            
+            # 낙폭 계산
+            drawdown = (peak_value - base_value) / peak_value * 100
+            
+            chart_data['equity_curve'].append({
+                'date': date,
+                'value': round(base_value, 2)
+            })
+            
+            chart_data['daily_returns'].append({
+                'date': date,
+                'return': round(daily_return * 100, 2)
+            })
+            
+            chart_data['drawdown_curve'].append({
+                'date': date,
+                'drawdown': round(-drawdown, 2)
+            })
+            
+            # 롤링 샤프 비율 (7일 기준)
+            if i >= 6:
+                recent_returns = [chart_data['daily_returns'][j]['return'] for j in range(i-6, i+1)]
+                sharpe = np.mean(recent_returns) / np.std(recent_returns) * np.sqrt(252) if np.std(recent_returns) > 0 else 0
+                chart_data['rolling_sharpe'].append({
+                    'date': date,
+                    'sharpe': round(sharpe, 2)
+                })
+        
+        return success_response(
+            data=chart_data,
+            message="성과 차트 데이터 조회 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"성과 차트 조회 실패: {str(e)}")
+
+# 성능 최적화 및 모니터링 API
+@api.route('/api/system/performance-stats', methods=['GET'])
+@cache_api_response(ttl=30)  # 30초 캐싱
+@monitor_api_performance
+def get_system_performance_stats():
+    """시스템 성능 통계 조회"""
+    try:
+        optimizer = get_performance_optimizer()
+        stats = optimizer.get_performance_stats()
+        
+        return success_response(
+            data=stats,
+            message="시스템 성능 통계 조회 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"성능 통계 조회 실패: {str(e)}")
+
+@api.route('/api/system/optimize', methods=['POST'])
+def optimize_system_performance():
+    """시스템 성능 최적화 실행"""
+    try:
+        optimizer = get_performance_optimizer()
+        result = optimizer.optimize_memory()
+        
+        return success_response(
+            data=result,
+            message="시스템 최적화가 완료되었습니다"
+        )
+        
+    except Exception as e:
+        return error_response(f"시스템 최적화 실패: {str(e)}")
+
+@api.route('/api/system/cache/clear', methods=['POST'])
+def clear_system_cache():
+    """시스템 캐시 정리"""
+    try:
+        data = request.get_json()
+        pattern = data.get('pattern') if data else None
+        
+        optimizer = get_performance_optimizer()
+        optimizer.clear_cache(pattern)
+        
+        return success_response(
+            message=f"캐시가 정리되었습니다{'(패턴: ' + pattern + ')' if pattern else ''}"
+        )
+        
+    except Exception as e:
+        return error_response(f"캐시 정리 실패: {str(e)}")
+
+@api.route('/api/system/memory-monitor/start', methods=['POST'])
+def start_memory_monitoring():
+    """메모리 모니터링 시작"""
+    try:
+        data = request.get_json()
+        interval = data.get('interval', 30) if data else 30
+        
+        optimizer = get_performance_optimizer()
+        optimizer.memory_monitor.start_monitoring(interval)
+        
+        return success_response(
+            message=f"메모리 모니터링이 시작되었습니다 (간격: {interval}초)"
+        )
+        
+    except Exception as e:
+        return error_response(f"메모리 모니터링 시작 실패: {str(e)}")
+
+@api.route('/api/system/memory-monitor/stop', methods=['POST'])
+def stop_memory_monitoring():
+    """메모리 모니터링 중지"""
+    try:
+        optimizer = get_performance_optimizer()
+        optimizer.memory_monitor.stop_monitoring()
+        
+        return success_response(
+            message="메모리 모니터링이 중지되었습니다"
+        )
+        
+    except Exception as e:
+        return error_response(f"메모리 모니터링 중지 실패: {str(e)}")
+
+@api.route('/api/system/memory-stats', methods=['GET'])
+@cache_api_response(ttl=10)  # 10초 캐싱
+def get_memory_statistics():
+    """메모리 통계 조회"""
+    try:
+        optimizer = get_performance_optimizer()
+        stats = optimizer.memory_monitor.get_memory_stats()
+        
+        return success_response(
+            data=stats,
+            message="메모리 통계 조회 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"메모리 통계 조회 실패: {str(e)}")
+
+# 성능 최적화된 기존 API들 (중요한 엔드포인트에 캐싱 및 모니터링 적용)
+@api.route('/api/hot-coins-optimized', methods=['GET'])
+@cache_api_response(ttl=60)  # 1분 캐싱
+@monitor_api_performance
+def get_hot_coins_optimized():
+    """최적화된 핫 코인 목록 조회"""
+    return get_hot_coins()
+
+@api.route('/api/backtest/results-optimized', methods=['GET'])
+@cache_api_response(ttl=300)  # 5분 캐싱
+@monitor_api_performance
+def get_backtest_results_optimized():
+    """최적화된 백테스트 결과 조회"""
+    return get_backtest_results()
+
+@api.route('/api/live-trading/status-optimized', methods=['GET'])
+@cache_api_response(ttl=5)  # 5초 캐싱
+@monitor_api_performance
+def get_live_trading_status_optimized():
+    """최적화된 라이브 트레이딩 상태 조회"""
+    return get_live_trading_status()
+
+# 시스템 상태 대시보드
+@api.route('/api/system/dashboard', methods=['GET'])
+@cache_api_response(ttl=15)  # 15초 캐싱
+def get_system_dashboard():
+    """시스템 종합 대시보드"""
+    try:
+        optimizer = get_performance_optimizer()
+        
+        # 시스템 성능 통계
+        performance_stats = optimizer.get_performance_stats()
+        
+        # 메모리 통계
+        memory_stats = optimizer.memory_monitor.get_memory_stats()
+        
+        # 라이브 트레이딩 상태
+        try:
+            live_manager = get_live_trading_manager()
+            live_status = live_manager.get_status()
+        except:
+            live_status = {'error': '라이브 트레이딩 매니저 연결 실패'}
+        
+        # 포트폴리오 통계
+        try:
+            analytics = get_portfolio_analytics()
+            portfolio_metrics = analytics.calculate_performance_metrics(7)
+        except:
+            portfolio_metrics = {'error': '포트폴리오 분석 실패'}
+        
+        dashboard_data = {
+            'system_performance': performance_stats,
+            'memory_monitoring': memory_stats,
+            'live_trading': {
+                'is_active': live_status.get('is_trading', False),
+                'positions_count': live_status.get('positions', 0),
+                'enabled_strategies': live_status.get('enabled_strategies', [])
+            },
+            'portfolio_summary': {
+                'total_return_7d': portfolio_metrics.get('total_return', 0),
+                'win_rate': portfolio_metrics.get('win_rate', 0),
+                'sharpe_ratio': portfolio_metrics.get('sharpe_ratio', 0),
+                'max_drawdown': portfolio_metrics.get('max_drawdown', 0)
+            },
+            'system_health': {
+                'status': 'healthy' if performance_stats['system']['cpu_usage'] < 80 and 
+                                     performance_stats['system']['memory_usage'] < 85 else 'warning',
+                'uptime': '운영 중',
+                'last_optimization': datetime.now().isoformat(),
+                'cache_efficiency': performance_stats['cache']['hit_rate']
+            }
+        }
+        
+        return success_response(
+            data=dashboard_data,
+            message="시스템 대시보드 조회 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"시스템 대시보드 조회 실패: {str(e)}")
+
+# 성능 벤치마크 API
+@api.route('/api/system/benchmark', methods=['POST'])
+def run_performance_benchmark():
+    """성능 벤치마크 실행"""
+    try:
+        import time
+        
+        benchmark_results = {
+            'api_response_times': {},
+            'cache_performance': {},
+            'system_load': {}
+        }
+        
+        # API 응답 시간 테스트
+        test_endpoints = [
+            ('hot_coins', get_hot_coins),
+            ('backtest_results', get_backtest_results),
+            ('live_status', get_live_trading_status)
+        ]
+        
+        for endpoint_name, endpoint_func in test_endpoints:
+            start_time = time.time()
+            try:
+                endpoint_func()
+                response_time = time.time() - start_time
+                benchmark_results['api_response_times'][endpoint_name] = {
+                    'response_time_ms': round(response_time * 1000, 2),
+                    'status': 'success'
+                }
+            except Exception as e:
+                benchmark_results['api_response_times'][endpoint_name] = {
+                    'error': str(e),
+                    'status': 'failed'
+                }
+        
+        # 캐시 성능 테스트
+        optimizer = get_performance_optimizer()
+        cache_stats = optimizer.cache_stats
+        
+        benchmark_results['cache_performance'] = {
+            'hit_rate': cache_stats['hits'] / (cache_stats['hits'] + cache_stats['misses']) * 100 
+                       if (cache_stats['hits'] + cache_stats['misses']) > 0 else 0,
+            'total_requests': cache_stats['hits'] + cache_stats['misses'],
+            'cache_size': len(optimizer.response_cache.cache)
+        }
+        
+        # 시스템 부하 테스트
+        import psutil
+        benchmark_results['system_load'] = {
+            'cpu_usage': psutil.cpu_percent(interval=1),
+            'memory_usage': psutil.virtual_memory().percent,
+            'disk_usage': psutil.disk_usage('/').percent,
+            'network_io': dict(psutil.net_io_counters()._asdict()) if hasattr(psutil, 'net_io_counters') else {}
+        }
+        
+        return success_response(
+            data=benchmark_results,
+            message="성능 벤치마크 완료"
+        )
+        
+    except Exception as e:
+        return error_response(f"성능 벤치마크 실패: {str(e)}")

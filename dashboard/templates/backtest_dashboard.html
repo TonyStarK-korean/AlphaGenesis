@@ -903,6 +903,78 @@
             margin: 0.5rem 0;
         }
 
+        /* 기간 선택 버튼 스타일 */
+        .period-buttons {
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 1rem;
+        }
+
+        .period-btn {
+            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
+            border: 2px solid #dee2e6;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            color: #495057;
+            transition: all 0.3s ease;
+            font-size: 0.9rem;
+        }
+
+        .period-btn:hover {
+            background: linear-gradient(135deg, #e9ecef, #dee2e6);
+            border-color: #adb5bd;
+            transform: translateY(-1px);
+        }
+
+        .period-btn.active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-color: #667eea;
+            color: white;
+            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
+        }
+
+        .date-inputs {
+            transition: all 0.3s ease;
+        }
+
+        .date-inputs.hidden {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* 자본 프리셋 버튼 스타일 */
+        .capital-presets {
+            display: flex;
+            gap: 0.3rem;
+            flex-wrap: wrap;
+        }
+
+        .capital-preset-btn {
+            background: linear-gradient(135deg, #e9ecef, #f8f9fa);
+            border: 1px solid #dee2e6;
+            padding: 0.3rem 0.8rem;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.8rem;
+            color: #495057;
+            transition: all 0.2s ease;
+        }
+
+        .capital-preset-btn:hover {
+            background: linear-gradient(135deg, #dee2e6, #e9ecef);
+            border-color: #adb5bd;
+            transform: translateY(-1px);
+        }
+
+        .capital-preset-btn:active {
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-color: #667eea;
+            color: white;
+        }
+
         @media (max-width: 768px) {
             .container {
                 grid-template-columns: 1fr;
@@ -941,29 +1013,43 @@
             <h2>📊 백테스트 설정</h2>
             <form id="backtestForm">
                 <div class="form-group">
-                    <label for="startDate">시작일</label>
-                    <input type="date" id="startDate" name="startDate" required>
-                </div>
-
-                <div class="form-group">
-                    <label for="endDate">종료일</label>
-                    <input type="date" id="endDate" name="endDate" required>
+                    <label>백테스트 기간 설정</label>
+                    <div class="period-buttons" style="margin-bottom: 1rem;">
+                        <button type="button" class="period-btn" data-period="6m">6개월</button>
+                        <button type="button" class="period-btn" data-period="1y">1년</button>
+                        <button type="button" class="period-btn" data-period="1.5y">1년 6개월</button>
+                        <button type="button" class="period-btn" data-period="2y">2년</button>
+                        <button type="button" class="period-btn" data-period="3y">3년</button>
+                        <button type="button" class="period-btn" data-period="custom">커스텀</button>
+                    </div>
+                    <div class="date-inputs" id="dateInputs">
+                        <div style="display: flex; gap: 1rem;">
+                            <div style="flex: 1;">
+                                <label for="startDate">시작일</label>
+                                <input type="date" id="startDate" name="startDate" required>
+                            </div>
+                            <div style="flex: 1;">
+                                <label for="endDate">종료일</label>
+                                <input type="date" id="endDate" name="endDate" required>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <div class="form-group">
                     <label>백테스트 모드</label>
                     <div class="symbol-selection">
                         <div class="radio-group">
-                            <input type="radio" id="individualMode" name="backtestMode" value="individual" checked>
+                            <input type="radio" id="fourStrategyMode" name="backtestMode" value="four_strategy" checked>
+                            <label for="fourStrategyMode">4가지 전략 비교 (기본 vs 알파)</label>
+                        </div>
+                        <div class="radio-group">
+                            <input type="radio" id="allSymbolsMode" name="backtestMode" value="all_symbols">
+                            <label for="allSymbolsMode">전체 USDT.P 선물 테스트</label>
+                        </div>
+                        <div class="radio-group">
+                            <input type="radio" id="individualMode" name="backtestMode" value="individual">
                             <label for="individualMode">개별 전략 테스트</label>
-                        </div>
-                        <div class="radio-group">
-                            <input type="radio" id="comprehensiveMode" name="backtestMode" value="comprehensive">
-                            <label for="comprehensiveMode">전략 통합 분석</label>
-                        </div>
-                        <div class="radio-group">
-                            <input type="radio" id="portfolioMode" name="backtestMode" value="portfolio">
-                            <label for="portfolioMode">포트폴리오 최적화</label>
                         </div>
                     </div>
                 </div>
@@ -1018,8 +1104,22 @@
                 </div>
 
                 <div class="form-group">
-                    <label for="initialCapital">초기 자본 (원)</label>
-                    <input type="number" id="initialCapital" name="initialCapital" value="10000000" min="1000000" step="1000000">
+                    <label for="initialCapital">초기 자본</label>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <input type="number" id="initialCapital" name="initialCapital" value="10000" min="1000" step="1000" style="flex: 1;">
+                        <select id="capitalUnit" name="capitalUnit" style="width: 100px;">
+                            <option value="USD">USD</option>
+                            <option value="KRW">KRW</option>
+                            <option value="USDT">USDT</option>
+                        </select>
+                    </div>
+                    <div class="capital-presets" style="margin-top: 0.5rem;">
+                        <button type="button" class="capital-preset-btn" data-amount="1000">$1K</button>
+                        <button type="button" class="capital-preset-btn" data-amount="10000">$10K</button>
+                        <button type="button" class="capital-preset-btn" data-amount="50000">$50K</button>
+                        <button type="button" class="capital-preset-btn" data-amount="100000">$100K</button>
+                        <button type="button" class="capital-preset-btn" data-amount="1000000">$1M</button>
+                    </div>
                 </div>
 
                 <div class="form-group">
@@ -1430,19 +1530,31 @@
             const strategy = document.getElementById('strategy');
             const startBtn = document.getElementById('startBtn');
 
-            if (mode === 'comprehensive') {
-                // 전략 통합 분석 모드
+            if (mode === 'four_strategy') {
+                // 4가지 전략 비교 모드
+                symbolTypeContainer.style.display = 'block';
+                symbolListContainer.style.display = 'block';
+                strategyContainer.style.display = 'none';
+                timeframeContainer.style.display = 'none';
+                comprehensiveDescription.style.display = 'none';
+                
+                strategy.removeAttribute('required');
+                startBtn.textContent = '4가지 전략 비교 시작';
+                
+                // 개별 심볼 모드로 고정
+                document.querySelector('input[value="individual"]').checked = true;
+                
+            } else if (mode === 'all_symbols') {
+                // 전체 USDT.P 선물 테스트 모드
                 symbolTypeContainer.style.display = 'none';
                 symbolListContainer.style.display = 'none';
                 strategyContainer.style.display = 'none';
                 timeframeContainer.style.display = 'none';
-                comprehensiveDescription.style.display = 'block';
+                comprehensiveDescription.style.display = 'none';
                 
-                // 전략 선택을 필수가 아니게 만들기
                 strategy.removeAttribute('required');
+                startBtn.textContent = '전체 USDT.P 선물 테스트 시작';
                 
-                // 버튼 텍스트 변경
-                startBtn.textContent = '전략 통합 분석 시작';
             } else {
                 // 개별 전략 테스트 모드
                 symbolTypeContainer.style.display = 'block';
@@ -1451,14 +1563,11 @@
                 timeframeContainer.style.display = 'block';
                 comprehensiveDescription.style.display = 'none';
                 
-                // 전략 선택을 필수로 만들기
                 strategy.setAttribute('required', 'required');
-                
-                // 버튼 텍스트 변경
                 startBtn.textContent = '백테스트 시작';
                 
                 // 심볼 타입에 따라 심볼 선택 표시/숨김
-                const symbolTypeValue = document.querySelector('input[name="symbolType"]:checked').value;
+                const symbolTypeValue = document.querySelector('input[name="symbolType"]:checked')?.value;
                 if (symbolTypeValue === 'all') {
                     symbolListContainer.style.display = 'none';
                 } else {
@@ -1489,6 +1598,59 @@
                     timeframeSelect.innerHTML = '<option value="">전략을 먼저 선택하세요</option>';
                     timeframeSelect.disabled = true;
                 }
+            });
+
+            // 기간 선택 버튼 이벤트
+            document.querySelectorAll('.period-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    // 모든 버튼 비활성화
+                    document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
+                    // 클릭된 버튼 활성화
+                    this.classList.add('active');
+                    
+                    const period = this.dataset.period;
+                    const dateInputs = document.getElementById('dateInputs');
+                    
+                    if (period === 'custom') {
+                        dateInputs.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    // 자동 날짜 설정
+                    const endDate = new Date();
+                    const startDate = new Date();
+                    
+                    switch(period) {
+                        case '6m':
+                            startDate.setMonth(endDate.getMonth() - 6);
+                            break;
+                        case '1y':
+                            startDate.setFullYear(endDate.getFullYear() - 1);
+                            break;
+                        case '1.5y':
+                            startDate.setMonth(endDate.getMonth() - 18);
+                            break;
+                        case '2y':
+                            startDate.setFullYear(endDate.getFullYear() - 2);
+                            break;
+                        case '3y':
+                            startDate.setFullYear(endDate.getFullYear() - 3);
+                            break;
+                    }
+                    
+                    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+                    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
+                    dateInputs.classList.add('hidden');
+                });
+            });
+            
+            // 자본 프리셋 버튼 이벤트
+            document.querySelectorAll('.capital-preset-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const amount = this.dataset.amount;
+                    document.getElementById('initialCapital').value = amount;
+                    document.getElementById('capitalUnit').value = 'USD';
+                });
             });
 
             // 심볼 타입 변경
