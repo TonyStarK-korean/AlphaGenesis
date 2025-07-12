@@ -264,7 +264,7 @@
         }
 
         .coin-list {
-            max-height: 400px;
+            max-height: 600px;
             overflow-y: auto;
         }
 
@@ -522,7 +522,7 @@
                 <span>AlphaGenesis</span>
             </div>
             <nav class="nav-menu">
-                <a href="/" class="nav-link active">대시보드</a>
+                <a href="/" class="nav-link active"><i class="fas fa-home"></i> Home</a>
                 <a href="/backtest" class="nav-link">백테스트</a>
                 <a href="/live" class="nav-link">실전매매</a>
             </nav>
@@ -542,10 +542,10 @@
                             <i class="fas fa-chart-line"></i>
                         </div>
                     </div>
-                    <div class="stat-value" id="totalReturn">+24.5%</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+2.1% 오늘</span>
+                    <div class="stat-value" id="totalReturn">0.0%</div>
+                    <div class="stat-change">
+                        <i class="fas fa-minus"></i>
+                        <span>데이터 수집 중</span>
                     </div>
                 </div>
 
@@ -556,10 +556,10 @@
                             <i class="fas fa-coins"></i>
                         </div>
                     </div>
-                    <div class="stat-value" id="activePositions">7</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-plus"></i>
-                        <span>3개 신규</span>
+                    <div class="stat-value" id="activePositions">0</div>
+                    <div class="stat-change">
+                        <i class="fas fa-minus"></i>
+                        <span>대기 중</span>
                     </div>
                 </div>
 
@@ -570,10 +570,10 @@
                             <i class="fas fa-target"></i>
                         </div>
                     </div>
-                    <div class="stat-value" id="winRate">72.8%</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+1.2% 개선</span>
+                    <div class="stat-value" id="winRate">0.0%</div>
+                    <div class="stat-change">
+                        <i class="fas fa-minus"></i>
+                        <span>데이터 없음</span>
                     </div>
                 </div>
 
@@ -584,10 +584,10 @@
                             <i class="fas fa-dollar-sign"></i>
                         </div>
                     </div>
-                    <div class="stat-value" id="dailyProfit">+$1,247</div>
-                    <div class="stat-change positive">
-                        <i class="fas fa-arrow-up"></i>
-                        <span>+15.2% 전일비</span>
+                    <div class="stat-value" id="dailyProfit">$0</div>
+                    <div class="stat-change">
+                        <i class="fas fa-minus"></i>
+                        <span>거래 없음</span>
                     </div>
                 </div>
             </div>
@@ -616,26 +616,10 @@
                     <h3 class="chart-title">🎯 최근 트레이딩 신호</h3>
                 </div>
                 <div id="recentSignals">
-                    <div class="signal-item buy">
-                        <div class="signal-info">
-                            <h4>BTC/USDT</h4>
-                            <span>전략 1-1: 급등 초입 + 알파</span>
-                        </div>
-                        <div class="signal-badge buy">BUY</div>
-                    </div>
-                    <div class="signal-item buy">
-                        <div class="signal-info">
-                            <h4>ETH/USDT</h4>
-                            <span>전략 2-1: 눌림목 후 급등 + 알파</span>
-                        </div>
-                        <div class="signal-badge buy">BUY</div>
-                    </div>
-                    <div class="signal-item sell">
-                        <div class="signal-info">
-                            <h4>BNB/USDT</h4>
-                            <span>익절 실행</span>
-                        </div>
-                        <div class="signal-badge sell">SELL</div>
+                    <div style="text-align: center; color: var(--text-muted); padding: 2rem;">
+                        <i class="fas fa-chart-line" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>아직 트레이딩 신호가 없습니다</p>
+                        <p style="font-size: 0.875rem; margin-top: 0.5rem;">백테스트를 실행하여 신호를 생성하세요</p>
                     </div>
                 </div>
             </div>
@@ -674,7 +658,7 @@
                 const container = document.getElementById('hotCoinsList');
                 container.innerHTML = '';
                 
-                data.slice(0, 10).forEach((coin, index) => {
+                data.slice(0, 50).forEach((coin, index) => {
                     const changeClass = coin.change_24h >= 0 ? 'positive' : 'negative';
                     const changeIcon = coin.change_24h >= 0 ? 'fa-arrow-up' : 'fa-arrow-down';
                     
@@ -707,9 +691,18 @@
             }
         }
 
+        // 전역 차트 객체
+        let portfolioChart = null;
+
         // 포트폴리오 차트 생성
         async function createPortfolioChart() {
             const ctx = document.getElementById('portfolioChart').getContext('2d');
+            
+            // 기존 차트가 있으면 파괴
+            if (portfolioChart) {
+                portfolioChart.destroy();
+                portfolioChart = null;
+            }
             
             try {
                 // 실제 백테스트 결과 조회
@@ -760,7 +753,7 @@
                 }
                 
                 // Chart.js 차트 생성
-                new Chart(ctx, {
+                portfolioChart = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: chartData.labels,
@@ -790,8 +783,8 @@
                             },
                             y: {
                                 display: false,
-                                min: Math.min(...chartData.values) * 0.95, // 최소값 고정
-                                max: Math.max(...chartData.values) * 1.05  // 최대값 고정
+                                min: chartData.values.length > 0 ? Math.min(...chartData.values) * 0.95 : 0, // 최소값 고정
+                                max: chartData.values.length > 0 ? Math.max(...chartData.values) * 1.05 : 100000  // 최대값 고정
                             }
                         },
                         elements: {
@@ -819,7 +812,7 @@
                     values.push(baseValue);
                 }
                 
-                new Chart(ctx, {
+                portfolioChart = new Chart(ctx, {
                     type: 'line',
                     data: {
                         labels: dates,
@@ -853,11 +846,25 @@
 
         // 페이지 로드 시 실행
         document.addEventListener('DOMContentLoaded', function() {
+            // 페이지가 다시 표시될 때 기존 차트 정리
+            if (portfolioChart) {
+                portfolioChart.destroy();
+                portfolioChart = null;
+            }
+            
             loadHotCoins();
             createPortfolioChart();
             
             // 5분마다 핫 코인 데이터 새로고침
             setInterval(loadHotCoins, 5 * 60 * 1000);
+        });
+
+        // 페이지 전환 시 차트 정리
+        window.addEventListener('beforeunload', function() {
+            if (portfolioChart) {
+                portfolioChart.destroy();
+                portfolioChart = null;
+            }
         });
     </script>
 </body>

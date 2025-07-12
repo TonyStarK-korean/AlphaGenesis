@@ -886,6 +886,277 @@
             white-space: nowrap;
             z-index: 1000;
         }
+
+        /* 백테스트 미실행 시 숨김 */
+        .backtest-results {
+            display: none;
+        }
+
+        .backtest-results.show {
+            display: block;
+        }
+
+        /* 초기 상태 메시지 */
+        .no-results-message {
+            text-align: center;
+            padding: 4rem 2rem;
+            color: var(--text-muted);
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            margin: 2rem 0;
+        }
+
+        .no-results-message i {
+            font-size: 3rem;
+            color: var(--primary);
+            margin-bottom: 1rem;
+        }
+
+        .no-results-message h3 {
+            color: var(--text-primary);
+            margin-bottom: 0.5rem;
+        }
+
+        /* 드롭다운 심볼 선택 스타일 */
+        .symbol-dropdown-container {
+            position: relative;
+        }
+
+        .symbol-dropdown-trigger {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .symbol-dropdown-trigger:hover {
+            border-color: var(--primary);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .symbol-dropdown-trigger.active {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(0, 102, 255, 0.2);
+        }
+
+        .selected-text {
+            color: var(--text-primary);
+            font-weight: 500;
+        }
+
+        .dropdown-arrow {
+            color: var(--text-secondary);
+            transition: transform 0.3s ease;
+        }
+
+        .symbol-dropdown-trigger.active .dropdown-arrow {
+            transform: rotate(180deg);
+        }
+
+        .symbol-dropdown-menu {
+            position: absolute;
+            top: calc(100% + 0.5rem);
+            left: 0;
+            right: 0;
+            background: var(--dark-card);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            z-index: 1000;
+            max-height: 400px;
+            overflow: hidden;
+        }
+
+        .symbol-search-container {
+            position: relative;
+            padding: 1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .search-icon {
+            position: absolute;
+            right: 1.75rem;
+            top: 50%;
+            transform: translateY(-50%);
+            color: var(--text-muted);
+        }
+
+        .symbol-actions {
+            display: flex;
+            gap: 0.5rem;
+            padding: 0.75rem 1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .symbol-action-btn {
+            flex: 1;
+            padding: 0.5rem;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .symbol-action-btn:hover {
+            background: rgba(0, 102, 255, 0.1);
+            border-color: var(--primary);
+        }
+
+        .symbol-list {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+
+        .symbol-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            padding: 0.75rem;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .symbol-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .symbol-checkbox {
+            width: 18px;
+            height: 18px;
+            border: 2px solid var(--glass-border);
+            border-radius: 4px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .symbol-checkbox.checked {
+            background: var(--primary);
+            border-color: var(--primary);
+        }
+
+        .symbol-checkbox.checked::after {
+            content: '\\2713';
+            position: absolute;
+            color: white;
+            font-size: 12px;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        .symbol-text {
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+        }
+
+        .symbol-name {
+            color: var(--text-primary);
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .symbol-description {
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+        }
+
+        .loading-symbols {
+            text-align: center;
+            padding: 2rem;
+            color: var(--text-muted);
+        }
+
+        .symbol-info {
+            margin-top: 0.5rem;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        /* Risk Management 스타일 */
+        .risk-status {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1rem;
+        }
+
+        .risk-indicator {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 1rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .risk-level {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .risk-level.safe {
+            background: rgba(0, 208, 132, 0.2);
+            color: var(--success);
+        }
+
+        .risk-level.moderate {
+            background: rgba(255, 184, 0, 0.2);
+            color: var(--warning);
+        }
+
+        .risk-level.high {
+            background: rgba(255, 71, 87, 0.2);
+            color: var(--danger);
+        }
+
+        .risk-value {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            font-weight: 500;
+        }
+
+        .risk-metrics {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .metric-item {
+            text-align: center;
+        }
+
+        .metric-label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            margin-bottom: 0.25rem;
+        }
+
+        .metric-value {
+            display: block;
+            font-size: 0.875rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
     </style>
 </head>
 <body>
@@ -905,7 +1176,7 @@
                 <span>AlphaGenesis</span>
             </a>
             <nav class="nav-items">
-                <a href="/" class="nav-link">대시보드</a>
+                <a href="/" class="nav-link"><i class="fas fa-home"></i> Home</a>
                 <a href="/backtest" class="nav-link active">백테스트</a>
                 <a href="/live" class="nav-link">실전매매</a>
             </nav>
@@ -933,14 +1204,26 @@
             <!-- Symbol Selection -->
             <div class="form-group" id="symbolGroup">
                 <label class="form-label">거래 심볼</label>
-                <div class="symbol-search-container" style="position: relative; margin-bottom: 0.5rem;">
-                    <input type="text" class="form-input" id="symbolSearch" placeholder="심볼 검색 (예: BTC, ETH)" style="padding-right: 40px;">
-                    <i class="fas fa-search" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                <div class="symbol-dropdown-container">
+                    <div class="symbol-dropdown-trigger" id="symbolDropdownTrigger">
+                        <span class="selected-text">클릭하여 심볼 선택</span>
+                        <i class="fas fa-chevron-down dropdown-arrow"></i>
+                    </div>
+                    <div class="symbol-dropdown-menu" id="symbolDropdownMenu" style="display: none;">
+                        <div class="symbol-search-container">
+                            <input type="text" class="form-input" id="symbolSearch" placeholder="심볼 검색 (예: BTC, ETH)">
+                            <i class="fas fa-search search-icon"></i>
+                        </div>
+                        <div class="symbol-actions">
+                            <button type="button" class="symbol-action-btn" id="selectAllBtn">전체 선택</button>
+                            <button type="button" class="symbol-action-btn" id="clearAllBtn">전체 해제</button>
+                        </div>
+                        <div class="symbol-list" id="symbolList">
+                            <div class="loading-symbols">심볼 로딩 중...</div>
+                        </div>
+                    </div>
                 </div>
-                <select class="form-select" id="symbolSelect" style="height: 120px;" multiple>
-                    <option value="">로딩 중...</option>
-                </select>
-                <div class="symbol-info" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
+                <div class="symbol-info">
                     <span id="symbolCount">0</span>개 심볼 선택됨
                 </div>
             </div>
@@ -959,6 +1242,34 @@
                 <div class="date-inputs" style="display: none;">
                     <input type="date" class="form-input" id="startDate" style="margin-bottom: 0.5rem;">
                     <input type="date" class="form-input" id="endDate">
+                </div>
+            </div>
+
+            <!-- Risk Management -->
+            <div class="form-group">
+                <label class="form-label">Risk Management (자동)</label>
+                <div class="risk-status">
+                    <div class="risk-indicator" id="riskIndicator">
+                        <div class="risk-level safe" id="riskLevel">
+                            <i class="fas fa-shield-alt"></i>
+                            <span>안전</span>
+                        </div>
+                        <div class="risk-value" id="riskValue">Low Risk</div>
+                    </div>
+                    <div class="risk-metrics">
+                        <div class="metric-item">
+                            <span class="metric-label">최대 레버리지</span>
+                            <span class="metric-value" id="maxLeverage">5x</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">포지션 크기</span>
+                            <span class="metric-value" id="positionSize">2%</span>
+                        </div>
+                        <div class="metric-item">
+                            <span class="metric-label">Stop Loss</span>
+                            <span class="metric-value" id="stopLoss">-1.5%</span>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1076,24 +1387,33 @@
                 </div>
             </div>
 
-            <!-- Results Header -->
-            <div class="results-header" id="resultsHeader">
-                <h1 class="results-title">백테스트 결과</h1>
-                <div class="results-actions">
-                    <button class="results-btn" onclick="exportResults()" data-tooltip="CSV 내보내기">
-                        <i class="fas fa-download"></i>
-                    </button>
-                    <button class="results-btn" onclick="shareResults()" data-tooltip="결과 공유">
-                        <i class="fas fa-share"></i>
-                    </button>
-                    <button class="results-btn" onclick="saveConfiguration()" data-tooltip="설정 저장">
-                        <i class="fas fa-save"></i>
-                    </button>
-                    <button class="results-btn" onclick="resetResults()" data-tooltip="초기화">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
+            <!-- 백테스트 미실행 시 메시지 -->
+            <div class="no-results-message" id="noResultsMessage">
+                <i class="fas fa-chart-line"></i>
+                <h3>백테스트를 실행해주세요</h3>
+                <p>좌측 설정을 완료하고 "Run Backtest" 버튼을 클릭하여 백테스트를 시작하세요.</p>
             </div>
+
+            <!-- 백테스트 결과 섹션 (초기에는 숨김) -->
+            <div class="backtest-results" id="backtestResults">
+                <!-- Results Header -->
+                <div class="results-header" id="resultsHeader">
+                    <h1 class="results-title">백테스트 결과</h1>
+                    <div class="results-actions">
+                        <button class="results-btn" onclick="exportResults()" data-tooltip="CSV 내보내기">
+                            <i class="fas fa-download"></i>
+                        </button>
+                        <button class="results-btn" onclick="shareResults()" data-tooltip="결과 공유">
+                            <i class="fas fa-share"></i>
+                        </button>
+                        <button class="results-btn" onclick="saveConfiguration()" data-tooltip="설정 저장">
+                            <i class="fas fa-save"></i>
+                        </button>
+                        <button class="results-btn" onclick="resetResults()" data-tooltip="초기화">
+                            <i class="fas fa-sync-alt"></i>
+                        </button>
+                    </div>
+                </div>
 
             <!-- Performance Cards -->
             <div class="performance-grid">
@@ -1263,6 +1583,7 @@
                     </table>
                 </div>
             </div>
+            </div> <!-- backtest-results 닫기 -->
         </div>
     </div>
 
@@ -1270,6 +1591,9 @@
         // Global variables
         let equityChart = null;
         let isRunning = false;
+        let allSymbols = [];
+        let selectedSymbols = [];
+        let isDropdownOpen = false;
 
         // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
@@ -1286,6 +1610,192 @@
             
             document.getElementById('startDate').value = twoYearsAgo.toISOString().split('T')[0];
             document.getElementById('endDate').value = today.toISOString().split('T')[0];
+            
+            // 심볼 목록 로드
+            loadSymbols();
+            
+            // Risk Management 초기화
+            updateRiskManagement();
+        }
+
+        async function loadSymbols() {
+            try {
+                const response = await fetch('/api/binance/symbols');
+                const data = await response.json();
+                
+                if (data.status === 'success' && data.data) {
+                    allSymbols = data.data.map(symbol => ({
+                        symbol: symbol,
+                        name: symbol.replace('USDT', ''),
+                        description: `${symbol.replace('USDT', '')}/USDT 선물`
+                    }));
+                    
+                    renderSymbolList();
+                } else {
+                    // 기본 심볼들
+                    allSymbols = [
+                        { symbol: 'BTCUSDT', name: 'BTC', description: 'Bitcoin/USDT 선물' },
+                        { symbol: 'ETHUSDT', name: 'ETH', description: 'Ethereum/USDT 선물' },
+                        { symbol: 'BNBUSDT', name: 'BNB', description: 'BNB/USDT 선물' },
+                        { symbol: 'ADAUSDT', name: 'ADA', description: 'Cardano/USDT 선물' },
+                        { symbol: 'SOLUSDT', name: 'SOL', description: 'Solana/USDT 선물' },
+                    ];
+                    renderSymbolList();
+                }
+            } catch (error) {
+                console.error('심볼 로드 실패:', error);
+                // 기본 심볼들로 대체
+                allSymbols = [
+                    { symbol: 'BTCUSDT', name: 'BTC', description: 'Bitcoin/USDT 선물' },
+                    { symbol: 'ETHUSDT', name: 'ETH', description: 'Ethereum/USDT 선물' },
+                    { symbol: 'BNBUSDT', name: 'BNB', description: 'BNB/USDT 선물' }
+                ];
+                renderSymbolList();
+            }
+        }
+
+        function renderSymbolList(filteredSymbols = null) {
+            const symbolList = document.getElementById('symbolList');
+            const symbols = filteredSymbols || allSymbols;
+            
+            if (symbols.length === 0) {
+                symbolList.innerHTML = '<div class="loading-symbols">검색 결과가 없습니다</div>';
+                return;
+            }
+            
+            symbolList.innerHTML = symbols.map(symbolData => `
+                <div class="symbol-item" data-symbol="${symbolData.symbol}">
+                    <div class="symbol-checkbox ${selectedSymbols.includes(symbolData.symbol) ? 'checked' : ''}" 
+                         data-symbol="${symbolData.symbol}"></div>
+                    <div class="symbol-text">
+                        <div class="symbol-name">${symbolData.symbol}</div>
+                        <div class="symbol-description">${symbolData.description}</div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // 이벤트 리스너 추가
+            symbolList.querySelectorAll('.symbol-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const symbol = e.currentTarget.dataset.symbol;
+                    toggleSymbolSelection(symbol);
+                });
+            });
+        }
+
+        function toggleSymbolSelection(symbol) {
+            const index = selectedSymbols.indexOf(symbol);
+            
+            if (index > -1) {
+                selectedSymbols.splice(index, 1);
+            } else {
+                selectedSymbols.push(symbol);
+            }
+            
+            updateSelectedSymbolsDisplay();
+            renderSymbolList(); // 체크박스 상태 업데이트를 위해 재렌더링
+            updateRiskManagement(); // 리스크 관리 업데이트
+        }
+
+        function updateSelectedSymbolsDisplay() {
+            const trigger = document.getElementById('symbolDropdownTrigger');
+            const selectedText = trigger.querySelector('.selected-text');
+            const symbolCount = document.getElementById('symbolCount');
+            
+            if (selectedSymbols.length === 0) {
+                selectedText.textContent = '클릭하여 심볼 선택';
+            } else if (selectedSymbols.length === 1) {
+                selectedText.textContent = selectedSymbols[0];
+            } else if (selectedSymbols.length <= 3) {
+                selectedText.textContent = selectedSymbols.join(', ');
+            } else {
+                selectedText.textContent = `${selectedSymbols.slice(0, 2).join(', ')} 외 ${selectedSymbols.length - 2}개`;
+            }
+            
+            symbolCount.textContent = selectedSymbols.length;
+        }
+
+        function toggleDropdown() {
+            const trigger = document.getElementById('symbolDropdownTrigger');
+            const menu = document.getElementById('symbolDropdownMenu');
+            
+            isDropdownOpen = !isDropdownOpen;
+            
+            if (isDropdownOpen) {
+                trigger.classList.add('active');
+                menu.style.display = 'block';
+            } else {
+                trigger.classList.remove('active');
+                menu.style.display = 'none';
+            }
+        }
+
+        function closeDropdown() {
+            const trigger = document.getElementById('symbolDropdownTrigger');
+            const menu = document.getElementById('symbolDropdownMenu');
+            
+            isDropdownOpen = false;
+            trigger.classList.remove('active');
+            menu.style.display = 'none';
+        }
+
+        function updateRiskManagement() {
+            // 선택된 심볼 수와 자본금에 따른 동적 리스크 관리
+            const capital = parseFloat(document.getElementById('capitalAmount')?.value) || 10000;
+            const symbolCount = selectedSymbols.length || 1;
+            
+            // 리스크 레벨 계산
+            let riskLevel, riskValue, maxLeverage, positionSize, stopLoss;
+            
+            if (capital >= 50000 && symbolCount <= 3) {
+                // 고자본 + 적은 심볼 = 안전
+                riskLevel = 'safe';
+                riskValue = 'Low Risk';
+                maxLeverage = '10x';
+                positionSize = '3%';
+                stopLoss = '-2%';
+            } else if (capital >= 20000 && symbolCount <= 5) {
+                // 중자본 + 보통 심볼 = 보통
+                riskLevel = 'moderate';
+                riskValue = 'Medium Risk';
+                maxLeverage = '7x';
+                positionSize = '2.5%';
+                stopLoss = '-1.8%';
+            } else if (capital >= 10000) {
+                // 기본
+                riskLevel = 'safe';
+                riskValue = 'Low Risk';
+                maxLeverage = '5x';
+                positionSize = '2%';
+                stopLoss = '-1.5%';
+            } else {
+                // 저자본 = 고위험
+                riskLevel = 'high';
+                riskValue = 'High Risk';
+                maxLeverage = '3x';
+                positionSize = '1.5%';
+                stopLoss = '-1%';
+            }
+            
+            // UI 업데이트
+            const riskLevelElement = document.getElementById('riskLevel');
+            const riskValueElement = document.getElementById('riskValue');
+            const maxLeverageElement = document.getElementById('maxLeverage');
+            const positionSizeElement = document.getElementById('positionSize');
+            const stopLossElement = document.getElementById('stopLoss');
+            
+            if (riskLevelElement) {
+                riskLevelElement.className = `risk-level ${riskLevel}`;
+                riskLevelElement.innerHTML = `
+                    <i class="fas fa-shield-alt"></i>
+                    <span>${riskLevel === 'safe' ? '안전' : riskLevel === 'moderate' ? '보통' : '위험'}</span>
+                `;
+            }
+            
+            if (riskValueElement) riskValueElement.textContent = riskValue;
+            if (maxLeverageElement) maxLeverageElement.textContent = maxLeverage;
+            if (positionSizeElement) positionSizeElement.textContent = positionSize;
+            if (stopLossElement) stopLossElement.textContent = stopLoss;
         }
 
         function setupEventListeners() {
@@ -1317,6 +1827,8 @@
                     
                     if (period === 'custom') {
                         dateInputs.style.display = 'block';
+                        // Custom 선택 시 기본 1달 설정
+                        setDateRange('1m');
                     } else {
                         dateInputs.style.display = 'none';
                         setDateRange(period);
@@ -1329,8 +1841,12 @@
                 btn.addEventListener('click', function() {
                     const amount = this.dataset.amount;
                     document.getElementById('capitalAmount').value = amount;
+                    updateRiskManagement();
                 });
             });
+
+            // Capital amount change
+            document.getElementById('capitalAmount').addEventListener('input', updateRiskManagement);
 
             // Run backtest
             document.getElementById('runBacktest').addEventListener('click', runBacktest);
@@ -1346,6 +1862,46 @@
                     updateChartTimeframe(this.dataset.period);
                 });
             });
+
+            // 심볼 드롭다운 이벤트 리스너
+            document.getElementById('symbolDropdownTrigger').addEventListener('click', toggleDropdown);
+
+            // 전체 선택/해제 버튼
+            document.getElementById('selectAllBtn').addEventListener('click', () => {
+                selectedSymbols = [...allSymbols.map(s => s.symbol)];
+                updateSelectedSymbolsDisplay();
+                renderSymbolList();
+                updateRiskManagement();
+            });
+
+            document.getElementById('clearAllBtn').addEventListener('click', () => {
+                selectedSymbols = [];
+                updateSelectedSymbolsDisplay();
+                renderSymbolList();
+                updateRiskManagement();
+            });
+
+            // 심볼 검색
+            document.getElementById('symbolSearch').addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase();
+                if (searchTerm === '') {
+                    renderSymbolList();
+                } else {
+                    const filtered = allSymbols.filter(symbol => 
+                        symbol.symbol.toLowerCase().includes(searchTerm) ||
+                        symbol.name.toLowerCase().includes(searchTerm)
+                    );
+                    renderSymbolList(filtered);
+                }
+            });
+
+            // 드롭다운 외부 클릭 시 닫기
+            document.addEventListener('click', (e) => {
+                const container = document.querySelector('.symbol-dropdown-container');
+                if (!container.contains(e.target) && isDropdownOpen) {
+                    closeDropdown();
+                }
+            });
         }
 
         function setDateRange(period) {
@@ -1353,6 +1909,9 @@
             const startDate = new Date();
             
             switch(period) {
+                case '1m':
+                    startDate.setMonth(today.getMonth() - 1);
+                    break;
                 case '6m':
                     startDate.setMonth(today.getMonth() - 6);
                     break;
@@ -1374,11 +1933,11 @@
             document.getElementById('endDate').value = today.toISOString().split('T')[0];
         }
 
-        function initializeChart() {
+        async function initializeChart() {
             const ctx = document.getElementById('equityChart').getContext('2d');
             
-            // Generate sample data
-            const data = generateSampleEquityCurve();
+            // 차트 초기화 - 빈 데이터로 시작 (백테스트 실행 전까지 숨김)
+            const data = { labels: [], values: [], benchmark: [] };
             
             equityChart = new Chart(ctx, {
                 type: 'line',
@@ -1448,36 +2007,53 @@
             });
         }
 
-        function generateSampleEquityCurve() {
-            const labels = [];
-            const values = [];
-            const benchmark = [];
-            const startDate = new Date();
-            startDate.setFullYear(startDate.getFullYear() - 2);
-            
-            let portfolioValue = 10000;
-            let benchmarkValue = 10000;
-            
-            for (let i = 0; i < 730; i++) {
-                const date = new Date(startDate);
-                date.setDate(date.getDate() + i);
-                labels.push(date);
+        async function generateRealEquityCurve() {
+            try {
+                // 실제 백테스트 결과 가져오기
+                const response = await fetch('/api/backtest/results');
+                const data = await response.json();
                 
-                // Simulate portfolio growth with some volatility
-                const dailyReturn = (Math.random() - 0.45) * 0.02; // Slight positive bias
-                portfolioValue *= (1 + dailyReturn);
-                values.push(Math.round(portfolioValue));
-                
-                // Simulate benchmark (steady growth)
-                const benchmarkReturn = (Math.random() - 0.48) * 0.015;
-                benchmarkValue *= (1 + benchmarkReturn);
-                benchmark.push(Math.round(benchmarkValue));
+                if (data.results && data.results.length > 0) {
+                    const latestResult = data.results[data.results.length - 1];
+                    
+                    const labels = [];
+                    const values = [];
+                    const benchmark = [];
+                    
+                    if (latestResult.trade_log && latestResult.trade_log.length > 0) {
+                        let portfolioValue = latestResult.initial_capital;
+                        let benchmarkValue = latestResult.initial_capital;
+                        
+                        labels.push(new Date(latestResult.start_date));
+                        values.push(portfolioValue);
+                        benchmark.push(benchmarkValue);
+                        
+                        latestResult.trade_log.forEach(trade => {
+                            if (trade.pnl) {
+                                portfolioValue += trade.pnl;
+                            }
+                            
+                            labels.push(new Date(trade.timestamp));
+                            values.push(portfolioValue);
+                            
+                            // 벤치마크는 동일 기간 시장 평균 수익률로 계산
+                            const daysDiff = Math.floor((new Date(trade.timestamp) - new Date(latestResult.start_date)) / (1000 * 60 * 60 * 24));
+                            benchmarkValue = latestResult.initial_capital * Math.pow(1.08, daysDiff / 365); // 연 8% 가정
+                            benchmark.push(benchmarkValue);
+                        });
+                    }
+                    
+                    return { labels, values, benchmark };
+                }
+            } catch (error) {
+                console.error('백테스트 결과 조회 실패:', error);
             }
             
-            return { labels, values, benchmark };
+            // 백테스트 데이터가 없으면 빈 데이터 반환
+            return { labels: [], values: [], benchmark: [] };
         }
 
-        function runBacktest() {
+        async function runBacktest() {
             if (isRunning) return;
             
             isRunning = true;
@@ -1486,34 +2062,86 @@
             const progressFill = document.getElementById('progressFill');
             const progressText = document.getElementById('progressText');
             
-            // Update UI
+            // 폼 데이터 수집
+            const formData = {
+                strategy: document.querySelector('input[name="strategy"]:checked')?.value || 'strategy1_basic',
+                symbols: selectedSymbols,
+                initial_capital: parseFloat(document.getElementById('initialCapital').value) || 10000,
+                start_date: document.getElementById('startDate').value || '2024-01-01',
+                end_date: document.getElementById('endDate').value || '2024-12-31'
+            };
+            
+            // 유효성 검사
+            if (formData.symbols.length === 0) {
+                alert('최소 하나의 심볼을 선택해주세요.');
+                isRunning = false;
+                return;
+            }
+            
+            // UI 업데이트
             btn.innerHTML = '<div class="loading"></div> Running...';
             btn.disabled = true;
             progressContainer.style.display = 'block';
             
-            // Simulate backtest progress
-            let progress = 0;
-            const interval = setInterval(() => {
-                progress += Math.random() * 15;
-                if (progress >= 100) {
-                    progress = 100;
-                    clearInterval(interval);
+            try {
+                // 실제 백테스트 API 호출
+                const response = await fetch('/api/backtest/start', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (!response.ok) {
+                    throw new Error('백테스트 시작 실패');
+                }
+                
+                const result = await response.json();
+                
+                // SSE로 실시간 진행률 모니터링
+                const eventSource = new EventSource(`/api/backtest/stream/${result.job_id}`);
+                
+                eventSource.onmessage = function(event) {
+                    const data = JSON.parse(event.data);
                     
-                    // Complete
-                    setTimeout(() => {
+                    if (data.status === 'progress') {
+                        progressFill.style.width = data.progress + '%';
+                        progressText.textContent = `Processing... ${Math.round(data.progress)}%`;
+                        
+                        if (data.message) {
+                            progressText.textContent = data.message;
+                        }
+                    } else if (data.status === 'completed') {
+                        eventSource.close();
+                        
+                        progressFill.style.width = '100%';
                         btn.innerHTML = '<i class="fas fa-check"></i> Complete';
                         btn.style.background = 'linear-gradient(135deg, #00D084, #00A86B)';
                         progressText.textContent = 'Backtest completed successfully!';
                         
+                        // 결과 업데이트
+                        updateBacktestResults(data.result);
+                        
                         setTimeout(() => {
                             resetBacktestButton();
                         }, 2000);
-                    }, 500);
-                }
+                    } else if (data.status === 'error') {
+                        eventSource.close();
+                        throw new Error(data.message || '백테스트 실행 중 오류 발생');
+                    }
+                };
                 
-                progressFill.style.width = progress + '%';
-                progressText.textContent = `Processing... ${Math.round(progress)}%`;
-            }, 200);
+                eventSource.onerror = function(error) {
+                    eventSource.close();
+                    throw new Error('실시간 모니터링 연결 실패');
+                };
+                
+            } catch (error) {
+                console.error('백테스트 실행 오류:', error);
+                alert('백테스트 실행에 실패했습니다: ' + error.message);
+                resetBacktestButton();
+            }
         }
 
         function resetBacktestButton() {
@@ -1526,6 +2154,10 @@
         }
 
         function resetBacktest() {
+            // 결과 섹션 숨기고 초기 메시지 표시
+            document.getElementById('backtestResults').classList.remove('show');
+            document.getElementById('noResultsMessage').style.display = 'block';
+            
             // Reset all values to defaults
             document.getElementById('totalReturn').textContent = '+0.0%';
             document.getElementById('sharpeRatio').textContent = '0.00';
@@ -1534,6 +2166,14 @@
             document.getElementById('profitFactor').textContent = '0.00';
             document.getElementById('annualReturn').textContent = '0.0%';
             
+            // 차트 초기화
+            if (equityChart) {
+                equityChart.data.labels = [];
+                equityChart.data.datasets[0].data = [];
+                equityChart.data.datasets[1].data = [];
+                equityChart.update();
+            }
+            
             resetBacktestButton();
         }
 
@@ -1541,6 +2181,57 @@
             // Update chart based on selected timeframe
             // This would typically filter the data
             console.log('Updating chart for period:', period);
+        }
+
+        function updateBacktestResults(result) {
+            // 백테스트 결과 섹션 표시
+            document.getElementById('noResultsMessage').style.display = 'none';
+            document.getElementById('backtestResults').classList.add('show');
+            
+            // 백테스트 결과 UI 업데이트
+            document.getElementById('totalReturn').textContent = `${(result.total_return * 100).toFixed(2)}%`;
+            document.getElementById('sharpeRatio').textContent = result.sharpe_ratio.toFixed(2);
+            document.getElementById('maxDrawdown').textContent = `${(result.max_drawdown * 100).toFixed(2)}%`;
+            document.getElementById('winRate').textContent = `${(result.win_rate * 100).toFixed(1)}%`;
+            document.getElementById('profitFactor').textContent = (result.total_trades > 0 ? (result.winning_trades / result.total_trades).toFixed(2) : '0.00');
+            document.getElementById('annualReturn').textContent = `${((Math.pow(result.final_value / result.initial_capital, 365 / (new Date(result.end_date) - new Date(result.start_date)) * 365) - 1) * 100).toFixed(2)}%`;
+            
+            // 차트 업데이트
+            updateEquityChart(result);
+        }
+
+        async function updateEquityChart(result) {
+            if (!equityChart || !result.trade_log) return;
+            
+            const labels = [];
+            const values = [];
+            const benchmark = [];
+            
+            let portfolioValue = result.initial_capital;
+            let benchmarkValue = result.initial_capital;
+            
+            labels.push(new Date(result.start_date));
+            values.push(portfolioValue);
+            benchmark.push(benchmarkValue);
+            
+            result.trade_log.forEach(trade => {
+                if (trade.pnl) {
+                    portfolioValue += trade.pnl;
+                }
+                
+                labels.push(new Date(trade.timestamp));
+                values.push(portfolioValue);
+                
+                // 벤치마크는 연 8% 가정
+                const daysDiff = Math.floor((new Date(trade.timestamp) - new Date(result.start_date)) / (1000 * 60 * 60 * 24));
+                benchmarkValue = result.initial_capital * Math.pow(1.08, daysDiff / 365);
+                benchmark.push(benchmarkValue);
+            });
+            
+            equityChart.data.labels = labels;
+            equityChart.data.datasets[0].data = values;
+            equityChart.data.datasets[1].data = benchmark;
+            equityChart.update();
         }
     </script>
 </body>

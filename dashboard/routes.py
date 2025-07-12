@@ -334,9 +334,25 @@ def backtest_dashboard():
     return render_template('backtest_dashboard.html')
 
 @api.route('/live-trading')
+@api.route('/live')
 def live_trading():
     """실전매매 대시보드 페이지 렌더링"""
     return render_template('live_trading.html')
+
+@api.route('/premium-live')
+def premium_live_trading():
+    """프리미엄 실전매매 페이지 렌더링"""
+    return render_template('live_trading.html')
+
+@api.route('/premium-backtest')
+def premium_backtest():
+    """프리미엄 분석 페이지 렌더링"""
+    return render_template('analytics.html')
+
+@api.route('/analytics')
+def analytics_dashboard():
+    """고급 분석 대시보드 페이지 렌더링"""
+    return render_template('analytics.html')
 
 @api.route('/api/health', methods=['GET'])
 def health_check():

@@ -1,0 +1,24 @@
+╭───────────────────────────────────────────────────╮
+│ ✻ Welcome to Claude Code!                         │
+│                                                   │
+│   /help for help, /status for your current setup  │
+│                                                   │
+│   cwd: C:\Project\alphagenesis                    │
+╰───────────────────────────────────────────────────╯
+
+ Tips for getting started:
+
+ 1. Run /init to create a CLAUDE.md file with instructions for Claude
+ 2. Use Claude to help with file analysis, editing, bash commands and git
+ 3. Be as specific as you would with another engineer for the best results
+● Compact summary (ctrl+r to expand)
+  ⎿  Read dashboard\templates\backtest_dashboard.html (100+ lines)
+  ⎿  Read dashboard\routes.py (100+ lines)
+  ⎿  Read dashboard\templates\analytics.html (100+ lines)
+  ⎿  Read dashboard\templates\main_dashboard.html (864 lines)
+  ⎿  Read core\backtest_engine.py (100+ lines)
+  ⎿  Todo list read (9 items)
+  ⎿  Claude usage limit reached. Your limit will reset at 3am (Asia/Seoul).
+
+      • /upgrade to increase your usage limit.
+
