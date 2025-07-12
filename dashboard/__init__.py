@@ -9,12 +9,15 @@ import os
 
 # 코어 모듈 import (순환 참조 방지)
 try:
-    from ..core import config, initialize_core
-except ImportError:
-    # 절대 import 시도
     import sys
+    import os
+    # 프로젝트 루트 경로 추가
     sys.path.append(os.path.dirname(os.path.dirname(__file__)))
     from core import config, initialize_core
+except ImportError:
+    # 최소 기능으로 대체
+    config = None
+    initialize_core = None
 
 # 버전 정보
 __version__ = "3.0.0"
@@ -24,9 +27,16 @@ def create_app(config_name='development'):
     """Flask 앱 팩토리 함수"""
     app = Flask(__name__)
     
-    # 설정 로드
-    dashboard_config = config.get_config('dashboard')
-    app.config.update(dashboard_config)
+    # 설정 로드 (config가 None인 경우 기본값 사용)
+    if config:
+        dashboard_config = config.get_config('dashboard')
+        app.config.update(dashboard_config)
+    else:
+        # 기본 설정
+        app.config.update({
+            'DEBUG': True,
+            'TESTING': False
+        })
     
     # 보안 설정
     app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'dev-secret-key-change-in-production')
