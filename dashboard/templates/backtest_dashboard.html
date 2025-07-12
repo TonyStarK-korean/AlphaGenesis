@@ -1163,7 +1163,7 @@
         /* 전략 선택 스타일 */
         .strategy-selection {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
             gap: 1rem;
             margin-bottom: 1rem;
         }
@@ -1174,7 +1174,7 @@
             border-radius: 8px;
             padding: 1rem;
             transition: all 0.3s ease;
-            min-width: 350px;
+            min-width: 300px;
         }
 
         .strategy-option:hover {
@@ -2507,6 +2507,203 @@
             equityChart.data.datasets[0].data = values;
             equityChart.data.datasets[1].data = benchmark;
             equityChart.update();
+        }
+
+        // 백테스트 실행 함수
+        async function runBacktest() {
+            if (isRunning) return;
+            
+            // 현재 모드 확인
+            const activeMode = document.querySelector('.strategy-btn.active').dataset.mode;
+            
+            // 전략 선택 확인
+            const selectedStrategies = Array.from(document.querySelectorAll('.strategy-checkbox:checked'))
+                .map(cb => cb.value);
+            
+            if (selectedStrategies.length === 0) {
+                alert('백테스트할 전략을 최소 1개 이상 선택해주세요.');
+                return;
+            }
+            
+            // 심볼 선택 확인 (개별 전략 모드일 때만)
+            let symbolsToUse = [];
+            if (activeMode === 'compare') {
+                if (selectedSymbols.length === 0) {
+                    alert('백테스트할 심볼을 선택해주세요.');
+                    return;
+                }
+                symbolsToUse = selectedSymbols;
+            } else {
+                // 전체 시장 모드: 모든 심볼 사용
+                symbolsToUse = allSymbols.map(s => s.symbol);
+                if (symbolsToUse.length === 0) {
+                    alert('심볼 목록을 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+                    return;
+                }
+            }
+            
+            isRunning = true;
+            const btn = document.getElementById('runBacktest');
+            const originalText = btn.innerHTML;
+            
+            btn.innerHTML = '<div class="loading"></div> 백테스트 실행 중...';
+            btn.disabled = true;
+            
+            // 진행률 표시
+            const progressContainer = document.getElementById('progressContainer');
+            progressContainer.style.display = 'block';
+            
+            try {
+                const formData = {
+                    strategies: selectedStrategies,
+                    symbols: symbolsToUse,
+                    initial_capital: parseFloat(document.getElementById('capitalAmount').value) || 10000,
+                    start_date: document.getElementById('startDate').value || '2024-01-01',
+                    end_date: document.getElementById('endDate').value || '2024-12-31',
+                    backtest_mode: activeMode === 'all' ? 'market_wide' : 'individual'
+                };
+                
+                const response = await fetch('/api/backtest/start', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(formData)
+                });
+                
+                if (response.ok) {
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        // 스트리밍 로그 시작
+                        if (result.stream_url) {
+                            startStreamingLogs(result.stream_url);
+                        }
+                        
+                        btn.innerHTML = '<i class="fas fa-check"></i> 백테스트 완료';
+                        btn.style.background = 'linear-gradient(135deg, #00D084, #00A86B)';
+                        
+                        setTimeout(() => {
+                            btn.innerHTML = originalText;
+                            btn.style.background = '';
+                            btn.disabled = false;
+                            isRunning = false;
+                            progressContainer.style.display = 'none';
+                        }, 3000);
+                    } else {
+                        throw new Error(result.error || '백테스트 시작 실패');
+                    }
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '서버 오류');
+                }
+                
+            } catch (error) {
+                console.error('백테스트 실행 실패:', error);
+                alert('백테스트 실행에 실패했습니다: ' + error.message);
+                
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+                isRunning = false;
+                progressContainer.style.display = 'none';
+            }
+        }
+
+        // 스트리밍 로그 시작
+        function startStreamingLogs(streamUrl) {
+            const eventSource = new EventSource(streamUrl);
+            const logContainer = document.getElementById('tradeLogContainer');
+            
+            eventSource.onmessage = function(event) {
+                try {
+                    const data = JSON.parse(event.data);
+                    
+                    if (data.type === 'progress') {
+                        updateProgress(data.progress, data.message);
+                    } else if (data.type === 'log') {
+                        addLogMessage(data.message);
+                    } else if (data.type === 'result') {
+                        updateBacktestResults(data.result);
+                        eventSource.close();
+                    } else if (data.type === 'error') {
+                        addLogMessage('오류: ' + data.message, 'error');
+                        eventSource.close();
+                    }
+                } catch (e) {
+                    console.error('로그 파싱 오류:', e);
+                }
+            };
+            
+            eventSource.onerror = function() {
+                console.error('스트리밍 연결 오류');
+                eventSource.close();
+            };
+        }
+
+        // 진행률 업데이트
+        function updateProgress(progress, message) {
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            if (progressFill) {
+                progressFill.style.width = progress + '%';
+            }
+            if (progressText) {
+                progressText.textContent = message || `진행률: ${progress}%`;
+            }
+        }
+
+        // 로그 메시지 추가
+        function addLogMessage(message, type = 'info') {
+            const logContainer = document.getElementById('tradeLogContainer');
+            const logEmpty = logContainer.querySelector('.trade-log-empty');
+            
+            if (logEmpty) {
+                logEmpty.remove();
+            }
+            
+            const logItem = document.createElement('div');
+            logItem.className = `trade-log-item ${type}`;
+            logItem.innerHTML = `
+                <span class="log-time">${new Date().toLocaleTimeString()}</span>
+                <span class="log-message">${message}</span>
+            `;
+            
+            logContainer.appendChild(logItem);
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // 백테스트 초기화 함수
+        function resetBacktest() {
+            // 결과 섹션 숨기기
+            document.getElementById('backtestResults').classList.remove('show');
+            document.getElementById('noResultsMessage').style.display = 'block';
+            
+            // 차트 초기화
+            if (equityChart) {
+                equityChart.data.labels = [];
+                equityChart.data.datasets[0].data = [];
+                equityChart.data.datasets[1].data = [];
+                equityChart.update();
+            }
+            
+            // 로그 초기화
+            const logContainer = document.getElementById('tradeLogContainer');
+            logContainer.innerHTML = '<div class="trade-log-empty">거래 대기 중...</div>';
+            
+            // 진행률 숨기기
+            document.getElementById('progressContainer').style.display = 'none';
+            
+            // 전략 비교 테이블 초기화
+            const tableBody = document.getElementById('strategyTableBody');
+            tableBody.innerHTML = `
+                <tr>
+                    <td colspan="7" style="text-align: center; padding: 2rem; color: var(--text-muted);">
+                        <i class="fas fa-chart-bar" style="font-size: 2rem; margin-bottom: 1rem; opacity: 0.5;"></i>
+                        <p>4전략 비교분석을 실행하여 결과를 확인하세요</p>
+                    </td>
+                </tr>
+            `;
+            
+            console.log('백테스트 초기화 완료');
         }
     </script>
 </body>

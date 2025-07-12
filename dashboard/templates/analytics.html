@@ -1357,6 +1357,22 @@
         window.addEventListener('beforeunload', function() {
             destroyAllCharts();
         });
+
+        // 페이지 visibility 변경 시 차트 재초기화
+        document.addEventListener('visibilitychange', function() {
+            if (document.visibilityState === 'visible') {
+                // 페이지가 다시 보일 때 차트 완전 재초기화
+                setTimeout(() => {
+                    destroyAllCharts();
+                    const activeTab = document.querySelector('.tab-button.active');
+                    if (activeTab) {
+                        initializeTabCharts(activeTab.dataset.tab);
+                    } else {
+                        initializeTabCharts('strategy-analysis');
+                    }
+                }, 100);
+            }
+        });
         
         // 페이지 로드 시 초기화
         document.addEventListener('DOMContentLoaded', function() {
