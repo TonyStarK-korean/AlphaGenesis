@@ -525,6 +525,7 @@
                 <a href="/" class="nav-link active"><i class="fas fa-home"></i> Home</a>
                 <a href="/backtest" class="nav-link">백테스트</a>
                 <a href="/live" class="nav-link">실전매매</a>
+                <a href="/analytics" class="nav-link"><i class="fas fa-chart-pie"></i> 프리미엄 분석</a>
             </nav>
         </div>
     </header>
@@ -693,16 +694,31 @@
 
         // 전역 차트 객체
         let portfolioChart = null;
+        let chartCreated = false;
 
         // 포트폴리오 차트 생성
         async function createPortfolioChart() {
-            const ctx = document.getElementById('portfolioChart').getContext('2d');
+            const canvas = document.getElementById('portfolioChart');
+            if (!canvas) return;
             
-            // 기존 차트가 있으면 파괴
+            const ctx = canvas.getContext('2d');
+            
+            // 기존 차트가 있으면 완전히 파괴
             if (portfolioChart) {
                 portfolioChart.destroy();
                 portfolioChart = null;
             }
+            
+            // 캔버스 초기화
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // 차트 생성 중복 방지
+            if (chartCreated) {
+                chartCreated = false;
+                await new Promise(resolve => setTimeout(resolve, 100));
+            }
+            
+            chartCreated = true;
             
             try {
                 // 실제 백테스트 결과 조회
@@ -797,6 +813,8 @@
                     }
                 });
                 
+                chartCreated = false; // 차트 생성 완료
+                
             } catch (error) {
                 console.error('포트폴리오 차트 로드 실패:', error);
                 
@@ -841,6 +859,8 @@
                         }
                     }
                 });
+                
+                chartCreated = false; // 차트 생성 완료
             }
         }
 
