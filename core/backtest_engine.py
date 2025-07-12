@@ -676,15 +676,27 @@ class RealBacktestEngine:
                     bb_lower = data['BB_Lower'].iloc[i]
                     close = data['close'].iloc[i]
                     
-                    # 매수 신호
-                    if (rsi < rsi_oversold and 
-                        macd > macd_signal and 
-                        close <= bb_lower):
+                    # 매수 신호 - 조건 완화 (3개 중 2개 충족 시 매수)
+                    buy_conditions = 0
+                    if rsi < rsi_oversold:
+                        buy_conditions += 1
+                    if macd > macd_signal:
+                        buy_conditions += 1
+                    if close <= bb_lower * 1.01:  # 볼린저 밴드 하단 1% 여유
+                        buy_conditions += 1
+                    
+                    # 매도 신호 - 조건 완화 (3개 중 2개 충족 시 매도)
+                    sell_conditions = 0
+                    if rsi > rsi_overbought:
+                        sell_conditions += 1
+                    if macd < macd_signal:
+                        sell_conditions += 1
+                    if close >= bb_upper * 0.99:  # 볼린저 밴드 상단 1% 여유
+                        sell_conditions += 1
+                    
+                    if buy_conditions >= 2:
                         signals.append(1)
-                    # 매도 신호
-                    elif (rsi > rsi_overbought and 
-                          macd < macd_signal and 
-                          close >= bb_upper):
+                    elif sell_conditions >= 2:
                         signals.append(-1)
                     else:
                         signals.append(0)
@@ -706,15 +718,27 @@ class RealBacktestEngine:
                     bb_lower = data['BB_Lower'].iloc[i]
                     close = data['close'].iloc[i]
                     
-                    # 매수 신호
-                    if (rsi < rsi_oversold and 
-                        macd > macd_signal and 
-                        close <= bb_lower):
+                    # 매수 신호 - 조건 완화 (3개 중 2개 충족 시 매수)
+                    buy_conditions = 0
+                    if rsi < rsi_oversold:
+                        buy_conditions += 1
+                    if macd > macd_signal:
+                        buy_conditions += 1
+                    if close <= bb_lower * 1.01:  # 볼린저 밴드 하단 1% 여유
+                        buy_conditions += 1
+                    
+                    # 매도 신호 - 조건 완화 (3개 중 2개 충족 시 매도)
+                    sell_conditions = 0
+                    if rsi > rsi_overbought:
+                        sell_conditions += 1
+                    if macd < macd_signal:
+                        sell_conditions += 1
+                    if close >= bb_upper * 0.99:  # 볼린저 밴드 상단 1% 여유
+                        sell_conditions += 1
+                    
+                    if buy_conditions >= 2:
                         signals.append(1)
-                    # 매도 신호
-                    elif (rsi > rsi_overbought and 
-                          macd < macd_signal and 
-                          close >= bb_upper):
+                    elif sell_conditions >= 2:
                         signals.append(-1)
                     else:
                         signals.append(0)

@@ -21,6 +21,7 @@ class DataManager:
     
     def __init__(self, data_dir: str = "data"):
         self.data_dir = data_dir
+        self.market_data_dir = f"{data_dir}/market_data"  # market_data_dir 속성 추가
         self.exchange = None
         self.symbol_cache = {}
         self.price_cache = {}
@@ -30,6 +31,7 @@ class DataManager:
         os.makedirs(data_dir, exist_ok=True)
         os.makedirs(f"{data_dir}/raw", exist_ok=True)
         os.makedirs(f"{data_dir}/processed", exist_ok=True)
+        os.makedirs(self.market_data_dir, exist_ok=True)  # market_data 디렉토리 생성
         
         self.init_exchange()
     
@@ -735,3 +737,43 @@ class MLDataProcessor:
         except Exception as e:
             logger.error(f"피처 중요도 계산 실패: {e}")
             return {}
+    
+    def load_market_data(self, symbol: str, timeframe: str) -> pd.DataFrame:
+        """
+        로컬에 저장된 시장 데이터 로드
+        
+        Args:
+            symbol: 거래 심볼
+            timeframe: 시간프레임
+            
+        Returns:
+            DataFrame: 로드된 데이터
+        """
+        try:
+            # 기본 파일명 패턴으로 찾기
+            base_filename = f"{symbol.replace('/', '_')}_{timeframe}.csv"
+            base_filepath = os.path.join(self.market_data_dir, base_filename)
+            
+            if os.path.exists(base_filepath):
+                df = pd.read_csv(base_filepath, index_col=0, parse_dates=True)
+                logger.info(f"로컬 데이터 로드 성공: {base_filepath}")
+                return df
+            
+            # 날짜별 파일 패턴으로 찾기
+            import glob
+            pattern = os.path.join(self.market_data_dir, f"{symbol.replace('/', '_')}_{timeframe}_*.csv")
+            files = glob.glob(pattern)
+            
+            if files:
+                # 가장 최근 파일 사용
+                latest_file = max(files, key=os.path.getmtime)
+                df = pd.read_csv(latest_file, index_col=0, parse_dates=True)
+                logger.info(f"로컬 데이터 로드 성공: {latest_file}")
+                return df
+            
+            logger.warning(f"로컬 데이터 파일이 없음: {symbol} {timeframe}")
+            return pd.DataFrame()
+            
+        except Exception as e:
+            logger.error(f"로컬 데이터 로드 실패: {e}")
+            return pd.DataFrame()
