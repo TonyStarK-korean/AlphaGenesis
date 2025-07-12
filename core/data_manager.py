@@ -89,6 +89,11 @@ class DataManager:
             logger.info(f"심볼 데이터 다운로드 시도: {symbol}")
             logger.info(f"호출자 정보: {''.join(caller_info).strip()}")
             
+            # 임시: OP/USDT 자동 다운로드 차단
+            if symbol in ['OP/USDT', 'OPUSDT'] and 'manual_download' not in locals():
+                logger.warning(f"OP/USDT 자동 다운로드 차단됨 - 호출자: {''.join(caller_info).strip()}")
+                return pd.DataFrame()  # 빈 데이터프레임 반환
+            
             # 캐시 확인
             cache_key = f"{symbol}_{timeframe}_{start_date}_{end_date}"
             if cache_key in self.price_cache:

@@ -617,14 +617,18 @@
     </div>
 
     <script>
-        // 페이지 로드 시 초기화
+        // 페이지 로드 시 초기화 (자동 API 호출 비활성화)
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('메인 대시보드 로드 - 자동 API 호출 비활성화됨');
             initializeSystem();
-            loadMarketData();
+            // loadMarketData(); // 자동 로드 비활성화
             initializeChart();
             
-            // 실시간 업데이트 시작
-            setInterval(updateRealTimeData, 30000); // 30초마다 업데이트
+            // 실시간 업데이트 비활성화
+            // setInterval(updateRealTimeData, 30000); // 30초마다 업데이트
+            
+            // 수동 로드 버튼 추가
+            addManualLoadButton();
         });
 
         // 시스템 초기화
@@ -785,9 +789,24 @@
             return data;
         }
 
-        // 실시간 데이터 업데이트
+        // 수동 로드 버튼 추가
+        function addManualLoadButton() {
+            const marketSection = document.querySelector('.market-stats');
+            if (marketSection) {
+                const loadButton = document.createElement('button');
+                loadButton.textContent = '시장 데이터 수동 로드';
+                loadButton.style.cssText = 'margin: 10px; padding: 10px 20px; background: #667eea; color: white; border: none; border-radius: 5px; cursor: pointer;';
+                loadButton.onclick = function() {
+                    console.log('사용자가 수동으로 시장 데이터 로드 요청');
+                    loadMarketData();
+                };
+                marketSection.appendChild(loadButton);
+            }
+        }
+
+        // 실시간 데이터 업데이트 (비활성화됨)
         function updateRealTimeData() {
-            loadMarketData();
+            // loadMarketData(); // 비활성화
             checkServerStatus();
         }
 
