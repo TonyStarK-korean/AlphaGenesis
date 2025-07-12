@@ -93,10 +93,8 @@ class DataManager:
             if '/' not in symbol:
                 symbol = symbol.replace('USDT', '/USDT')
             
-            # 심볼 유효성 검사
-            if not self._is_valid_symbol(symbol):
-                logger.warning(f"지원되지 않는 심볼: {symbol}, 기본 심볼 사용")
-                symbol = 'BTC/USDT'  # 기본 심볼로 대체
+            # 심볼 유효성 검사 제거 - 모든 심볼 시도
+            logger.info(f"심볼 데이터 다운로드 시도: {symbol}")
             
             # 기본 날짜 설정
             if not end_date:
@@ -164,9 +162,26 @@ class DataManager:
             # 캐시 저장
             self.price_cache[cache_key] = (time.time(), df)
             
-            # 파일로 저장
-            filename = f"{self.data_dir}/raw/{symbol.replace('/', '_')}_{timeframe}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv"
-            df.to_csv(filename)
+            # 파일로 저장 - 디렉토리 확인 및 생성
+            try:
+                # market_data 디렉토리에 저장
+                filename = f"{symbol.replace('/', '_')}_{timeframe}_{start_date.strftime('%Y%m%d')}_{end_date.strftime('%Y%m%d')}.csv"
+                filepath = os.path.join(self.market_data_dir, filename)
+                
+                # 디렉토리가 없으면 생성
+                os.makedirs(self.market_data_dir, exist_ok=True)
+                
+                # CSV 저장
+                df.to_csv(filepath, index=True)
+                logger.info(f"데이터 저장 완료: {filepath}")
+                
+                # 심볼별 기본 파일도 업데이트
+                base_filename = f"{symbol.replace('/', '_')}_{timeframe}.csv"
+                base_filepath = os.path.join(self.market_data_dir, base_filename)
+                df.to_csv(base_filepath, index=True)
+                
+            except Exception as e:
+                logger.warning(f"CSV 저장 실패: {e}")
             
             logger.info(f"데이터 다운로드 완료: {len(df)} 캔들")
             return df

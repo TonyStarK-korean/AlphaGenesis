@@ -1938,9 +1938,19 @@
         }
 
         // 상세 모달 표시
-        function showDetailModal(result) {
+        async function showDetailModal(result) {
             const modal = document.getElementById('detailModal');
             const content = document.getElementById('detailContent');
+            
+            // 매매 기록 가져오기
+            let trades = [];
+            try {
+                const response = await fetch(`/api/backtest/results/${result.id}`);
+                const data = await response.json();
+                trades = data.trades || [];
+            } catch (error) {
+                console.error('매매 기록 로드 실패:', error);
+            }
             
             content.innerHTML = `
                 <div class="detail-section">
@@ -1950,7 +1960,7 @@
                         <tr><td>심볼</td><td>${result.symbol}</td></tr>
                         <tr><td>시간프레임</td><td>${result.timeframe}</td></tr>
                         <tr><td>기간</td><td>${result.start_date} ~ ${result.end_date}</td></tr>
-                        <tr><td>레버리지</td><td>${result.leverage}x</td></tr>
+                        <tr><td>레버리지</td><td>${result.leverage || result.avg_leverage ? `동적 (평균 ${result.avg_leverage?.toFixed(1) || 1.0}x)` : '1.0x'}</td></tr>
                         <tr><td>초기 자본</td><td>${result.initial_capital.toLocaleString()}원</td></tr>
                     </table>
                 </div>
@@ -1969,15 +1979,41 @@
                     </table>
                 </div>
                 
-                ${result.ml_optimized ? `
+                ${trades.length > 0 ? `
                 <div class="detail-section">
-                    <h3>ML 최적화 정보</h3>
-                    <table class="comparison-table">
-                        <tr><td>최적화 파라미터</td><td>${JSON.stringify(result.ml_params || {})}</td></tr>
-                        <tr><td>중요 특성</td><td>${result.feature_importance || 'N/A'}</td></tr>
-                    </table>
+                    <h3>매매 기록</h3>
+                    <div style="max-height: 400px; overflow-y: auto;">
+                        <table class="comparison-table">
+                            <thead>
+                                <tr>
+                                    <th>시간</th>
+                                    <th>유형</th>
+                                    <th>가격</th>
+                                    <th>수량</th>
+                                    <th>레버리지</th>
+                                    <th>손익</th>
+                                    <th>손익률</th>
+                                    <th>잔액</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${trades.map(trade => `
+                                    <tr>
+                                        <td>${new Date(trade.timestamp).toLocaleString()}</td>
+                                        <td>${trade.type === 'buy' ? '매수' : '매도'}</td>
+                                        <td>${trade.price?.toFixed(2) || 'N/A'}</td>
+                                        <td>${trade.amount?.toFixed(4) || 'N/A'}</td>
+                                        <td>${trade.leverage?.toFixed(1) || '1.0'}x</td>
+                                        <td class="${trade.pnl > 0 ? 'positive' : trade.pnl < 0 ? 'negative' : ''}">${trade.pnl?.toFixed(0) || '0'}원</td>
+                                        <td class="${trade.pnl_percent > 0 ? 'positive' : trade.pnl_percent < 0 ? 'negative' : ''}">${trade.pnl_percent?.toFixed(2) || '0.00'}%</td>
+                                        <td>${trade.balance_after?.toLocaleString() || 'N/A'}원</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                ` : ''}
+                ` : '<div class="detail-section"><p>매매 기록이 없습니다.</p></div>'}
                 
                 <div class="btn-group">
                     <button class="btn" onclick="exportResultToExcel(${result.id})">엑셀 다운로드</button>

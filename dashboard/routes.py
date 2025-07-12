@@ -541,6 +541,61 @@ def get_backtest_results():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@api.route('/api/backtest/results/<result_id>', methods=['GET'])
+def get_backtest_result_detail(result_id):
+    """백테스트 결과 상세 조회 API"""
+    try:
+        # result_id로 결과 찾기
+        result_index = int(result_id) - 1
+        if 0 <= result_index < len(backtest_results):
+            result = backtest_results[result_index]
+            
+            # BacktestResult 객체를 딕셔너리로 변환
+            if hasattr(result, 'trade_log'):
+                trades = result.trade_log
+            else:
+                trades = []
+            
+            # 거래 로그 정리
+            formatted_trades = []
+            for trade in trades:
+                formatted_trades.append({
+                    'timestamp': trade.get('timestamp', ''),
+                    'type': trade.get('type', ''),
+                    'symbol': trade.get('symbol', ''),
+                    'price': trade.get('price', 0),
+                    'amount': trade.get('amount', 0),
+                    'leverage': trade.get('leverage', 1.0),
+                    'pnl': trade.get('pnl', 0),
+                    'pnl_percent': trade.get('pnl_percent', 0),
+                    'reason': trade.get('reason', ''),
+                    'balance_after': trade.get('balance_after', 0)
+                })
+            
+            return jsonify({
+                'result': {
+                    'id': result_id,
+                    'strategy_name': result.strategy_name,
+                    'symbol': result.symbol,
+                    'start_date': result.start_date,
+                    'end_date': result.end_date,
+                    'initial_capital': result.initial_capital,
+                    'final_value': result.final_value,
+                    'total_return': result.total_return,
+                    'total_trades': result.total_trades,
+                    'win_rate': result.win_rate,
+                    'max_drawdown': result.max_drawdown,
+                    'sharpe_ratio': result.sharpe_ratio,
+                    'avg_leverage': result.avg_leverage
+                },
+                'trades': formatted_trades
+            })
+        else:
+            return jsonify({'error': '결과를 찾을 수 없습니다.'}), 404
+            
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @api.route('/api/backtest/results', methods=['POST'])
 def save_backtest_result():
     """백테스트 결과 저장 API"""
