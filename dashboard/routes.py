@@ -321,20 +321,26 @@ def get_binance_symbols():
 
 @api.route('/api/strategies', methods=['GET'])
 def get_strategies():
-    """전략 목록 조회 API - 백테스트 엔진에서 실제 전략 로드"""
+    """전략 목록 조회 API - 실제 구현된 전략만 반환"""
     try:
         # 백테스트 엔진의 실제 전략 목록을 가져오기
         engine_strategies = backtest_engine.strategies
         
         strategies = []
         for strategy_id, strategy_info in engine_strategies.items():
+            # 구현된 전략만 포함 (구현되지 않은 전략은 비활성화 표시)
+            is_implemented = strategy_info.get('implemented', True)
+            status = '✅ 사용 가능' if is_implemented else '🚧 구현 예정'
+            
             strategies.append({
                 'id': strategy_id,
                 'name': strategy_info.get('name', strategy_id),
-                'description': strategy_info.get('description', ''),
+                'description': f"{strategy_info.get('description', '')} - {status}",
                 'timeframe': strategy_info.get('timeframe', '1h'),
                 'category': 'technical',
-                'risk_level': 'medium'
+                'risk_level': 'medium',
+                'implemented': is_implemented,
+                'status': status
             })
         
         return jsonify({'strategies': strategies})
@@ -919,32 +925,44 @@ def get_backtest_statistics():
 @api.route('/api/backtest/stream_log')
 def stream_backtest_log():
     """실제 백테스트 로그 실시간 스트리밍 (SSE)"""
-    # request context가 있을 때 파라미터 추출
-    start_date = request.args.get('start_date', '2025-01-01')
-    end_date = request.args.get('end_date', '2025-07-11')
-    symbol = request.args.get('symbol', 'BTC/USDT')
-    strategy_name = request.args.get('strategy', 'triple_combo')
+    # request context가 있을 때 파라미터 추출 및 검증
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')  
+    symbol = request.args.get('symbol')
+    strategy_name = request.args.get('strategy')
     initial_capital = float(request.args.get('initial_capital', '10000000'))
     backtest_mode = request.args.get('backtest_mode', 'single')
     ml_optimization = request.args.get('ml_optimization', 'off') == 'on'
     
-    # 전략 이름을 ID로 매핑
+    # 필수 파라미터 검증
+    if not all([start_date, end_date, symbol, strategy_name]):
+        def error_response():
+            yield "data: " + json.dumps({
+                "type": "error", 
+                "message": "❌ 필수 파라미터가 누락되었습니다. (날짜, 심볼, 전략)",
+                "timestamp": time.time()
+            }) + "\n\n"
+            yield "data: " + json.dumps({"type": "end"}) + "\n\n"
+        return Response(error_response(), mimetype='text/plain')
+    
+    # 실제 구현된 전략만 매핑
     strategy_name_to_id = {
         '트리플 콤보 전략': 'triple_combo',
-        '심플 트리플 콤보': 'simple_triple_combo',
         'RSI 전략': 'rsi_strategy',
-        'MACD 전략': 'macd_strategy',
-        '볼린저 밴드 전략': 'bollinger_strategy',
-        '모멘텀 전략': 'momentum_strategy',
-        '평균 회귀 전략': 'mean_reversion',
-        'ML 앙상블 전략': 'ml_ensemble',
-        '그리드 트레이딩': 'grid_trading',
-        '차익거래 전략': 'arbitrage'
+        'MACD 전략': 'macd_strategy'  # 구현 예정
     }
     
-    # 전략 이름을 ID로 변환
-    if strategy_name == '전략을 선택하세요' or not strategy_name:
-        strategy = 'triple_combo'  # 기본 전략
+    # 전략 검증 - 유효하지 않은 전략은 실행하지 않음
+    if strategy_name == '전략을 선택하세요' or not strategy_name or strategy_name == '':
+        # 유효하지 않은 전략 요청시 즉시 종료
+        def error_response():
+            yield "data: " + json.dumps({
+                "type": "error",
+                "message": "❌ 전략이 선택되지 않았습니다. 전략을 선택해주세요.",
+                "timestamp": time.time()
+            }) + "\n\n"
+            yield "data: " + json.dumps({"type": "end"}) + "\n\n"
+        return Response(error_response(), mimetype='text/plain')
     else:
         strategy = strategy_name_to_id.get(strategy_name, strategy_name)
     

@@ -53,12 +53,13 @@ class RealBacktestEngine:
         self.leverage_manager = DynamicLeverageManager()
         self.results = []
         
-        # 지원하는 전략 목록
+        # 실제 구현된 유의미한 전략 목록만 유지
         self.strategies = {
             'triple_combo': {
                 'name': '트리플 콤보 전략',
-                'description': 'RSI, MACD, 볼린저 밴드 조합',
+                'description': 'RSI, MACD, 볼린저 밴드 조합 (3개 중 2개 충족시 거래)',
                 'timeframe': '1h',
+                'implemented': True,
                 'params': {
                     'rsi_period': (10, 20),
                     'rsi_oversold': (25, 35),
@@ -70,8 +71,9 @@ class RealBacktestEngine:
             },
             'rsi_strategy': {
                 'name': 'RSI 전략',
-                'description': 'RSI 지표 기반 역추세 전략',
+                'description': 'RSI 지표 기반 역추세 전략 (과매수/과매도 구간 활용)',
                 'timeframe': '15m',
+                'implemented': True,
                 'params': {
                     'rsi_period': (10, 20),
                     'rsi_oversold': (20, 35),
@@ -80,43 +82,13 @@ class RealBacktestEngine:
             },
             'macd_strategy': {
                 'name': 'MACD 전략',
-                'description': 'MACD 크로스오버 전략',
+                'description': 'MACD 크로스오버 전략 (구현 예정)',
                 'timeframe': '30m',
+                'implemented': False,
                 'params': {
                     'macd_fast': (8, 15),
                     'macd_slow': (18, 30),
                     'macd_signal': (7, 12)
-                }
-            },
-            'momentum_strategy': {
-                'name': '모멘텀 전략',
-                'description': '가격 모멘텀 추세 추종',
-                'timeframe': '4h',
-                'params': {
-                    'momentum_period': (15, 25),
-                    'threshold': (0.03, 0.08)
-                }
-            },
-            'ml_ensemble': {
-                'name': 'ML 앙상블 전략',
-                'description': '머신러닝 앙상블 예측',
-                'timeframe': '1h',
-                'params': {
-                    'confidence_threshold': (0.6, 0.8),
-                    'ensemble_models': ['XGBoost', 'RandomForest', 'LSTM']
-                }
-            },
-            'simple_triple_combo': {
-                'name': '심플 트리플 콤보',
-                'description': '간단한 트리플 콤보 전략',
-                'timeframe': '1h',
-                'params': {
-                    'rsi_period': (10, 20),
-                    'rsi_oversold': (25, 35),
-                    'rsi_overbought': (65, 75),
-                    'macd_fast': (10, 15),
-                    'macd_slow': (20, 30),
-                    'bb_period': (15, 25)
                 }
             }
         }
