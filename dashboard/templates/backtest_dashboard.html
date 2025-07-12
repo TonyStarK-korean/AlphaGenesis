@@ -3,7 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AlphaGenesis - 백테스트 대시보드</title>
+    <title>AlphaGenesis - Professional Backtesting</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
     <style>
         * {
             margin: 0;
@@ -11,2616 +15,1132 @@
             box-sizing: border-box;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            min-height: 100vh;
-            color: #333;
+        :root {
+            --primary: #0066FF;
+            --primary-light: #3D8BFF;
+            --primary-dark: #0052CC;
+            --success: #00D084;
+            --warning: #FFB800;
+            --danger: #FF4757;
+            --dark: #1A1D29;
+            --dark-light: #252836;
+            --dark-lighter: #2F3349;
+            --text-primary: #FFFFFF;
+            --text-secondary: #8B8FA3;
+            --text-muted: #6C7293;
+            --border: #3A3F5C;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --glow: 0 0 20px rgba(0, 102, 255, 0.3);
         }
 
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0F0F1E 0%, #1A1D29 50%, #252836 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Animated Background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            opacity: 0.1;
+        }
+
+        .bg-animation::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at 20% 80%, var(--primary) 0%, transparent 50%),
+                        radial-gradient(circle at 80% 20%, var(--success) 0%, transparent 50%),
+                        radial-gradient(circle at 40% 40%, var(--warning) 0%, transparent 50%);
+            animation: float 20s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) rotate(0deg); }
+            33% { transform: translate(30px, -30px) rotate(120deg); }
+            66% { transform: translate(-20px, 20px) rotate(240deg); }
+        }
+
+        /* Header */
         .header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            padding: 1rem 2rem;
-            box-shadow: 0 2px 20px rgba(0, 0, 0, 0.1);
             position: sticky;
             top: 0;
             z-index: 1000;
+            backdrop-filter: blur(20px);
+            background: rgba(26, 29, 41, 0.9);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1rem 2rem;
+        }
+
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
             display: flex;
-            justify-content: space-between;
             align-items: center;
+            justify-content: space-between;
         }
 
-        .header h1 {
-            color: #2c3e50;
-            font-size: 2rem;
-            flex-grow: 1;
-            text-align: center;
-        }
-
-        .nav-button {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 10px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
             text-decoration: none;
+        }
+
+        .logo i {
+            color: var(--primary);
+            filter: drop-shadow(0 0 10px var(--primary));
+        }
+
+        .nav-items {
+            display: flex;
+            align-items: center;
+            gap: 2rem;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+
+        .nav-link:hover, .nav-link.active {
+            color: var(--text-primary);
+            background: var(--glass);
+        }
+
+        /* Main Container */
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            gap: 2rem;
+            min-height: calc(100vh - 120px);
+        }
+
+        /* Control Panel */
+        .control-panel {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 2rem;
+            height: fit-content;
+            position: sticky;
+            top: 120px;
+            box-shadow: var(--shadow);
+        }
+
+        .panel-title {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 2rem;
+            color: var(--text-primary);
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
 
-        .nav-button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        .panel-title i {
+            color: var(--primary);
         }
 
-        .container {
-            max-width: 1400px;
-            margin: 2rem auto;
-            padding: 0 1rem;
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-        }
-
-        .card {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(10px);
-            border-radius: 20px;
-            padding: 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
-
-        .card h2 {
-            color: #2c3e50;
-            margin-bottom: 1.5rem;
-            font-size: 1.5rem;
-            border-bottom: 2px solid #3498db;
-            padding-bottom: 0.5rem;
-        }
-
+        /* Form Groups */
         .form-group {
             margin-bottom: 1.5rem;
         }
 
-        .form-group label {
+        .form-label {
             display: block;
-            margin-bottom: 0.5rem;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 0.75rem;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            font-size: 1rem;
-            transition: border-color 0.3s;
-        }
-
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
-            outline: none;
-            border-color: #3498db;
-        }
-
-        .symbol-selection {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-            align-items: flex-start;
-        }
-
-        .radio-group {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-            white-space: nowrap;
-            min-width: fit-content;
-            margin-right: 1rem;
-            margin-bottom: 0.5rem;
-        }
-        
-        .radio-group label {
+            font-size: 0.875rem;
             font-weight: 500;
-            color: #2c3e50;
-            cursor: pointer;
-            font-size: 0.95rem;
-            white-space: nowrap;
-            margin-bottom: 0 !important;
-        }
-
-        .symbol-list {
-            display: none;
-            max-height: 200px;
-            overflow-y: auto;
-            border: 2px solid #e0e0e0;
-            border-radius: 10px;
-            padding: 1rem;
-            background: #f8f9fa;
-        }
-
-        .symbol-item {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
+            color: var(--text-secondary);
             margin-bottom: 0.5rem;
         }
 
-        .btn {
-            background: linear-gradient(45deg, #3498db, #2980b9);
-            color: white;
-            border: none;
-            padding: 0.75rem 1.5rem;
-            border-radius: 25px;
-            font-size: 1rem;
-            cursor: pointer;
-            transition: all 0.3s;
-            text-decoration: none;
-            display: inline-block;
-            text-align: center;
+        .form-input, .form-select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            background: var(--dark-lighter);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            transition: all 0.3s ease;
         }
 
-        .btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 5px 15px rgba(52, 152, 219, 0.4);
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(0, 102, 255, 0.1);
         }
 
-        .btn-success {
-            background: linear-gradient(45deg, #27ae60, #219a52);
-        }
-
-        .btn-danger {
-            background: linear-gradient(45deg, #e74c3c, #c0392b);
-        }
-
-        .btn-warning {
-            background: linear-gradient(45deg, #f39c12, #e67e22);
-        }
-
-        .btn-group {
-            display: flex;
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .results-section {
-            grid-column: 1 / -1;
-            margin-top: 2rem;
-        }
-
-        .results-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .results-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 1rem;
-            margin-bottom: 2rem;
-        }
-
-        .result-card {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
-            transition: transform 0.3s;
-            cursor: pointer;
-        }
-
-        .result-card:hover {
-            transform: translateY(-5px);
-        }
-
-        .result-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 1rem;
-        }
-
-        .result-title {
-            font-weight: 600;
-            color: #2c3e50;
-        }
-
-        .result-date {
-            color: #7f8c8d;
-            font-size: 0.9rem;
-        }
-
-        .result-metrics {
+        /* Strategy Toggle */
+        .strategy-toggle {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 0.5rem;
+            margin-bottom: 1rem;
         }
 
-        .metric {
-            display: flex;
-            justify-content: space-between;
+        .strategy-btn {
+            padding: 0.75rem;
+            background: var(--dark-lighter);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .strategy-btn.active {
+            background: var(--primary);
+            border-color: var(--primary);
+            color: white;
+            box-shadow: var(--glow);
+        }
+
+        /* Period Selector */
+        .period-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .period-btn {
             padding: 0.5rem;
-            background: #f8f9fa;
-            border-radius: 5px;
+            background: var(--dark-lighter);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .period-btn.active {
+            background: var(--success);
+            border-color: var(--success);
+            color: white;
+        }
+
+        /* Capital Input */
+        .capital-input {
+            display: flex;
+            gap: 0.5rem;
+            align-items: center;
+        }
+
+        .capital-presets {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 0.25rem;
+            margin-top: 0.5rem;
+        }
+
+        .capital-preset {
+            padding: 0.375rem 0.25rem;
+            background: var(--dark-lighter);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--text-muted);
+            font-size: 0.7rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-align: center;
+        }
+
+        .capital-preset:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            padding: 1rem;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            color: white;
+            box-shadow: 0 4px 20px rgba(0, 102, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 102, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--dark-lighter);
+            border: 1px solid var(--border);
+            color: var(--text-secondary);
+        }
+
+        .btn-secondary:hover {
+            background: var(--border);
+            color: var(--text-primary);
+        }
+
+        /* Main Content */
+        .main-content {
+            display: flex;
+            flex-direction: column;
+            gap: 2rem;
+        }
+
+        /* Results Header */
+        .results-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .results-title {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .results-actions {
+            display: flex;
+            gap: 1rem;
+        }
+
+        .results-btn {
+            padding: 0.5rem 1rem;
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 8px;
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .results-btn:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Performance Cards */
+        .performance-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .performance-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .performance-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--primary), var(--success));
+        }
+
+        .performance-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 0.875rem;
+            font-weight: 500;
+            color: var(--text-secondary);
+        }
+
+        .card-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
+        }
+
+        .badge-success {
+            background: rgba(0, 208, 132, 0.2);
+            color: var(--success);
+        }
+
+        .badge-warning {
+            background: rgba(255, 184, 0, 0.2);
+            color: var(--warning);
+        }
+
+        .badge-danger {
+            background: rgba(255, 71, 87, 0.2);
+            color: var(--danger);
+        }
+
+        .card-value {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--text-primary);
+        }
+
+        .card-change {
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: flex;
+            align-items: center;
+            gap: 0.25rem;
+        }
+
+        .positive {
+            color: var(--success);
+        }
+
+        .negative {
+            color: var(--danger);
+        }
+
+        /* Chart Container */
+        .chart-container {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            height: 500px;
+        }
+
+        .chart-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 2rem;
+        }
+
+        .chart-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .chart-controls {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .chart-btn {
+            padding: 0.375rem 0.75rem;
+            background: var(--dark-lighter);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-secondary);
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .chart-btn.active {
+            background: var(--primary);
+            color: white;
+        }
+
+        /* Strategy Comparison Table */
+        .comparison-table {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            overflow: hidden;
+        }
+
+        .table-header {
+            background: var(--dark-lighter);
+            padding: 1.5rem 2rem;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .table-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .table-content {
+            overflow-x: auto;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        th, td {
+            padding: 1rem 1.5rem;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        th {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        td {
+            font-size: 0.875rem;
+            color: var(--text-primary);
+        }
+
+        .strategy-name {
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        .strategy-icon {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--primary);
         }
 
         .metric-value {
             font-weight: 600;
         }
 
-        .positive {
-            color: #27ae60;
+        /* Status Indicator */
+        .status-indicator {
+            position: fixed;
+            top: 1rem;
+            right: 1rem;
+            padding: 0.75rem 1rem;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 0.875rem;
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
         }
 
-        .negative {
-            color: #e74c3c;
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--success);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        /* Progress Bar */
+        .progress-container {
+            margin: 1.5rem 0;
         }
 
         .progress-bar {
             width: 100%;
-            height: 20px;
-            background: #e0e0e0;
-            border-radius: 10px;
+            height: 6px;
+            background: var(--dark-lighter);
+            border-radius: 3px;
             overflow: hidden;
-            margin: 1rem 0;
         }
 
         .progress-fill {
             height: 100%;
-            background: linear-gradient(90deg, #3498db, #2980b9);
+            background: linear-gradient(90deg, var(--primary), var(--success));
+            border-radius: 3px;
+            transition: width 0.3s ease;
             width: 0%;
-            transition: width 0.3s;
         }
 
-        .log-container {
-            background: #2c3e50;
-            color: #ecf0f1;
-            padding: 1.5rem;
-            border-radius: 12px;
-            height: 450px;
-            overflow-y: auto;
-            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-            font-size: 0.8rem;
-            line-height: 1.4;
-            border: 2px solid #34495e;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
-        }
-
-        .enhanced-log {
-            height: 500px !important;
-            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 100%);
-            border: 2px solid #00d4ff;
-            border-radius: 15px;
-            padding: 1.5rem;
-            font-size: 0.8rem;
-            line-height: 1.3;
-            box-shadow: 0 8px 32px rgba(0, 212, 255, 0.2);
-        }
-
-        .log-entry {
-            margin: 0.2rem 0;
-            padding: 0.4rem 0.8rem;
-            border-radius: 6px;
-            border-left: 3px solid #333;
-            background: rgba(255, 255, 255, 0.02);
-            transition: all 0.2s ease;
-            word-wrap: break-word;
-            display: flex;
-            align-items: center;
-            min-height: 28px;
-        }
-
-        .log-entry:hover {
-            background: rgba(255, 255, 255, 0.05);
-            transform: translateX(2px);
-        }
-
-        /* 서브 로그 항목 스타일 (들여쓰기된 항목) - 더 나은 가독성 */
-        .log-entry.log-sub {
-            margin-left: 1.2rem;
-            padding: 0.3rem 0.6rem;
-            margin-bottom: 0.1rem;
+        .progress-text {
             font-size: 0.75rem;
-            border-left-width: 2px;
-            background: rgba(255, 255, 255, 0.01);
-            opacity: 0.9;
-            border-radius: 4px;
-            min-height: 24px;
-        }
-
-        .log-entry.log-sub:hover {
-            transform: translateX(1px);
-            opacity: 1;
-            background: rgba(255, 255, 255, 0.03);
-        }
-
-        .log-system { 
-            color: #00d4ff; 
-            border-left-color: #00d4ff;
-            background: rgba(0, 212, 255, 0.1);
-        }
-        .log-data { 
-            color: #ffffff; 
-            border-left-color: #ffffff;
-            background: rgba(255, 255, 255, 0.05);
-        }
-        .log-strategy { 
-            color: #e74c3c; 
-            border-left-color: #e74c3c;
-            background: rgba(231, 76, 60, 0.1);
-        }
-        .log-market { 
-            color: #ffd700; 
-            border-left-color: #ffd700;
-            background: rgba(255, 215, 0, 0.1);
-        }
-        .log-analysis { 
-            color: #ff6b6b; 
-            border-left-color: #ff6b6b;
-            background: rgba(255, 107, 107, 0.1);
-        }
-        .log-leverage { 
-            color: #ff9f43; 
-            border-left-color: #ff9f43;
-            background: rgba(255, 159, 67, 0.1);
-        }
-        .log-signal { 
-            color: #00ff88; 
-            border-left-color: #00ff88;
-            background: rgba(0, 255, 136, 0.1);
-        }
-        .log-buy { 
-            color: #00ff88; 
-            border-left-color: #00ff88;
-            background: rgba(0, 255, 136, 0.15);
-            font-weight: bold;
-        }
-        .log-buy_add { 
-            color: #4ecdc4; 
-            border-left-color: #4ecdc4;
-            background: rgba(78, 205, 196, 0.15);
-            font-weight: bold;
-        }
-        .log-sell { 
-            color: #ff6b6b; 
-            border-left-color: #ff6b6b;
-            background: rgba(255, 107, 107, 0.15);
-            font-weight: bold;
-        }
-        .log-position { 
-            color: #a29bfe; 
-            border-left-color: #a29bfe;
-            background: rgba(162, 155, 254, 0.1);
-        }
-        .log-price { 
-            color: #fd79a8; 
-            border-left-color: #fd79a8;
-            background: rgba(253, 121, 168, 0.1);
-        }
-        .log-profit { 
-            color: #00ff88; 
-            border-left-color: #00ff88;
-            background: rgba(0, 255, 136, 0.2);
-            font-weight: bold;
-            animation: profit-glow 2s ease-in-out infinite;
-        }
-        .log-result { 
-            color: #00ff88; 
-            border-left-color: #00ff88;
-            background: rgba(0, 255, 136, 0.2);
-            font-weight: bold;
-            font-size: 1.1rem;
-        }
-        .log-capital { 
-            color: #3498db; 
-            border-left-color: #3498db;
-            background: rgba(52, 152, 219, 0.1);
-            font-weight: bold;
-        }
-        .log-error {
-            color: #ff4757;
-            border-left-color: #ff4757;
-            background: rgba(255, 71, 87, 0.15);
-            font-weight: bold;
-        }
-
-        @keyframes profit-glow {
-            0%, 100% { box-shadow: 0 0 5px rgba(0, 255, 136, 0.3); }
-            50% { box-shadow: 0 0 20px rgba(0, 255, 136, 0.6); }
-        }
-
-        .stats-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-            margin-top: 1rem;
-        }
-
-        .stat-card {
-            background: rgba(255, 255, 255, 0.1);
-            border-radius: 10px;
-            padding: 1rem;
-            text-align: center;
-            backdrop-filter: blur(10px);
-        }
-
-        .stat-value {
-            font-size: 2rem;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
-        }
-
-        .stat-label {
-            font-size: 0.9rem;
-            opacity: 0.8;
-        }
-
-        .chart-container {
-            background: rgba(255, 255, 255, 0.95);
-            border-radius: 15px;
-            padding: 1.5rem;
-            margin-top: 1rem;
-            height: 400px;
-        }
-
-        .comparison-section {
-            grid-column: 1 / -1;
-            margin-top: 2rem;
-        }
-
-        .comparison-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 2rem;
-            margin-top: 1rem;
-        }
-
-        .performance-chart {
-            height: 300px;
-            background: white;
-            border-radius: 10px;
-            padding: 1rem;
-        }
-
-        .ml-optimization {
-            border-left: 4px solid #9b59b6;
-        }
-
-        .comparison-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-top: 1rem;
-        }
-
-        .comparison-table th,
-        .comparison-table td {
-            padding: 0.75rem;
-            text-align: left;
-            border-bottom: 1px solid #e0e0e0;
-        }
-
-        .comparison-table th {
-            background: #f8f9fa;
-            font-weight: 600;
-        }
-
-        .comparison-table tr:hover {
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .strategy-name {
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .ml-badge {
-            background: linear-gradient(135deg, #00d4ff, #0099cc);
-            color: white;
-            padding: 0.2rem 0.5rem;
-            border-radius: 10px;
-            font-size: 0.8rem;
-            font-weight: bold;
-        }
-
-        .risk-높음 { 
-            background: #ff4757; 
-            color: white; 
-            padding: 0.2rem 0.5rem; 
-            border-radius: 10px; 
-            font-size: 0.8rem; 
-        }
-        .risk-중간 { 
-            background: #ffa502; 
-            color: white; 
-            padding: 0.2rem 0.5rem; 
-            border-radius: 10px; 
-            font-size: 0.8rem; 
-        }
-        .risk-낮음 { 
-            background: #2ed573; 
-            color: white; 
-            padding: 0.2rem 0.5rem; 
-            border-radius: 10px; 
-            font-size: 0.8rem; 
-        }
-        .risk-매우낮음 { 
-            background: #70a1ff; 
-            color: white; 
-            padding: 0.2rem 0.5rem; 
-            border-radius: 10px; 
-            font-size: 0.8rem; 
-        }
-
-        .positive { color: #27ae60; font-weight: bold; }
-        .negative { color: #e74c3c; font-weight: bold; }
-        .warning { color: #f39c12; font-weight: bold; }
-
-        #strategyComparisonChart {
-            margin-top: 2rem;
-            text-align: center;
-        }
-
-        #strategyComparisonChart canvas {
-            max-width: 100%;
-            height: auto;
-        }
-
-        .modal {
-            display: none;
-            position: fixed;
-            z-index: 2000;
-            left: 0;
-            top: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.5);
-        }
-
-        .modal-content {
-            background: white;
-            margin: 5% auto;
-            padding: 2rem;
-            border-radius: 15px;
-            width: 90%;
-            max-width: 800px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .close {
-            color: #aaa;
-            float: right;
-            font-size: 28px;
-            font-weight: bold;
-            cursor: pointer;
-        }
-
-        .close:hover {
-            color: black;
-        }
-
-        .status-indicator {
-            display: inline-block;
-            width: 10px;
-            height: 10px;
-            border-radius: 50%;
-            margin-right: 0.5rem;
-        }
-
-        .status-running {
-            background: #27ae60;
-        }
-
-        .status-stopped {
-            background: #e74c3c;
-        }
-
-        .status-pending {
-            background: #f39c12;
-        }
-
-        .summary-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1rem;
-        }
-
-        .summary-item {
-            text-align: center;
-            padding: 1rem;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.1);
-        }
-
-        .summary-value {
-            font-size: 2rem;
-            font-weight: bold;
-            margin-bottom: 0.5rem;
-        }
-
-        .summary-label {
-            font-size: 0.9rem;
-            opacity: 0.8;
-        }
-
-        .strategy-categories {
-            margin: 2rem 0;
-        }
-
-        .strategy-item {
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.05);
-            border-left: 4px solid #3498db;
-        }
-
-        .strategy-item h4 {
-            margin: 0 0 0.5rem 0;
-            font-size: 1.1rem;
-        }
-
-        .strategy-item p {
-            margin: 0.25rem 0;
-            font-size: 0.9rem;
-        }
-
-        .strategy-metrics {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
-            gap: 0.5rem;
+            color: var(--text-secondary);
             margin-top: 0.5rem;
         }
 
-        .metric-item {
-            text-align: center;
-            padding: 0.5rem;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 5px;
-        }
-
-        .analysis-tabs {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            border-bottom: 2px solid #e0e0e0;
-        }
-
-        .tab-button {
-            background: none;
-            border: none;
-            padding: 1rem 2rem;
-            cursor: pointer;
-            font-size: 1rem;
-            color: #666;
-            border-bottom: 2px solid transparent;
-            transition: all 0.3s ease;
-        }
-
-        .tab-button:hover {
-            color: #3498db;
-        }
-
-        .tab-button.active {
-            color: #3498db;
-            border-bottom-color: #3498db;
-            font-weight: bold;
-        }
-
-        .tab-content {
-            padding: 2rem 0;
-        }
-
-        .recommendation-item {
-            padding: 1rem;
-            margin-bottom: 1rem;
-            border-radius: 10px;
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .recommendation-title {
-            font-weight: bold;
-            margin-bottom: 0.5rem;
-        }
-
-        .recommendation-reason {
-            font-size: 0.9rem;
-            opacity: 0.8;
-            margin-bottom: 0.5rem;
-        }
-
-        .recommendation-metrics {
-            display: flex;
-            gap: 1rem;
-            font-size: 0.9rem;
-        }
-
-        .comprehensive-analysis-section {
-            margin-top: 2rem;
-        }
-
-        .priority-높음 {
-            color: #e74c3c;
-            font-weight: bold;
-        }
-
-        .priority-중간 {
-            color: #f39c12;
-            font-weight: bold;
-        }
-
-        .priority-낮음 {
-            color: #27ae60;
-            font-weight: bold;
-        }
-
-        .insight-action {
-            margin-top: 0.5rem;
-            padding: 0.5rem;
-            background: rgba(52, 152, 219, 0.1);
-            border-radius: 5px;
-            font-size: 0.9rem;
-        }
-
-        .recommendation-priority {
-            margin-top: 0.5rem;
-            font-size: 0.9rem;
-        }
-
-        .analysis-summary {
-            background: rgba(255, 255, 255, 0.05);
-            padding: 1rem;
-            border-radius: 10px;
-            margin-bottom: 1rem;
-        }
-
-        .analysis-summary p {
-            margin: 0.5rem 0;
-        }
-
-        .insights {
-            margin-top: 1rem;
-        }
-        
-        /* Responsive Design and Layout Improvements */
-        .form-row {
-            display: flex;
-            gap: 1rem;
-            flex-wrap: wrap;
-            align-items: flex-end;
-        }
-        
-        .form-row .form-group {
-            flex: 1;
-            min-width: 200px;
-        }
-        
-        .control-buttons {
-            display: flex;
-            gap: 1rem;
-            margin-top: 2rem;
-            flex-wrap: wrap;
-            align-items: center;
-        }
-        
-        .btn-start, .btn-stop {
-            white-space: nowrap;
-            min-width: fit-content;
-        }
-        
-        .comprehensive-description {
-            line-height: 1.6;
-        }
-        
-        .comprehensive-description h4 {
-            margin: 0 0 0.8rem 0;
-            font-size: 1.1rem;
-            color: #2c3e50;
-        }
-        
-        .comprehensive-description ul {
-            margin: 0.8rem 0;
-            padding-left: 1.2rem;
-        }
-        
-        .comprehensive-description li {
-            margin-bottom: 0.4rem;
-            line-height: 1.5;
-        }
-        
-        .comprehensive-description p {
-            margin-bottom: 0.8rem;
-            line-height: 1.6;
-        }
-        
-        /* Mobile Responsive */
-        @media (max-width: 768px) {
-            .symbol-selection {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-            
-            .radio-group {
-                margin-right: 0;
-                margin-bottom: 0.5rem;
-            }
-            
-            .form-row {
-                flex-direction: column;
-            }
-            
-            .form-row .form-group {
-                min-width: 100%;
-            }
-            
-            .control-buttons {
-                flex-direction: column;
-            }
-            
-            .btn-start, .btn-stop {
-                width: 100%;
-                max-width: none;
-            }
-        }
-        
-        /* Tablet Responsive */
-        @media (max-width: 992px) {
+        /* Responsive Design */
+        @media (max-width: 1200px) {
             .container {
-                grid-template-columns: 1fr;
+                grid-template-columns: 280px 1fr;
                 gap: 1.5rem;
             }
-            
-            .form-row .form-group {
-                min-width: 150px;
-            }
-        }
-
-        .insights h5 {
-            margin-bottom: 0.5rem;
-            color: #3498db;
-        }
-
-        .insights ul {
-            padding-left: 1.5rem;
-        }
-
-        .insights li {
-            margin: 0.5rem 0;
-        }
-
-        /* 기간 선택 버튼 스타일 */
-        .period-buttons {
-            display: flex;
-            gap: 0.5rem;
-            flex-wrap: wrap;
-            margin-bottom: 1rem;
-        }
-
-        .period-btn {
-            background: linear-gradient(135deg, #f8f9fa, #e9ecef);
-            border: 2px solid #dee2e6;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            color: #495057;
-            transition: all 0.3s ease;
-            font-size: 0.9rem;
-        }
-
-        .period-btn:hover {
-            background: linear-gradient(135deg, #e9ecef, #dee2e6);
-            border-color: #adb5bd;
-            transform: translateY(-1px);
-        }
-
-        .period-btn.active {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-color: #667eea;
-            color: white;
-            box-shadow: 0 3px 10px rgba(102, 126, 234, 0.3);
-        }
-
-        .date-inputs {
-            transition: all 0.3s ease;
-        }
-
-        .date-inputs.hidden {
-            opacity: 0.5;
-            pointer-events: none;
-        }
-
-        /* 자본 프리셋 버튼 스타일 */
-        .capital-presets {
-            display: flex;
-            gap: 0.3rem;
-            flex-wrap: wrap;
-        }
-
-        .capital-preset-btn {
-            background: linear-gradient(135deg, #e9ecef, #f8f9fa);
-            border: 1px solid #dee2e6;
-            padding: 0.3rem 0.8rem;
-            border-radius: 6px;
-            cursor: pointer;
-            font-size: 0.8rem;
-            color: #495057;
-            transition: all 0.2s ease;
-        }
-
-        .capital-preset-btn:hover {
-            background: linear-gradient(135deg, #dee2e6, #e9ecef);
-            border-color: #adb5bd;
-            transform: translateY(-1px);
-        }
-
-        .capital-preset-btn:active {
-            background: linear-gradient(135deg, #667eea, #764ba2);
-            border-color: #667eea;
-            color: white;
         }
 
         @media (max-width: 768px) {
             .container {
                 grid-template-columns: 1fr;
+                padding: 1rem;
             }
             
-            .results-grid {
+            .control-panel {
+                position: static;
+                order: 2;
+            }
+            
+            .main-content {
+                order: 1;
+            }
+            
+            .performance-grid {
                 grid-template-columns: 1fr;
             }
-
-            .summary-grid {
-                grid-template-columns: 1fr;
+            
+            .header-content {
+                padding: 0 1rem;
             }
-
-            .analysis-tabs {
-                flex-wrap: wrap;
+            
+            .nav-items {
+                gap: 1rem;
             }
+        }
 
-            .tab-button {
-                padding: 0.5rem 1rem;
-            }
+        /* Loading Animation */
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: relative;
+            cursor: help;
+        }
+
+        .tooltip:hover::after {
+            content: attr(data-tooltip);
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 0.5rem;
+            background: var(--dark);
+            color: var(--text-primary);
+            font-size: 0.75rem;
+            border-radius: 6px;
+            white-space: nowrap;
+            z-index: 1000;
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <a href="/" class="nav-button">
-            🏠 메인 페이지
-        </a>
-        <h1>🚀 AlphaGenesis 백테스트 대시보드</h1>
-        <div style="width: 120px;"></div> <!-- 균형을 위한 공간 -->
+    <div class="bg-animation"></div>
+    
+    <!-- Status Indicator -->
+    <div class="status-indicator">
+        <div class="status-dot"></div>
+        <span>System Online</span>
     </div>
 
-    <div class="container">
-        <!-- 백테스트 설정 -->
-        <div class="card">
-            <h2>📊 백테스트 설정</h2>
-            <form id="backtestForm">
-                <div class="form-group">
-                    <label>백테스트 기간 설정</label>
-                    <div class="period-buttons" style="margin-bottom: 1rem;">
-                        <button type="button" class="period-btn" data-period="6m">6개월</button>
-                        <button type="button" class="period-btn" data-period="1y">1년</button>
-                        <button type="button" class="period-btn" data-period="1.5y">1년 6개월</button>
-                        <button type="button" class="period-btn" data-period="2y">2년</button>
-                        <button type="button" class="period-btn" data-period="3y">3년</button>
-                        <button type="button" class="period-btn" data-period="custom">커스텀</button>
-                    </div>
-                    <div class="date-inputs" id="dateInputs">
-                        <div style="display: flex; gap: 1rem;">
-                            <div style="flex: 1;">
-                                <label for="startDate">시작일</label>
-                                <input type="date" id="startDate" name="startDate" required>
-                            </div>
-                            <div style="flex: 1;">
-                                <label for="endDate">종료일</label>
-                                <input type="date" id="endDate" name="endDate" required>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>백테스트 모드</label>
-                    <div class="symbol-selection">
-                        <div class="radio-group">
-                            <input type="radio" id="fourStrategyMode" name="backtestMode" value="four_strategy" checked>
-                            <label for="fourStrategyMode">4가지 전략 비교 (기본 vs 알파)</label>
-                        </div>
-                        <div class="radio-group">
-                            <input type="radio" id="allSymbolsMode" name="backtestMode" value="all_symbols">
-                            <label for="allSymbolsMode">전체 USDT.P 선물 테스트</label>
-                        </div>
-                        <div class="radio-group">
-                            <input type="radio" id="individualMode" name="backtestMode" value="individual">
-                            <label for="individualMode">개별 전략 테스트</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group" id="symbolTypeContainer">
-                    <label>심볼 선택</label>
-                    <div class="symbol-selection">
-                        <div class="radio-group">
-                            <input type="radio" id="individualSymbol" name="symbolType" value="individual" checked>
-                            <label for="individualSymbol">개별 심볼</label>
-                        </div>
-                        <div class="radio-group">
-                            <input type="radio" id="allSymbols" name="symbolType" value="all">
-                            <label for="allSymbols">시장 전체</label>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group" id="symbolListContainer">
-                    <label for="symbolSelect">심볼 선택</label>
-                    <select id="symbolSelect" name="symbol">
-                        <option value="">로딩 중...</option>
-                    </select>
-                </div>
-
-                <div class="form-group" id="strategyContainer">
-                    <label for="strategy">전략 선택</label>
-                    <select id="strategy" name="strategy" required>
-                        <option value="">전략을 선택하세요</option>
-                    </select>
-                </div>
-
-                <div class="form-group" id="timeframeContainer">
-                    <label for="timeframe">시간프레임</label>
-                    <select id="timeframe" name="timeframe" disabled>
-                        <option value="">전략을 먼저 선택하세요</option>
-                    </select>
-                </div>
-
-                <div class="form-group" id="comprehensiveDescription" style="display: none;">
-                    <div style="padding: 1rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; border-radius: 10px; border: 2px solid #e0e0e0;">
-                        <h4 style="margin-top: 0; color: white;">🔬 전략 통합 분석 모드</h4>
-                        <p style="margin-bottom: 0;">이 모드에서는 모든 전략을 동일한 날짜 범위에서 백테스트하고 다음과 같은 분석을 제공합니다:</p>
-                        <ul style="margin: 0.5rem 0 0 1rem; padding: 0;">
-                            <li>각 전략의 상대적 성과 비교</li>
-                            <li>폐기 권장 전략 식별</li>
-                            <li>수정이 필요한 전략 분석</li>
-                            <li>조합 가능한 전략 추천</li>
-                            <li>상세한 성과 분석 및 인사이트</li>
-                        </ul>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label for="initialCapital">초기 자본</label>
-                    <div style="display: flex; gap: 0.5rem; align-items: center;">
-                        <input type="number" id="initialCapital" name="initialCapital" value="10000" min="1000" step="1000" style="flex: 1;">
-                        <select id="capitalUnit" name="capitalUnit" style="width: 100px;">
-                            <option value="USD">USD</option>
-                            <option value="KRW">KRW</option>
-                            <option value="USDT">USDT</option>
-                        </select>
-                    </div>
-                    <div class="capital-presets" style="margin-top: 0.5rem;">
-                        <button type="button" class="capital-preset-btn" data-amount="1000">$1K</button>
-                        <button type="button" class="capital-preset-btn" data-amount="10000">$10K</button>
-                        <button type="button" class="capital-preset-btn" data-amount="50000">$50K</button>
-                        <button type="button" class="capital-preset-btn" data-amount="100000">$100K</button>
-                        <button type="button" class="capital-preset-btn" data-amount="1000000">$1M</button>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>동적 레버리지</label>
-                    <div id="dynamicLeverageInfo" style="padding: 0.75rem; background: #f8f9fa; border-radius: 10px; border: 2px solid #e0e0e0;">
-                        <span id="leverageValue">자동 계산됨</span>
-                        <div style="font-size: 0.9rem; color: #666; margin-top: 0.5rem;">
-                            <span id="leverageReason">시장 상황과 전략에 따라 자동으로 최적화됩니다</span>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="mlOptimization" name="mlOptimization">
-                        ML 최적화 적용
-                    </label>
-                </div>
-
-                <div class="btn-group">
-                    <button type="submit" class="btn btn-success" id="startBtn">백테스트 시작</button>
-                    <button type="button" class="btn btn-danger" id="stopBtn">중지</button>
-                    <button type="button" class="btn btn-warning" id="resetBtn">초기화</button>
-                </div>
-            </form>
+    <!-- Header -->
+    <header class="header">
+        <div class="header-content">
+            <a href="/" class="logo">
+                <i class="fas fa-rocket"></i>
+                <span>AlphaGenesis</span>
+            </a>
+            <nav class="nav-items">
+                <a href="/dashboard" class="nav-link">Dashboard</a>
+                <a href="/backtest" class="nav-link active">Backtest</a>
+                <a href="/live-trading" class="nav-link">Live Trading</a>
+                <a href="/analytics" class="nav-link">Analytics</a>
+            </nav>
         </div>
+    </header>
 
-        <!-- 실시간 상태 -->
-        <div class="card">
-            <h2>📈 실시간 상태</h2>
+    <!-- Main Container -->
+    <div class="container">
+        <!-- Control Panel -->
+        <div class="control-panel">
+            <h2 class="panel-title">
+                <i class="fas fa-cog"></i>
+                Backtest Configuration
+            </h2>
+
+            <!-- Strategy Selection -->
             <div class="form-group">
-                <label>백테스트 상태</label>
-                <div id="backtestStatus">
-                    <span class="status-indicator status-stopped"></span>
-                    <span>대기 중</span>
+                <label class="form-label">Strategy Mode</label>
+                <div class="strategy-toggle">
+                    <button class="strategy-btn active" data-mode="compare">Compare 4</button>
+                    <button class="strategy-btn" data-mode="all">All Symbols</button>
                 </div>
             </div>
 
+            <!-- Symbol Selection -->
+            <div class="form-group" id="symbolGroup">
+                <label class="form-label">Trading Symbol</label>
+                <select class="form-select" id="symbolSelect">
+                    <option value="BTC/USDT">BTC/USDT</option>
+                    <option value="ETH/USDT">ETH/USDT</option>
+                    <option value="BNB/USDT">BNB/USDT</option>
+                </select>
+            </div>
+
+            <!-- Time Period -->
             <div class="form-group">
-                <label>진행률</label>
+                <label class="form-label">Time Period</label>
+                <div class="period-selector">
+                    <button class="period-btn" data-period="6m">6M</button>
+                    <button class="period-btn" data-period="1y">1Y</button>
+                    <button class="period-btn active" data-period="2y">2Y</button>
+                    <button class="period-btn" data-period="3y">3Y</button>
+                    <button class="period-btn" data-period="5y">5Y</button>
+                    <button class="period-btn" data-period="custom">Custom</button>
+                </div>
+                <div class="date-inputs" style="display: none;">
+                    <input type="date" class="form-input" id="startDate" style="margin-bottom: 0.5rem;">
+                    <input type="date" class="form-input" id="endDate">
+                </div>
+            </div>
+
+            <!-- Initial Capital -->
+            <div class="form-group">
+                <label class="form-label">Initial Capital</label>
+                <div class="capital-input">
+                    <input type="number" class="form-input" id="capitalAmount" value="10000" min="1000">
+                    <select class="form-select" id="capitalCurrency" style="width: 80px;">
+                        <option value="USD">USD</option>
+                        <option value="USDT">USDT</option>
+                    </select>
+                </div>
+                <div class="capital-presets">
+                    <button class="capital-preset" data-amount="1000">$1K</button>
+                    <button class="capital-preset" data-amount="5000">$5K</button>
+                    <button class="capital-preset" data-amount="10000">$10K</button>
+                    <button class="capital-preset" data-amount="50000">$50K</button>
+                    <button class="capital-preset" data-amount="100000">$100K</button>
+                </div>
+            </div>
+
+            <!-- Advanced Settings -->
+            <div class="form-group">
+                <label class="form-label">Risk Management</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.5rem;">
+                    <input type="number" class="form-input" placeholder="Max Risk %" value="2" min="0.1" max="10" step="0.1">
+                    <input type="number" class="form-input" placeholder="Stop Loss %" value="5" min="1" max="20" step="0.5">
+                </div>
+            </div>
+
+            <!-- Progress -->
+            <div class="progress-container" style="display: none;" id="progressContainer">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progressFill"></div>
                 </div>
-                <div id="progressText">0%</div>
+                <div class="progress-text" id="progressText">Initializing...</div>
             </div>
 
-            <div class="form-group">
-                <label>실시간 로그</label>
-                <div class="log-container enhanced-log" id="logContainer">
-                    <div class="log-entry log-system">🚀 백테스트를 시작하면 로그가 표시됩니다.</div>
-                </div>
+            <!-- Action Buttons -->
+            <div class="action-buttons">
+                <button class="btn btn-primary" id="runBacktest">
+                    <i class="fas fa-play"></i>
+                    Run Backtest
+                </button>
+                <button class="btn btn-secondary" id="resetBacktest">
+                    <i class="fas fa-refresh"></i>
+                    Reset
+                </button>
             </div>
         </div>
-    </div>
 
-    <!-- 백테스트 결과 섹션 -->
-    <div class="results-section">
-        <div class="card">
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Results Header -->
             <div class="results-header">
-                <h2>📊 백테스트 결과</h2>
-                <div class="btn-group">
-                    <button class="btn" id="compareBtn">성과 비교</button>
-                    <button class="btn" id="exportBtn">엑셀 다운로드</button>
-                    <button class="btn" id="resetBtn" style="background: #e74c3c;">결과 초기화</button>
-                    <button class="btn" id="statsBtn" style="background: #9b59b6;">통계 보기</button>
+                <h1 class="results-title">Backtest Results</h1>
+                <div class="results-actions">
+                    <button class="results-btn" data-tooltip="Export to CSV">
+                        <i class="fas fa-download"></i>
+                    </button>
+                    <button class="results-btn" data-tooltip="Share Results">
+                        <i class="fas fa-share"></i>
+                    </button>
+                    <button class="results-btn" data-tooltip="Save Configuration">
+                        <i class="fas fa-save"></i>
+                    </button>
                 </div>
             </div>
 
-            <div class="results-grid" id="resultsGrid">
-                <!-- 결과 카드들이 여기에 동적으로 추가됩니다 -->
+            <!-- Performance Cards -->
+            <div class="performance-grid">
+                <div class="performance-card">
+                    <div class="card-header">
+                        <span class="card-title">Total Return</span>
+                        <span class="card-badge badge-success">Excellent</span>
+                    </div>
+                    <div class="card-value" id="totalReturn">+24.7%</div>
+                    <div class="card-change positive">
+                        <i class="fas fa-arrow-up"></i>
+                        +12.3% vs benchmark
+                    </div>
+                </div>
+
+                <div class="performance-card">
+                    <div class="card-header">
+                        <span class="card-title">Sharpe Ratio</span>
+                        <span class="card-badge badge-success">Strong</span>
+                    </div>
+                    <div class="card-value" id="sharpeRatio">2.34</div>
+                    <div class="card-change positive">
+                        <i class="fas fa-arrow-up"></i>
+                        Risk-adjusted return
+                    </div>
+                </div>
+
+                <div class="performance-card">
+                    <div class="card-header">
+                        <span class="card-title">Max Drawdown</span>
+                        <span class="card-badge badge-warning">Moderate</span>
+                    </div>
+                    <div class="card-value" id="maxDrawdown">-8.2%</div>
+                    <div class="card-change negative">
+                        <i class="fas fa-arrow-down"></i>
+                        Peak to trough
+                    </div>
+                </div>
+
+                <div class="performance-card">
+                    <div class="card-header">
+                        <span class="card-title">Win Rate</span>
+                        <span class="card-badge badge-success">High</span>
+                    </div>
+                    <div class="card-value" id="winRate">67.8%</div>
+                    <div class="card-change positive">
+                        <i class="fas fa-arrow-up"></i>
+                        456 / 673 trades
+                    </div>
+                </div>
+
+                <div class="performance-card">
+                    <div class="card-header">
+                        <span class="card-title">Profit Factor</span>
+                        <span class="card-badge badge-success">Excellent</span>
+                    </div>
+                    <div class="card-value" id="profitFactor">1.89</div>
+                    <div class="card-change positive">
+                        <i class="fas fa-arrow-up"></i>
+                        Gross profit/loss
+                    </div>
+                </div>
+
+                <div class="performance-card">
+                    <div class="card-header">
+                        <span class="card-title">Annual Return</span>
+                        <span class="card-badge badge-success">Strong</span>
+                    </div>
+                    <div class="card-value" id="annualReturn">18.6%</div>
+                    <div class="card-change positive">
+                        <i class="fas fa-arrow-up"></i>
+                        Compounded annual
+                    </div>
+                </div>
             </div>
 
-            <div class="card ml-optimization" id="mlComparisonCard" style="display: none;">
-                <h3>🤖 ML 최적화 비교</h3>
-                <table class="comparison-table">
-                    <thead>
-                        <tr>
-                            <th>구분</th>
-                            <th>수익률</th>
-                            <th>샤프 비율</th>
-                            <th>최대 낙폭</th>
-                            <th>승률</th>
-                            <th>거래 횟수</th>
-                        </tr>
-                    </thead>
-                    <tbody id="mlComparisonBody">
-                        <!-- ML 비교 데이터가 여기에 추가됩니다 -->
-                    </tbody>
-                </table>
-            </div>
-
-            <!-- 성과 통계 -->
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-value positive" id="totalReturn">+0.0%</div>
-                    <div class="stat-label">총 수익률</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="totalTrades">0</div>
-                    <div class="stat-label">총 거래 횟수</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="winRate">0.0%</div>
-                    <div class="stat-label">승률</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="sharpeRatio">0.0</div>
-                    <div class="stat-label">샤프 비율</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value negative" id="maxDrawdown">0.0%</div>
-                    <div class="stat-label">최대 낙폭</div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-value" id="avgLeverage">0.0x</div>
-                    <div class="stat-label">평균 레버리지</div>
-                </div>
-            </div>
-
-            <!-- 성과 차트 -->
+            <!-- Performance Chart -->
             <div class="chart-container">
-                <canvas id="performanceChart"></canvas>
-            </div>
-        </div>
-    </div>
-
-    <!-- 전략 비교 섹션 -->
-    <div class="comparison-section">
-        <div class="card">
-            <h2>⚔️ 전략 성과 비교</h2>
-            <div class="comparison-grid">
-                <div class="performance-chart">
-                    <canvas id="strategyComparisonChart"></canvas>
-                </div>
-                <div class="performance-chart">
-                    <canvas id="riskReturnChart"></canvas>
-                </div>
-            </div>
-            
-            <table class="comparison-table" id="strategyComparisonTable">
-                <thead>
-                    <tr>
-                        <th>전략</th>
-                        <th>수익률</th>
-                        <th>샤프 비율</th>
-                        <th>최대 낙폭</th>
-                        <th>승률</th>
-                        <th>거래 횟수</th>
-                        <th>평균 레버리지</th>
-                        <th>위험 등급</th>
-                    </tr>
-                </thead>
-                <tbody id="strategyComparisonBody">
-                    <!-- 전략 비교 데이터가 여기에 추가됩니다 -->
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <!-- 전략 통합 분석 섹션 -->
-    <div class="comprehensive-analysis-section" id="comprehensiveAnalysisSection" style="display: none;">
-        <div class="card">
-            <h2>🔬 전략 통합 분석 결과</h2>
-            
-            <!-- 분석 요약 -->
-            <div class="analysis-summary">
-                <div class="card" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; margin-bottom: 2rem;">
-                    <h3 style="color: white;">📊 분석 요약</h3>
-                    <div class="summary-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
-                        <div class="summary-item">
-                            <div class="summary-value" id="totalStrategiesTested">0</div>
-                            <div class="summary-label">테스트된 전략 수</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-value" id="bestStrategy">-</div>
-                            <div class="summary-label">최고 성과 전략</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-value" id="avgReturn">0.0%</div>
-                            <div class="summary-label">평균 수익률</div>
-                        </div>
-                        <div class="summary-item">
-                            <div class="summary-value" id="recommendedStrategies">0</div>
-                            <div class="summary-label">추천 전략 수</div>
-                        </div>
+                <div class="chart-header">
+                    <h3 class="chart-title">Equity Curve</h3>
+                    <div class="chart-controls">
+                        <button class="chart-btn active" data-period="1D">1D</button>
+                        <button class="chart-btn" data-period="1W">1W</button>
+                        <button class="chart-btn" data-period="1M">1M</button>
+                        <button class="chart-btn" data-period="ALL">All</button>
                     </div>
                 </div>
+                <canvas id="equityChart"></canvas>
             </div>
 
-            <!-- 전략 분류 -->
-            <div class="strategy-categories">
-                <div class="comparison-grid">
-                    <!-- 추천 전략 -->
-                    <div class="card" style="border-left: 4px solid #27ae60;">
-                        <h3 style="color: #27ae60;">✅ 추천 전략</h3>
-                        <div id="recommendedStrategiesList">
-                            <!-- 추천 전략이 여기에 표시됩니다 -->
-                        </div>
-                    </div>
-
-                    <!-- 수정 필요 전략 -->
-                    <div class="card" style="border-left: 4px solid #f39c12;">
-                        <h3 style="color: #f39c12;">⚠️ 수정 필요 전략</h3>
-                        <div id="modificationNeededList">
-                            <!-- 수정 필요 전략이 여기에 표시됩니다 -->
-                        </div>
-                    </div>
-
-                    <!-- 폐기 권장 전략 -->
-                    <div class="card" style="border-left: 4px solid #e74c3c;">
-                        <h3 style="color: #e74c3c;">❌ 폐기 권장 전략</h3>
-                        <div id="discardRecommendedList">
-                            <!-- 폐기 권장 전략이 여기에 표시됩니다 -->
-                        </div>
-                    </div>
-
-                    <!-- 조합 추천 전략 -->
-                    <div class="card" style="border-left: 4px solid #9b59b6;">
-                        <h3 style="color: #9b59b6;">🔗 조합 추천</h3>
-                        <div id="combinationRecommendations">
-                            <!-- 조합 추천이 여기에 표시됩니다 -->
-                        </div>
-                    </div>
+            <!-- Strategy Comparison -->
+            <div class="comparison-table">
+                <div class="table-header">
+                    <h3 class="table-title">Strategy Performance Comparison</h3>
                 </div>
-            </div>
-
-            <!-- 상세 분석 -->
-            <div class="detailed-analysis">
-                <h3>📈 상세 성과 분석</h3>
-                <div class="analysis-tabs">
-                    <button class="tab-button active" onclick="showAnalysisTab('performance')">성과 분석</button>
-                    <button class="tab-button" onclick="showAnalysisTab('risk')">위험 분석</button>
-                    <button class="tab-button" onclick="showAnalysisTab('correlation')">상관관계</button>
-                    <button class="tab-button" onclick="showAnalysisTab('insights')">인사이트</button>
+                <div class="table-content">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Strategy</th>
+                                <th>Return</th>
+                                <th>Sharpe</th>
+                                <th>Max DD</th>
+                                <th>Win Rate</th>
+                                <th>Trades</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="strategyTableBody">
+                            <tr>
+                                <td>
+                                    <div class="strategy-name">
+                                        <div class="strategy-icon" style="background: #0066FF;"></div>
+                                        Strategy 1 (Basic)
+                                    </div>
+                                </td>
+                                <td><span class="metric-value positive">+18.4%</span></td>
+                                <td><span class="metric-value">1.95</span></td>
+                                <td><span class="metric-value negative">-12.3%</span></td>
+                                <td><span class="metric-value">64.2%</span></td>
+                                <td><span class="metric-value">523</span></td>
+                                <td><span class="card-badge badge-success">Active</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="strategy-name">
+                                        <div class="strategy-icon" style="background: #00D084;"></div>
+                                        Strategy 1-1 (Alpha)
+                                    </div>
+                                </td>
+                                <td><span class="metric-value positive">+24.7%</span></td>
+                                <td><span class="metric-value">2.34</span></td>
+                                <td><span class="metric-value negative">-8.2%</span></td>
+                                <td><span class="metric-value">67.8%</span></td>
+                                <td><span class="metric-value">456</span></td>
+                                <td><span class="card-badge badge-success">Best</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="strategy-name">
+                                        <div class="strategy-icon" style="background: #FFB800;"></div>
+                                        Strategy 2 (Basic)
+                                    </div>
+                                </td>
+                                <td><span class="metric-value positive">+15.9%</span></td>
+                                <td><span class="metric-value">1.67</span></td>
+                                <td><span class="metric-value negative">-15.7%</span></td>
+                                <td><span class="metric-value">61.5%</span></td>
+                                <td><span class="metric-value">389</span></td>
+                                <td><span class="card-badge badge-warning">Review</span></td>
+                            </tr>
+                            <tr>
+                                <td>
+                                    <div class="strategy-name">
+                                        <div class="strategy-icon" style="background: #FF4757;"></div>
+                                        Strategy 2-1 (Alpha)
+                                    </div>
+                                </td>
+                                <td><span class="metric-value positive">+21.3%</span></td>
+                                <td><span class="metric-value">2.12</span></td>
+                                <td><span class="metric-value negative">-9.8%</span></td>
+                                <td><span class="metric-value">65.9%</span></td>
+                                <td><span class="metric-value">412</span></td>
+                                <td><span class="card-badge badge-success">Active</span></td>
+                            </tr>
+                        </tbody>
+                    </table>
                 </div>
-                
-                <div class="tab-content" id="performanceTab">
-                    <div class="chart-container">
-                        <canvas id="comprehensivePerformanceChart"></canvas>
-                    </div>
-                    <div id="performanceAnalysis">
-                        <!-- 성과 분석 내용 -->
-                    </div>
-                </div>
-
-                <div class="tab-content" id="riskTab" style="display: none;">
-                    <div class="chart-container">
-                        <canvas id="riskAnalysisChart"></canvas>
-                    </div>
-                    <div id="riskAnalysis">
-                        <!-- 위험 분석 내용 -->
-                    </div>
-                </div>
-
-                <div class="tab-content" id="correlationTab" style="display: none;">
-                    <div class="chart-container">
-                        <canvas id="correlationChart"></canvas>
-                    </div>
-                    <div id="correlationAnalysis">
-                        <!-- 상관관계 분석 내용 -->
-                    </div>
-                </div>
-
-                <div class="tab-content" id="insightsTab" style="display: none;">
-                    <div id="insightsContent">
-                        <!-- 인사이트 내용 -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- 액션 버튼 -->
-            <div class="btn-group" style="margin-top: 2rem;">
-                <button class="btn btn-success" onclick="exportComprehensiveAnalysis()">분석 결과 다운로드</button>
-                <button class="btn" onclick="generateOptimizedPortfolio()">최적화 포트폴리오 생성</button>
-                <button class="btn btn-warning" onclick="resetComprehensiveAnalysis()">분석 초기화</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- 상세 정보 모달 -->
-    <div id="detailModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>백테스트 상세 정보</h2>
-            <div id="detailContent">
-                <!-- 상세 정보가 여기에 표시됩니다 -->
             </div>
         </div>
     </div>
 
     <script>
-        // 전역 변수
-        let currentBacktestId = null;
-        let eventSource = null;
-        let strategies = [];
-        let symbols = [];
+        // Global variables
+        let equityChart = null;
+        let isRunning = false;
 
-        // 페이지 로드 시 초기화 (자동 실행 완전 제거)
+        // Initialize on page load
         document.addEventListener('DOMContentLoaded', function() {
-            initializeDates();
-            // loadStrategies(); // 자동 로드 제거 - 수동으로만 로드
-            // loadSymbols(); // 자동 로드 제거 - 수동으로만 로드
-            // loadBacktestResults(); // 자동 로드 제거
+            initializeUI();
             setupEventListeners();
-            updateStatus('stopped', '전략과 심볼을 선택한 후 백테스트를 시작하세요');
-            
-            // 사용자가 수동으로 로드할 수 있도록 버튼 활성화
-            enableManualLoading();
+            initializeChart();
         });
 
-        // 날짜 초기화 (시작일: 1달 전, 종료일: 오늘)
-        function initializeDates() {
+        function initializeUI() {
+            // Set default dates
             const today = new Date();
-            const oneMonthAgo = new Date();
-            oneMonthAgo.setMonth(today.getMonth() - 1);
-
-            document.getElementById('startDate').value = oneMonthAgo.toISOString().split('T')[0];
+            const twoYearsAgo = new Date();
+            twoYearsAgo.setFullYear(today.getFullYear() - 2);
+            
+            document.getElementById('startDate').value = twoYearsAgo.toISOString().split('T')[0];
             document.getElementById('endDate').value = today.toISOString().split('T')[0];
         }
 
-        // 전략 목록 로드 (수동으로만 실행)
-        async function loadStrategies() {
-            try {
-                console.log('사용자 요청으로 전략 목록 로드 중...');
-                const response = await fetch('/api/strategies');
-                const data = await response.json();
-                strategies = data.strategies || [];
-                
-                const strategySelect = document.getElementById('strategy');
-                strategySelect.innerHTML = '<option value="">전략을 선택하세요</option>';
-                
-                strategies.forEach(strategy => {
-                    const option = document.createElement('option');
-                    option.value = strategy.id;
-                    option.textContent = strategy.name;
-                    option.dataset.timeframe = strategy.timeframe;
-                    strategySelect.appendChild(option);
-                });
-                
-                console.log(`전략 목록 로드 완료: ${strategies.length}개`);
-            } catch (error) {
-                console.error('전략 로드 실패:', error);
-                const strategySelect = document.getElementById('strategy');
-                strategySelect.innerHTML = '<option value="">전략 로드 실패 - 다시 시도</option>';
-            }
-        }
-
-        // 수동 로딩 기능 활성화
-        function enableManualLoading() {
-            // 전략 선택 박스에 로드 버튼 기능 추가
-            const strategySelect = document.getElementById('strategy');
-            if (strategySelect && !strategySelect.hasAttribute('data-loaded')) {
-                strategySelect.innerHTML = '<option value="">전략 목록 로드하기</option>';
-                strategySelect.addEventListener('focus', function() {
-                    if (!this.hasAttribute('data-loaded')) {
-                        loadStrategies();
-                        this.setAttribute('data-loaded', 'true');
-                    }
-                });
-            }
-            
-            // 심볼 선택 박스에 로드 버튼 기능 추가
-            const symbolSelect = document.getElementById('symbolSelect');
-            if (symbolSelect && !symbolSelect.hasAttribute('data-loaded')) {
-                symbolSelect.innerHTML = '<option value="">심볼 목록 로드하기</option>';
-                symbolSelect.addEventListener('focus', function() {
-                    if (!this.hasAttribute('data-loaded')) {
-                        loadSymbols();
-                        this.setAttribute('data-loaded', 'true');
-                    }
-                });
-            }
-        }
-
-        // 심볼 목록 로드 (수동으로만 실행)
-        async function loadSymbols() {
-            try {
-                console.log('사용자 요청으로 심볼 목록 로드 중...');
-                const response = await fetch('/api/binance/symbols');
-                const data = await response.json();
-                symbols = data.symbols || [];
-                
-                const symbolSelect = document.getElementById('symbolSelect');
-                symbolSelect.innerHTML = '<option value="">심볼을 선택하세요</option>';
-                
-                symbols.forEach(symbol => {
-                    const option = document.createElement('option');
-                    option.value = symbol;
-                    option.textContent = symbol;
-                    symbolSelect.appendChild(option);
-                });
-                
-                console.log(`심볼 목록 로드 완료: ${symbols.length}개`);
-            } catch (error) {
-                console.error('심볼 로드 실패:', error);
-                const symbolSelect = document.getElementById('symbolSelect');
-                symbolSelect.innerHTML = '<option value="">심볼 로드 실패 - 다시 시도</option>';
-            }
-        }
-
-        // 백테스트 모드 전환
-        function toggleBacktestMode(mode) {
-            const symbolTypeContainer = document.getElementById('symbolTypeContainer');
-            const symbolListContainer = document.getElementById('symbolListContainer');
-            const strategyContainer = document.getElementById('strategyContainer');
-            const timeframeContainer = document.getElementById('timeframeContainer');
-            const comprehensiveDescription = document.getElementById('comprehensiveDescription');
-            const strategy = document.getElementById('strategy');
-            const startBtn = document.getElementById('startBtn');
-
-            if (mode === 'four_strategy') {
-                // 4가지 전략 비교 모드
-                symbolTypeContainer.style.display = 'block';
-                symbolListContainer.style.display = 'block';
-                strategyContainer.style.display = 'none';
-                timeframeContainer.style.display = 'none';
-                comprehensiveDescription.style.display = 'none';
-                
-                strategy.removeAttribute('required');
-                startBtn.textContent = '4가지 전략 비교 시작';
-                
-                // 개별 심볼 모드로 고정
-                document.querySelector('input[value="individual"]').checked = true;
-                
-            } else if (mode === 'all_symbols') {
-                // 전체 USDT.P 선물 테스트 모드
-                symbolTypeContainer.style.display = 'none';
-                symbolListContainer.style.display = 'none';
-                strategyContainer.style.display = 'none';
-                timeframeContainer.style.display = 'none';
-                comprehensiveDescription.style.display = 'none';
-                
-                strategy.removeAttribute('required');
-                startBtn.textContent = '전체 USDT.P 선물 테스트 시작';
-                
-            } else {
-                // 개별 전략 테스트 모드
-                symbolTypeContainer.style.display = 'block';
-                symbolListContainer.style.display = 'block';
-                strategyContainer.style.display = 'block';
-                timeframeContainer.style.display = 'block';
-                comprehensiveDescription.style.display = 'none';
-                
-                strategy.setAttribute('required', 'required');
-                startBtn.textContent = '백테스트 시작';
-                
-                // 심볼 타입에 따라 심볼 선택 표시/숨김
-                const symbolTypeValue = document.querySelector('input[name="symbolType"]:checked')?.value;
-                if (symbolTypeValue === 'all') {
-                    symbolListContainer.style.display = 'none';
-                } else {
-                    symbolListContainer.style.display = 'block';
-                }
-            }
-        }
-
-        // 이벤트 리스너 설정
         function setupEventListeners() {
-            // 백테스트 모드 변경
-            document.querySelectorAll('input[name="backtestMode"]').forEach(radio => {
-                radio.addEventListener('change', function() {
-                    toggleBacktestMode(this.value);
+            // Strategy mode toggle
+            document.querySelectorAll('.strategy-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.strategy-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    
+                    const mode = this.dataset.mode;
+                    const symbolGroup = document.getElementById('symbolGroup');
+                    
+                    if (mode === 'all') {
+                        symbolGroup.style.display = 'none';
+                    } else {
+                        symbolGroup.style.display = 'block';
+                    }
                 });
             });
 
-            // 전략 선택 시 시간프레임 자동 설정
-            document.getElementById('strategy').addEventListener('change', function() {
-                const selectedOption = this.options[this.selectedIndex];
-                const timeframe = selectedOption.dataset.timeframe;
-                const timeframeSelect = document.getElementById('timeframe');
-                
-                if (timeframe) {
-                    timeframeSelect.innerHTML = `<option value="${timeframe}">${timeframe}</option>`;
-                    timeframeSelect.disabled = true;
-                } else {
-                    timeframeSelect.innerHTML = '<option value="">전략을 먼저 선택하세요</option>';
-                    timeframeSelect.disabled = true;
-                }
-            });
-
-            // 기간 선택 버튼 이벤트
+            // Period selector
             document.querySelectorAll('.period-btn').forEach(btn => {
                 btn.addEventListener('click', function() {
-                    // 모든 버튼 비활성화
                     document.querySelectorAll('.period-btn').forEach(b => b.classList.remove('active'));
-                    // 클릭된 버튼 활성화
                     this.classList.add('active');
                     
                     const period = this.dataset.period;
-                    const dateInputs = document.getElementById('dateInputs');
+                    const dateInputs = document.querySelector('.date-inputs');
                     
                     if (period === 'custom') {
-                        dateInputs.classList.remove('hidden');
-                        return;
+                        dateInputs.style.display = 'block';
+                    } else {
+                        dateInputs.style.display = 'none';
+                        setDateRange(period);
                     }
-                    
-                    // 자동 날짜 설정
-                    const endDate = new Date();
-                    const startDate = new Date();
-                    
-                    switch(period) {
-                        case '6m':
-                            startDate.setMonth(endDate.getMonth() - 6);
-                            break;
-                        case '1y':
-                            startDate.setFullYear(endDate.getFullYear() - 1);
-                            break;
-                        case '1.5y':
-                            startDate.setMonth(endDate.getMonth() - 18);
-                            break;
-                        case '2y':
-                            startDate.setFullYear(endDate.getFullYear() - 2);
-                            break;
-                        case '3y':
-                            startDate.setFullYear(endDate.getFullYear() - 3);
-                            break;
-                    }
-                    
-                    document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
-                    document.getElementById('endDate').value = endDate.toISOString().split('T')[0];
-                    dateInputs.classList.add('hidden');
                 });
             });
-            
-            // 자본 프리셋 버튼 이벤트
-            document.querySelectorAll('.capital-preset-btn').forEach(btn => {
+
+            // Capital presets
+            document.querySelectorAll('.capital-preset').forEach(btn => {
                 btn.addEventListener('click', function() {
                     const amount = this.dataset.amount;
-                    document.getElementById('initialCapital').value = amount;
-                    document.getElementById('capitalUnit').value = 'USD';
+                    document.getElementById('capitalAmount').value = amount;
                 });
             });
 
-            // 심볼 타입 변경
-            document.querySelectorAll('input[name="symbolType"]').forEach(radio => {
-                radio.addEventListener('change', function() {
-                    const symbolListContainer = document.getElementById('symbolListContainer');
-                    if (this.value === 'all') {
-                        symbolListContainer.style.display = 'none';
-                    } else {
-                        symbolListContainer.style.display = 'block';
-                    }
+            // Run backtest
+            document.getElementById('runBacktest').addEventListener('click', runBacktest);
+            
+            // Reset backtest
+            document.getElementById('resetBacktest').addEventListener('click', resetBacktest);
+
+            // Chart controls
+            document.querySelectorAll('.chart-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.chart-btn').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    updateChartTimeframe(this.dataset.period);
                 });
             });
-
-            // 백테스트 폼 제출
-            document.getElementById('backtestForm').addEventListener('submit', function(e) {
-                e.preventDefault();
-                startBacktest();
-            });
-
-            // 정지 버튼
-            document.getElementById('stopBtn').addEventListener('click', stopBacktest);
-
-            // 비교 버튼
-            document.getElementById('compareBtn').addEventListener('click', showComparison);
-
-            // 엑셀 다운로드 버튼
-            document.getElementById('exportBtn').addEventListener('click', exportToExcel);
-
-            // 결과 초기화 버튼
-            document.getElementById('resetBtn').addEventListener('click', resetBacktestResults);
-
-            // 통계 보기 버튼
-            document.getElementById('statsBtn').addEventListener('click', showStatistics);
-
-            // 모달 닫기
-            document.querySelector('.close').addEventListener('click', function() {
-                document.getElementById('detailModal').style.display = 'none';
-            });
         }
 
-        // 백테스트 시작
-        async function startBacktest() {
-            const formData = new FormData(document.getElementById('backtestForm'));
-            const data = Object.fromEntries(formData);
+        function setDateRange(period) {
+            const today = new Date();
+            const startDate = new Date();
             
-            // 백테스트 모드 확인
-            const backtestMode = document.querySelector('input[name="backtestMode"]:checked').value;
-            
-            // 폼 데이터 검증 및 정리
-            const backtestConfig = {
-                startDate: data.startDate || document.getElementById('startDate').value,
-                endDate: data.endDate || document.getElementById('endDate').value,
-                backtestMode: backtestMode,
-                initialCapital: data.initialCapital || document.getElementById('initialCapital').value,
-                mlOptimization: data.mlOptimization || document.getElementById('mlOptimization').checked
-            };
-
-            // 개별 전략 테스트 모드인 경우에만 전략 관련 정보 추가
-            if (backtestMode === 'individual') {
-                backtestConfig.strategy = data.strategy || document.getElementById('strategy').value;
-                backtestConfig.symbolType = data.symbolType || document.querySelector('input[name="symbolType"]:checked').value;
-                backtestConfig.symbol = data.symbol || document.getElementById('symbolSelect').value;
-                backtestConfig.timeframe = data.timeframe || document.getElementById('timeframe').value;
-            }
-
-            // 로그에 설정 정보 표시
-            const logContainer = document.getElementById('logContainer');
-            
-            if (backtestMode === 'comprehensive') {
-                logContainer.innerHTML = `
-                    <div class="log-entry log-system">🚀 전략 통합 분석 시작</div>
-                    <div class="log-entry log-data">📊 설정 정보:</div>
-                    <div class="log-entry log-data">  📅 기간: ${backtestConfig.startDate} ~ ${backtestConfig.endDate}</div>
-                    <div class="log-entry log-data">  🎯 모드: 전략 통합 분석</div>
-                    <div class="log-entry log-data">  💰 초기자본: ${Number(backtestConfig.initialCapital).toLocaleString()}원</div>
-                    <div class="log-entry log-data">  📈 심볼: 전체 시장</div>
-                    <div class="log-entry log-system">  🤖 ML 최적화: ${backtestConfig.mlOptimization ? '활성화' : '비활성화'}</div>
-                    <div class="log-entry log-analysis">🔬 모든 전략을 테스트하고 성과 분석을 수행합니다...</div>
-                `;
-            } else {
-                logContainer.innerHTML = `
-                    <div class="log-entry log-system">🚀 백테스트 시작</div>
-                    <div class="log-entry log-data">📊 설정 정보:</div>
-                    <div class="log-entry log-data">  📅 기간: ${backtestConfig.startDate} ~ ${backtestConfig.endDate}</div>
-                    <div class="log-entry log-data">  🎯 전략: ${backtestConfig.strategy}</div>
-                    <div class="log-entry log-data">  💰 초기자본: ${Number(backtestConfig.initialCapital).toLocaleString()}원</div>
-                    <div class="log-entry log-data">  📈 심볼: ${backtestConfig.symbolType === 'all' ? '전체 시장' : backtestConfig.symbol}</div>
-                    <div class="log-entry log-data">  ⏰ 시간프레임: ${backtestConfig.timeframe}</div>
-                    <div class="log-entry log-system">  🤖 ML 최적화: ${backtestConfig.mlOptimization ? '활성화' : '비활성화'}</div>
-                `;
-            }
-
-            try {
-                updateStatus('running', backtestMode === 'comprehensive' ? '전략 통합 분석 시작 중...' : '백테스트 시작 중...');
-                
-                let endpoint;
-                if (backtestMode === 'comprehensive') {
-                    endpoint = '/api/backtest/comprehensive';
-                } else if (backtestMode === 'portfolio') {
-                    endpoint = '/api/portfolio/analyze';
-                } else {
-                    endpoint = '/api/backtest/run';
-                }
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(backtestConfig)
-                });
-
-                const result = await response.json();
-                
-                if (result.error) {
-                    throw new Error(result.error);
-                }
-
-                currentBacktestId = result.backtest_id;
-                startLogStream();
-                
-            } catch (error) {
-                console.error('백테스트 시작 실패:', error);
-                updateStatus('stopped', '백테스트 실패: ' + error.message);
-                logContainer.innerHTML += `<div class="log-entry log-error">❌ 오류: ${error.message}</div>`;
-            }
-        }
-
-        // 백테스트 중지
-        async function stopBacktest() {
-            try {
-                await fetch('/api/backtest/stop', { method: 'POST' });
-                updateStatus('stopped', '백테스트 중지됨');
-                if (eventSource) {
-                    eventSource.close();
-                    eventSource = null;
-                }
-            } catch (error) {
-                console.error('백테스트 중지 실패:', error);
-            }
-        }
-
-        // 상태 업데이트
-        function updateStatus(status, message) {
-            const statusElement = document.getElementById('backtestStatus');
-            const indicator = statusElement.querySelector('.status-indicator');
-            const text = statusElement.querySelector('span:last-child');
-            
-            indicator.className = `status-indicator status-${status}`;
-            text.textContent = message;
-        }
-
-        // 로그 스트림 시작
-        function startLogStream() {
-            if (eventSource) {
-                eventSource.close();
-            }
-
-            // 백테스트 설정 파라미터 준비
-            // 선택된 심볼과 전략 검증
-            const selectedSymbol = document.querySelector('input[name="symbolType"]:checked').value === 'all' ? 'ALL_MARKET' : document.getElementById('symbolSelect').value;
-            const selectedStrategy = document.getElementById('strategy').value;
-            
-            if (!selectedStrategy) {
-                console.warn('전략이 선택되지 않음');
-                updateStatus('stopped', '전략을 선택해주세요');
-                return;
+            switch(period) {
+                case '6m':
+                    startDate.setMonth(today.getMonth() - 6);
+                    break;
+                case '1y':
+                    startDate.setFullYear(today.getFullYear() - 1);
+                    break;
+                case '2y':
+                    startDate.setFullYear(today.getFullYear() - 2);
+                    break;
+                case '3y':
+                    startDate.setFullYear(today.getFullYear() - 3);
+                    break;
+                case '5y':
+                    startDate.setFullYear(today.getFullYear() - 5);
+                    break;
             }
             
-            let params;
-            
-            if (selectedSymbol === 'ALL_MARKET' || selectedSymbol) {
-                params = new URLSearchParams({
-                    start_date: document.getElementById('startDate').value,
-                    end_date: document.getElementById('endDate').value,
-                    symbol: selectedSymbol,
-                    strategy: selectedStrategy
-                });
-            } else {
-                console.warn('심볼이 선택되지 않음');
-                updateStatus('stopped', '심볼을 선택해주세요');
-                return;
-            }
-
-            eventSource = new EventSource(`/api/backtest/stream_log?${params.toString()}`);
-            
-            eventSource.onmessage = function(event) {
-                const data = JSON.parse(event.data);
-                
-                if (data.type === 'end') {
-                    const backtestMode = document.querySelector('input[name="backtestMode"]:checked').value;
-                    
-                    if (backtestMode === 'comprehensive') {
-                        updateStatus('stopped', '전략 통합 분석 완료');
-                        
-                        // 전략 통합 분석 결과 처리
-                        if (data.comprehensive_analysis) {
-                            displayComprehensiveAnalysis(data.comprehensive_analysis);
-                        } else {
-                            // 테스트용 더미 데이터 표시
-                            testComprehensiveAnalysis();
-                        }
-                    } else {
-                        updateStatus('stopped', '백테스트 완료');
-                        // 완료 후에만 결과 로드
-                        setTimeout(() => {
-                            loadBacktestResults();
-                            updateStatistics();
-                        }, 1000);
-                    }
-                    
-                    eventSource.close();
-                    eventSource = null;
-                    return;
-                }
-
-                // 로그 추가 (타입별 색상 적용 + 서브 로그 감지)
-                const logContainer = document.getElementById('logContainer');
-                const logEntry = document.createElement('div');
-                const message = data.message || event.data;
-                
-                // 서브 로그 감지 (들여쓰기된 항목)
-                const isSubLog = message.includes('└─');
-                const baseClass = `log-entry log-${data.type || 'system'}`;
-                logEntry.className = isSubLog ? `${baseClass} log-sub` : baseClass;
-                logEntry.textContent = message;
-                
-                logContainer.appendChild(logEntry);
-                logContainer.scrollTop = logContainer.scrollHeight;
-
-                // 진행률 업데이트
-                if (data.progress) {
-                    updateProgress(data.progress);
-                }
-            };
-
-            eventSource.onerror = function(event) {
-                console.error('EventSource 연결 오류:', event);
-                updateStatus('stopped', '연결 오류 발생');
-            };
+            document.getElementById('startDate').value = startDate.toISOString().split('T')[0];
+            document.getElementById('endDate').value = today.toISOString().split('T')[0];
         }
 
-        // 통계 업데이트 - 실제 백테스트 결과 사용
-        async function updateStatistics() {
-            try {
-                // 실제 백테스트 결과에서 통계 계산
-                const response = await fetch('/api/backtest/results');
-                const data = await response.json();
-                
-                if (data.results && data.results.length > 0) {
-                    // 최신 결과들로부터 통계 계산
-                    const results = data.results;
-                    const latestResults = results.slice(-10); // 최근 10개 결과
-                    
-                    const stats = calculateAggregatedStats(latestResults);
-                    updateStatisticsDisplay(stats);
-                } else {
-                    // 결과가 없을 때 초기값 표시
-                    const emptyStats = {
-                        totalReturn: 0,
-                        totalTrades: 0,
-                        winRate: 0,
-                        sharpeRatio: 0,
-                        maxDrawdown: 0,
-                        avgLeverage: 0
-                    };
-                    updateStatisticsDisplay(emptyStats);
-                }
-                
-                // 차트 업데이트
-                updatePerformanceChart();
-                updateStrategyComparisonChart();
-                
-            } catch (error) {
-                console.error('통계 업데이트 실패:', error);
-                // 오류 시 초기값 표시
-                const emptyStats = {
-                    totalReturn: 0,
-                    totalTrades: 0,
-                    winRate: 0,
-                    sharpeRatio: 0,
-                    maxDrawdown: 0,
-                    avgLeverage: 0
-                };
-                updateStatisticsDisplay(emptyStats);
-            }
-        }
-        
-        // 집계 통계 계산 함수
-        function calculateAggregatedStats(results) {
-            if (!results || results.length === 0) {
-                return {
-                    totalReturn: 0,
-                    totalTrades: 0,
-                    winRate: 0,
-                    sharpeRatio: 0,
-                    maxDrawdown: 0,
-                    avgLeverage: 0
-                };
-            }
+        function initializeChart() {
+            const ctx = document.getElementById('equityChart').getContext('2d');
             
-            const totalReturn = results.reduce((sum, r) => sum + (r.total_return || 0), 0) / results.length;
-            const totalTrades = results.reduce((sum, r) => sum + (r.total_trades || 0), 0);
-            const avgWinRate = results.reduce((sum, r) => sum + (r.win_rate || 0), 0) / results.length;
-            const avgSharpe = results.reduce((sum, r) => sum + (r.sharpe_ratio || 0), 0) / results.length;
-            const avgDrawdown = results.reduce((sum, r) => sum + (r.max_drawdown || 0), 0) / results.length;
-            const avgLeverage = results.reduce((sum, r) => sum + (r.avg_leverage || 1), 0) / results.length;
+            // Generate sample data
+            const data = generateSampleEquityCurve();
             
-            return {
-                totalReturn: totalReturn.toFixed(1),
-                totalTrades: totalTrades,
-                winRate: avgWinRate.toFixed(1),
-                sharpeRatio: avgSharpe.toFixed(2),
-                maxDrawdown: avgDrawdown.toFixed(1),
-                avgLeverage: avgLeverage.toFixed(1)
-            };
-        }
-        
-        // 통계 표시 업데이트 함수
-        function updateStatisticsDisplay(stats) {
-            const totalReturnElement = document.getElementById('totalReturn');
-            const sign = stats.totalReturn >= 0 ? '+' : '';
-            totalReturnElement.textContent = `${sign}${stats.totalReturn}%`;
-            totalReturnElement.className = stats.totalReturn >= 0 ? 'stat-value positive' : 'stat-value negative';
-            
-            document.getElementById('totalTrades').textContent = stats.totalTrades;
-            document.getElementById('winRate').textContent = `${stats.winRate}%`;
-            document.getElementById('sharpeRatio').textContent = stats.sharpeRatio;
-            document.getElementById('maxDrawdown').textContent = `${stats.maxDrawdown}%`;
-            document.getElementById('avgLeverage').textContent = `${stats.avgLeverage}x`;
-        }
-
-        // 성과 차트 업데이트
-        function updatePerformanceChart() {
-            const ctx = document.getElementById('performanceChart');
-            if (!ctx) return;
-
-            // Chart.js 라이브러리가 필요합니다
-            // 여기서는 기본 canvas API로 간단한 차트 그리기
-            const canvas = ctx.getContext('2d');
-            canvas.clearRect(0, 0, ctx.width, ctx.height);
-            
-            // 샘플 데이터로 선 그래프 그리기
-            const data = [100, 102, 98, 105, 110, 108, 115, 120, 118, 125];
-            const width = ctx.width;
-            const height = ctx.height;
-            const margin = 20;
-            
-            canvas.strokeStyle = '#3498db';
-            canvas.lineWidth = 2;
-            canvas.beginPath();
-            
-            for (let i = 0; i < data.length; i++) {
-                const x = margin + (i * (width - 2 * margin)) / (data.length - 1);
-                const y = height - margin - ((data[i] - 90) * (height - 2 * margin)) / 40;
-                
-                if (i === 0) {
-                    canvas.moveTo(x, y);
-                } else {
-                    canvas.lineTo(x, y);
-                }
-            }
-            
-            canvas.stroke();
-        }
-
-        // 전략 비교 차트 업데이트 - 실제 백테스트 결과 사용
-        async function updateStrategyComparisonChart() {
-            try {
-                // 실제 백테스트 결과에서 전략별 성과 가져오기
-                const response = await fetch('/api/backtest/results');
-                const data = await response.json();
-                
-                let strategies = [];
-                
-                if (data.results && data.results.length > 0) {
-                    // 전략별로 결과 그룹화
-                    const strategyGroups = {};
-                    data.results.forEach(result => {
-                        const strategyName = result.strategy_name || '알 수 없음';
-                        if (!strategyGroups[strategyName]) {
-                            strategyGroups[strategyName] = [];
-                        }
-                        strategyGroups[strategyName].push(result);
-                    });
-                    
-                    // 각 전략의 평균 성과 계산
-                    strategies = Object.keys(strategyGroups).map(strategyName => {
-                        const results = strategyGroups[strategyName];
-                        const avgReturn = results.reduce((sum, r) => sum + (r.total_return || 0), 0) / results.length;
-                        const avgSharpe = results.reduce((sum, r) => sum + (r.sharpe_ratio || 0), 0) / results.length;
-                        const avgDrawdown = results.reduce((sum, r) => sum + (r.max_drawdown || 0), 0) / results.length;
-                        const avgWinRate = results.reduce((sum, r) => sum + (r.win_rate || 0), 0) / results.length;
-                        const totalTrades = results.reduce((sum, r) => sum + (r.total_trades || 0), 0);
-                        const avgLeverage = results.reduce((sum, r) => sum + (r.avg_leverage || 1), 0) / results.length;
-                        
-                        // 위험 수준 계산 (최대 낙폭 기준)
-                        let risk = '낮음';
-                        if (avgDrawdown > 15) risk = '높음';
-                        else if (avgDrawdown > 10) risk = '중간';
-                        
-                        return {
-                            name: strategyName,
-                            return: parseFloat(avgReturn.toFixed(1)),
-                            sharpe: parseFloat(avgSharpe.toFixed(2)),
-                            drawdown: parseFloat(avgDrawdown.toFixed(1)),
-                            winRate: parseFloat(avgWinRate.toFixed(1)),
-                            trades: totalTrades,
-                            leverage: parseFloat(avgLeverage.toFixed(1)),
-                            risk: risk,
-                            mlOptimized: results.some(r => r.ml_optimized)
-                        };
-                    });
-                } else {
-                    // 백테스트 결과가 없을 때 빈 배열
-                    strategies = [];
-                }
-
-                // 전략 비교 테이블 업데이트
-                const tbody = document.getElementById('strategyComparisonBody');
-                if (tbody) {
-                    if (strategies.length === 0) {
-                        // 백테스트 결과가 없을 때 안내 메시지
-                        tbody.innerHTML = `
-                            <tr>
-                                <td colspan="8" style="text-align: center; padding: 20px; color: #666;">
-                                    백테스트를 실행하면 전략별 성과 비교가 표시됩니다.
-                                </td>
-                            </tr>
-                        `;
-                    } else {
-                        tbody.innerHTML = '';
-
-                        strategies.forEach(strategy => {
-                            const row = document.createElement('tr');
-                            const returnClass = strategy.return > 0 ? 'positive' : 'negative';
-                            const riskClass = strategy.risk === '높음' ? 'negative' : strategy.risk === '중간' ? 'warning' : 'positive';
-                            
-                            row.innerHTML = `
-                                <td>
-                                    <div class="strategy-name">
-                                        <strong>${strategy.name}</strong>
-                                        ${strategy.mlOptimized ? '<span class="ml-badge">🤖 ML</span>' : ''}
-                                    </div>
-                                </td>
-                                <td class="${returnClass}">${strategy.return > 0 ? '+' : ''}${strategy.return}%</td>
-                                <td>${strategy.sharpe}</td>
-                                <td class="negative">${strategy.drawdown}%</td>
-                                <td>${strategy.winRate}%</td>
-                                <td>${strategy.trades}</td>
-                                <td>${strategy.leverage}x</td>
-                                <td><span class="risk-${strategy.risk}">${strategy.risk}</span></td>
-                            `;
-                            tbody.appendChild(row);
-                        });
-                    }
-                }
-
-                // 전략 비교 차트 생성 (데이터가 있을 때만)
-                if (strategies.length > 0) {
-                    createStrategyComparisonChart(strategies);
-                }
-                
-            } catch (error) {
-                console.error('전략 비교 차트 업데이트 실패:', error);
-                // 오류 시 안내 메시지 표시
-                const tbody = document.getElementById('strategyComparisonBody');
-                if (tbody) {
-                    tbody.innerHTML = `
-                        <tr>
-                            <td colspan="8" style="text-align: center; padding: 20px; color: #e74c3c;">
-                                전략 비교 데이터를 불러오는 중 오류가 발생했습니다.
-                            </td>
-                        </tr>
-                    `;
-                }
-            }
-        }
-
-        // 전략 비교 차트 생성
-        function createStrategyComparisonChart(strategies) {
-            const chartContainer = document.getElementById('strategyComparisonChart');
-            if (!chartContainer) return;
-
-            // 차트 데이터 준비
-            const labels = strategies.map(s => s.name);
-            const returns = strategies.map(s => s.return);
-            const sharpeRatios = strategies.map(s => s.sharpe);
-
-            // 간단한 막대 차트 생성 (Canvas API 사용)
-            const canvas = document.createElement('canvas');
-            canvas.width = 800;
-            canvas.height = 400;
-            canvas.id = 'strategyChart';
-            
-            chartContainer.innerHTML = '';
-            chartContainer.appendChild(canvas);
-
-            const ctx = canvas.getContext('2d');
-            
-            // 차트 설정
-            const padding = 60;
-            const chartWidth = canvas.width - 2 * padding;
-            const chartHeight = canvas.height - 2 * padding;
-            const barWidth = chartWidth / strategies.length * 0.8;
-            const maxReturn = Math.max(...returns);
-            const minReturn = Math.min(...returns);
-            const range = maxReturn - minReturn;
-
-            // 배경 그리기
-            ctx.fillStyle = '#f8f9fa';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            // 격자 그리기
-            ctx.strokeStyle = '#e0e0e0';
-            ctx.lineWidth = 1;
-            for (let i = 0; i <= 10; i++) {
-                const y = padding + (chartHeight / 10) * i;
-                ctx.beginPath();
-                ctx.moveTo(padding, y);
-                ctx.lineTo(canvas.width - padding, y);
-                ctx.stroke();
-            }
-
-            // 막대 그리기
-            strategies.forEach((strategy, i) => {
-                const x = padding + (chartWidth / strategies.length) * i + (chartWidth / strategies.length - barWidth) / 2;
-                const barHeight = (strategy.return / maxReturn) * chartHeight * 0.8;
-                const y = padding + chartHeight - barHeight;
-
-                // 막대 색상 (ML 최적화 여부에 따라)
-                ctx.fillStyle = strategy.mlOptimized ? '#00d4ff' : '#3498db';
-                ctx.fillRect(x, y, barWidth, barHeight);
-
-                // 값 표시
-                ctx.fillStyle = '#333';
-                ctx.font = '12px Arial';
-                ctx.textAlign = 'center';
-                ctx.fillText(`${strategy.return}%`, x + barWidth / 2, y - 5);
-
-                // 라벨 표시
-                ctx.save();
-                ctx.translate(x + barWidth / 2, canvas.height - 20);
-                ctx.rotate(-Math.PI / 4);
-                ctx.textAlign = 'right';
-                ctx.fillText(strategy.name, 0, 0);
-                ctx.restore();
-            });
-
-            // 범례 추가
-            ctx.fillStyle = '#00d4ff';
-            ctx.fillRect(10, 10, 15, 15);
-            ctx.fillStyle = '#333';
-            ctx.font = '12px Arial';
-            ctx.textAlign = 'left';
-            ctx.fillText('ML 최적화', 30, 22);
-
-            ctx.fillStyle = '#3498db';
-            ctx.fillRect(10, 30, 15, 15);
-            ctx.fillStyle = '#333';
-            ctx.fillText('기본 전략', 30, 42);
-        }
-
-        // 진행률 업데이트
-        function updateProgress(progress) {
-            const progressFill = document.getElementById('progressFill');
-            const progressText = document.getElementById('progressText');
-            
-            progressFill.style.width = progress + '%';
-            progressText.textContent = progress + '%';
-        }
-
-        // 백테스트 결과 로드
-        async function loadBacktestResults() {
-            try {
-                const response = await fetch('/api/backtest/results');
-                const data = await response.json();
-                
-                if (data.results) {
-                    displayResults(data.results);
-                }
-            } catch (error) {
-                console.error('결과 로드 실패:', error);
-            }
-        }
-
-        // 결과 표시
-        function displayResults(results) {
-            const resultsGrid = document.getElementById('resultsGrid');
-            resultsGrid.innerHTML = '';
-
-            results.forEach((result, index) => {
-                const resultCard = createResultCard(result, index);
-                resultsGrid.appendChild(resultCard);
-            });
-        }
-
-        // 결과 카드 생성
-        function createResultCard(result, index) {
-            const card = document.createElement('div');
-            card.className = 'result-card';
-            card.onclick = () => showDetailModal(result);
-            
-            const totalReturn = ((result.final_value - result.initial_capital) / result.initial_capital * 100).toFixed(2);
-            const isProfit = totalReturn > 0;
-            
-            card.innerHTML = `
-                <div class="result-header">
-                    <div class="result-title">${result.strategy_name}</div>
-                    <div class="result-date">${new Date(result.created_at).toLocaleDateString()}</div>
-                </div>
-                <div class="result-metrics">
-                    <div class="metric">
-                        <span>수익률</span>
-                        <span class="metric-value ${isProfit ? 'positive' : 'negative'}">${totalReturn}%</span>
-                    </div>
-                    <div class="metric">
-                        <span>샤프 비율</span>
-                        <span class="metric-value">${result.sharpe_ratio?.toFixed(2) || 'N/A'}</span>
-                    </div>
-                    <div class="metric">
-                        <span>최대 낙폭</span>
-                        <span class="metric-value negative">${result.max_drawdown?.toFixed(2) || 'N/A'}%</span>
-                    </div>
-                    <div class="metric">
-                        <span>승률</span>
-                        <span class="metric-value">${result.win_rate?.toFixed(2) || 'N/A'}%</span>
-                    </div>
-                    <div class="metric">
-                        <span>거래 횟수</span>
-                        <span class="metric-value">${result.total_trades || 0}</span>
-                    </div>
-                    <div class="metric">
-                        <span>심볼</span>
-                        <span class="metric-value">${result.symbol}</span>
-                    </div>
-                </div>
-                ${result.ml_optimized ? '<div style="color: #9b59b6; font-weight: bold;">🤖 ML 최적화 적용</div>' : ''}
-            `;
-            
-            return card;
-        }
-
-        // 상세 모달 표시
-        async function showDetailModal(result) {
-            const modal = document.getElementById('detailModal');
-            const content = document.getElementById('detailContent');
-            
-            // 매매 기록 가져오기
-            let trades = [];
-            try {
-                const response = await fetch(`/api/backtest/results/${result.id}`);
-                const data = await response.json();
-                trades = data.trades || [];
-            } catch (error) {
-                console.error('매매 기록 로드 실패:', error);
-            }
-            
-            content.innerHTML = `
-                <div class="detail-section">
-                    <h3>기본 정보</h3>
-                    <table class="comparison-table">
-                        <tr><td>전략</td><td>${result.strategy_name}</td></tr>
-                        <tr><td>심볼</td><td>${result.symbol}</td></tr>
-                        <tr><td>시간프레임</td><td>${result.timeframe}</td></tr>
-                        <tr><td>기간</td><td>${result.start_date} ~ ${result.end_date}</td></tr>
-                        <tr><td>레버리지</td><td>${result.leverage || result.avg_leverage ? `동적 (평균 ${result.avg_leverage?.toFixed(1) || 1.0}x)` : '1.0x'}</td></tr>
-                        <tr><td>초기 자본</td><td>${result.initial_capital.toLocaleString()}원</td></tr>
-                    </table>
-                </div>
-                
-                <div class="detail-section">
-                    <h3>성과 지표</h3>
-                    <table class="comparison-table">
-                        <tr><td>최종 자산</td><td>${result.final_value.toLocaleString()}원</td></tr>
-                        <tr><td>총 수익률</td><td>${((result.final_value - result.initial_capital) / result.initial_capital * 100).toFixed(2)}%</td></tr>
-                        <tr><td>샤프 비율</td><td>${result.sharpe_ratio?.toFixed(2) || 'N/A'}</td></tr>
-                        <tr><td>최대 낙폭</td><td>${result.max_drawdown?.toFixed(2) || 'N/A'}%</td></tr>
-                        <tr><td>승률</td><td>${result.win_rate?.toFixed(2) || 'N/A'}%</td></tr>
-                        <tr><td>총 거래 횟수</td><td>${result.total_trades || 0}</td></tr>
-                        <tr><td>수익 거래</td><td>${result.winning_trades || 0}</td></tr>
-                        <tr><td>손실 거래</td><td>${result.losing_trades || 0}</td></tr>
-                    </table>
-                </div>
-                
-                ${trades.length > 0 ? `
-                <div class="detail-section">
-                    <h3>매매 기록</h3>
-                    <div style="max-height: 400px; overflow-y: auto;">
-                        <table class="comparison-table">
-                            <thead>
-                                <tr>
-                                    <th>시간</th>
-                                    <th>유형</th>
-                                    <th>가격</th>
-                                    <th>수량</th>
-                                    <th>레버리지</th>
-                                    <th>손익</th>
-                                    <th>손익률</th>
-                                    <th>잔액</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${trades.map(trade => `
-                                    <tr>
-                                        <td>${new Date(trade.timestamp).toLocaleString()}</td>
-                                        <td>${trade.type === 'buy' ? '매수' : '매도'}</td>
-                                        <td>${trade.price?.toFixed(2) || 'N/A'}</td>
-                                        <td>${trade.amount?.toFixed(4) || 'N/A'}</td>
-                                        <td>${trade.leverage?.toFixed(1) || '1.0'}x</td>
-                                        <td class="${trade.pnl > 0 ? 'positive' : trade.pnl < 0 ? 'negative' : ''}">${trade.pnl?.toFixed(0) || '0'}원</td>
-                                        <td class="${trade.pnl_percent > 0 ? 'positive' : trade.pnl_percent < 0 ? 'negative' : ''}">${trade.pnl_percent?.toFixed(2) || '0.00'}%</td>
-                                        <td>${trade.balance_after?.toLocaleString() || 'N/A'}원</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-                ` : '<div class="detail-section"><p>매매 기록이 없습니다.</p></div>'}
-                
-                <div class="btn-group">
-                    <button class="btn" onclick="exportResultToExcel(${result.id})">엑셀 다운로드</button>
-                </div>
-            `;
-            
-            modal.style.display = 'block';
-        }
-
-        // 폼 초기화
-        function resetForm() {
-            document.getElementById('backtestForm').reset();
-            initializeDates();
-            updateStatus('stopped', '대기 중');
-            updateProgress(0);
-            document.getElementById('logContainer').innerHTML = '백테스트를 시작하면 로그가 표시됩니다.';
-        }
-
-        // 성과 비교 표시
-        async function showComparison() {
-            try {
-                // 백테스트 결과 로드
-                const response = await fetch('/api/backtest/results');
-                const data = await response.json();
-                
-                if (data.error) {
-                    throw new Error(data.error);
-                }
-
-                const results = data.results || [];
-                if (results.length === 0) {
-                    alert('비교할 백테스트 결과가 없습니다.');
-                    return;
-                }
-
-                // 전략별 성과 비교 섹션 표시
-                const comparisonSection = document.querySelector('.comparison-section');
-                comparisonSection.style.display = 'block';
-
-                // 전략별 데이터 그룹화
-                const strategyData = {};
-                results.forEach(result => {
-                    const strategyName = result.strategy_name;
-                    if (!strategyData[strategyName]) {
-                        strategyData[strategyName] = {
-                            returns: [],
-                            sharpe: [],
-                            drawdown: [],
-                            winRate: [],
-                            totalTrades: 0,
-                            avgLeverage: 0,
-                            count: 0
-                        };
-                    }
-                    
-                    const totalReturn = ((result.final_value - result.initial_capital) / result.initial_capital * 100);
-                    strategyData[strategyName].returns.push(totalReturn);
-                    strategyData[strategyName].sharpe.push(result.sharpe_ratio);
-                    strategyData[strategyName].drawdown.push(result.max_drawdown);
-                    strategyData[strategyName].winRate.push(result.win_rate);
-                    strategyData[strategyName].totalTrades += result.total_trades;
-                    strategyData[strategyName].avgLeverage += result.avg_leverage;
-                    strategyData[strategyName].count++;
-                });
-
-                // 전략 비교 차트 생성
-                createStrategyComparisonChart(strategyData);
-                createRiskReturnChart(strategyData);
-                
-                // 전략 비교 테이블 업데이트
-                updateStrategyComparisonTable(strategyData);
-                
-                // 성과 차트 업데이트
-                updatePerformanceChart(results);
-
-                // 부드럽게 스크롤
-                comparisonSection.scrollIntoView({ behavior: 'smooth' });
-
-            } catch (error) {
-                console.error('성과 비교 실패:', error);
-                alert('❌ 성과 비교에 실패했습니다: ' + error.message);
-            }
-        }
-
-        // 전략 비교 차트 생성
-        function createStrategyComparisonChart(strategyData) {
-            const ctx = document.getElementById('strategyComparisonChart').getContext('2d');
-            
-            // 기존 차트 제거
-            if (window.strategyComparisonChart) {
-                window.strategyComparisonChart.destroy();
-            }
-
-            const strategies = Object.keys(strategyData);
-            const avgReturns = strategies.map(strategy => {
-                const returns = strategyData[strategy].returns;
-                return returns.reduce((sum, ret) => sum + ret, 0) / returns.length;
-            });
-
-            window.strategyComparisonChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: strategies,
-                    datasets: [{
-                        label: '평균 수익률 (%)',
-                        data: avgReturns,
-                        backgroundColor: ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6'],
-                        borderColor: ['#2980b9', '#c0392b', '#27ae60', '#e67e22', '#8e44ad'],
-                        borderWidth: 2
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: '전략별 평균 수익률 비교'
-                        },
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return value + '%';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // 위험-수익률 차트 생성
-        function createRiskReturnChart(strategyData) {
-            const ctx = document.getElementById('riskReturnChart').getContext('2d');
-            
-            // 기존 차트 제거
-            if (window.riskReturnChart) {
-                window.riskReturnChart.destroy();
-            }
-
-            const datasets = Object.keys(strategyData).map((strategy, index) => {
-                const data = strategyData[strategy];
-                const avgReturn = data.returns.reduce((sum, ret) => sum + ret, 0) / data.returns.length;
-                const avgDrawdown = data.drawdown.reduce((sum, dd) => sum + dd, 0) / data.drawdown.length;
-                
-                return {
-                    label: strategy,
-                    data: [{ x: avgDrawdown, y: avgReturn }],
-                    backgroundColor: ['#3498db', '#e74c3c', '#2ecc71', '#f39c12', '#9b59b6'][index],
-                    borderColor: ['#2980b9', '#c0392b', '#27ae60', '#e67e22', '#8e44ad'][index],
-                    pointRadius: 8,
-                    pointHoverRadius: 10
-                };
-            });
-
-            window.riskReturnChart = new Chart(ctx, {
-                type: 'scatter',
-                data: {
-                    datasets: datasets
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: '위험 대비 수익률 (낙폭 vs 수익률)'
-                        }
-                    },
-                    scales: {
-                        x: {
-                            display: true,
-                            title: {
-                                display: true,
-                                text: '평균 최대 낙폭 (%)'
-                            }
-                        },
-                        y: {
-                            display: true,
-                            title: {
-                                display: true,
-                                text: '평균 수익률 (%)'
-                            }
-                        }
-                    }
-                }
-            });
-        }
-
-        // 전략 비교 테이블 업데이트
-        function updateStrategyComparisonTable(strategyData) {
-            const tbody = document.getElementById('strategyComparisonBody');
-            tbody.innerHTML = '';
-
-            Object.keys(strategyData).forEach(strategy => {
-                const data = strategyData[strategy];
-                const avgReturn = (data.returns.reduce((sum, ret) => sum + ret, 0) / data.returns.length).toFixed(2);
-                const avgSharpe = (data.sharpe.reduce((sum, sh) => sum + sh, 0) / data.sharpe.length).toFixed(2);
-                const avgDrawdown = (data.drawdown.reduce((sum, dd) => sum + dd, 0) / data.drawdown.length).toFixed(2);
-                const avgWinRate = (data.winRate.reduce((sum, wr) => sum + wr, 0) / data.winRate.length).toFixed(2);
-                const avgLeverage = (data.avgLeverage / data.count).toFixed(2);
-
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td>${strategy}</td>
-                    <td class="positive">+${avgReturn}%</td>
-                    <td>${avgSharpe}</td>
-                    <td class="negative">-${avgDrawdown}%</td>
-                    <td>${avgWinRate}%</td>
-                    <td>${data.totalTrades}</td>
-                    <td>${avgLeverage}x</td>
-                    <td>${avgReturn > 15 ? '높음' : avgReturn > 8 ? '중간' : '낮음'}</td>
-                `;
-                tbody.appendChild(row);
-            });
-        }
-
-        // 성과 차트 업데이트
-        function updatePerformanceChart(results) {
-            const ctx = document.getElementById('performanceChart').getContext('2d');
-            
-            // 기존 차트 제거
-            if (window.performanceChart) {
-                window.performanceChart.destroy();
-            }
-
-            // 날짜별 누적 수익률 계산
-            const chartData = results.slice(-10).map(result => {
-                const totalReturn = ((result.final_value - result.initial_capital) / result.initial_capital * 100);
-                return {
-                    x: new Date(result.created_at).toLocaleDateString(),
-                    y: totalReturn
-                };
-            });
-
-            window.performanceChart = new Chart(ctx, {
+            equityChart = new Chart(ctx, {
                 type: 'line',
                 data: {
+                    labels: data.labels,
                     datasets: [{
-                        label: '백테스트 수익률',
-                        data: chartData,
-                        borderColor: '#3498db',
-                        backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                        label: 'Portfolio Value',
+                        data: data.values,
+                        borderColor: '#0066FF',
+                        backgroundColor: 'rgba(0, 102, 255, 0.1)',
+                        borderWidth: 2,
                         fill: true,
+                        tension: 0.4
+                    }, {
+                        label: 'Benchmark',
+                        data: data.benchmark,
+                        borderColor: '#8B8FA3',
+                        backgroundColor: 'transparent',
+                        borderWidth: 1,
+                        borderDash: [5, 5],
+                        fill: false,
                         tension: 0.4
                     }]
                 },
@@ -2628,493 +1148,140 @@
                     responsive: true,
                     maintainAspectRatio: false,
                     plugins: {
-                        title: {
+                        legend: {
                             display: true,
-                            text: '최근 백테스트 성과 추이'
+                            labels: {
+                                color: '#FFFFFF',
+                                usePointStyle: true
+                            }
                         }
                     },
                     scales: {
                         x: {
-                            type: 'category',
-                            title: {
-                                display: true,
-                                text: '테스트 날짜'
+                            type: 'time',
+                            time: {
+                                unit: 'month'
+                            },
+                            grid: {
+                                color: '#3A3F5C'
+                            },
+                            ticks: {
+                                color: '#8B8FA3'
                             }
                         },
                         y: {
-                            title: {
-                                display: true,
-                                text: '수익률 (%)'
+                            grid: {
+                                color: '#3A3F5C'
                             },
                             ticks: {
+                                color: '#8B8FA3',
                                 callback: function(value) {
-                                    return value + '%';
+                                    return '$' + value.toLocaleString();
                                 }
                             }
                         }
+                    },
+                    interaction: {
+                        intersect: false,
+                        mode: 'index'
                     }
                 }
             });
         }
 
-        // 엑셀 다운로드
-        function exportToExcel() {
-            // 구현 예정
-            alert('엑셀 다운로드 기능은 준비 중입니다.');
-        }
-
-        // 개별 결과 엑셀 다운로드
-        function exportResultToExcel(resultId) {
-            // 구현 예정
-            alert('개별 결과 엑셀 다운로드 기능은 준비 중입니다.');
-        }
-
-        // 백테스트 결과 초기화
-        async function resetBacktestResults() {
-            if (!confirm('⚠️ 모든 백테스트 결과를 초기화하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다.')) {
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/backtest/results/reset', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-
-                const result = await response.json();
+        function generateSampleEquityCurve() {
+            const labels = [];
+            const values = [];
+            const benchmark = [];
+            const startDate = new Date();
+            startDate.setFullYear(startDate.getFullYear() - 2);
+            
+            let portfolioValue = 10000;
+            let benchmarkValue = 10000;
+            
+            for (let i = 0; i < 730; i++) {
+                const date = new Date(startDate);
+                date.setDate(date.getDate() + i);
+                labels.push(date);
                 
-                if (result.error) {
-                    throw new Error(result.error);
+                // Simulate portfolio growth with some volatility
+                const dailyReturn = (Math.random() - 0.45) * 0.02; // Slight positive bias
+                portfolioValue *= (1 + dailyReturn);
+                values.push(Math.round(portfolioValue));
+                
+                // Simulate benchmark (steady growth)
+                const benchmarkReturn = (Math.random() - 0.48) * 0.015;
+                benchmarkValue *= (1 + benchmarkReturn);
+                benchmark.push(Math.round(benchmarkValue));
+            }
+            
+            return { labels, values, benchmark };
+        }
+
+        function runBacktest() {
+            if (isRunning) return;
+            
+            isRunning = true;
+            const btn = document.getElementById('runBacktest');
+            const progressContainer = document.getElementById('progressContainer');
+            const progressFill = document.getElementById('progressFill');
+            const progressText = document.getElementById('progressText');
+            
+            // Update UI
+            btn.innerHTML = '<div class="loading"></div> Running...';
+            btn.disabled = true;
+            progressContainer.style.display = 'block';
+            
+            // Simulate backtest progress
+            let progress = 0;
+            const interval = setInterval(() => {
+                progress += Math.random() * 15;
+                if (progress >= 100) {
+                    progress = 100;
+                    clearInterval(interval);
+                    
+                    // Complete
+                    setTimeout(() => {
+                        btn.innerHTML = '<i class="fas fa-check"></i> Complete';
+                        btn.style.background = 'linear-gradient(135deg, #00D084, #00A86B)';
+                        progressText.textContent = 'Backtest completed successfully!';
+                        
+                        setTimeout(() => {
+                            resetBacktestButton();
+                        }, 2000);
+                    }, 500);
                 }
-
-                // 결과 그리드 초기화
-                const resultsGrid = document.getElementById('resultsGrid');
-                resultsGrid.innerHTML = '<div class="no-results">백테스트 결과가 없습니다. 백테스트를 실행해보세요.</div>';
-
-                // 통계 초기화
-                document.getElementById('totalReturn').textContent = '+0.0%';
-                document.getElementById('totalTrades').textContent = '0';
-                document.getElementById('winRate').textContent = '0.0%';
-                document.getElementById('sharpeRatio').textContent = '0.0';
-                document.getElementById('maxDrawdown').textContent = '0.0%';
-                document.getElementById('avgLeverage').textContent = '0.0x';
-
-                alert('✅ 모든 백테스트 결과가 초기화되었습니다.');
                 
-            } catch (error) {
-                console.error('백테스트 결과 초기화 실패:', error);
-                alert('❌ 백테스트 결과 초기화에 실패했습니다: ' + error.message);
-            }
+                progressFill.style.width = progress + '%';
+                progressText.textContent = `Processing... ${Math.round(progress)}%`;
+            }, 200);
         }
 
-        // 통계 보기
-        async function showStatistics() {
-            try {
-                const response = await fetch('/api/backtest/statistics');
-                const stats = await response.json();
-                
-                if (stats.error) {
-                    throw new Error(stats.error);
-                }
-
-                // 통계 모달 HTML 생성
-                const statsHtml = `
-                    <div class="stats-section">
-                        <h3>📊 전략별 통계</h3>
-                        <div class="stats-grid">
-                            ${Object.entries(stats.strategy_stats).map(([strategy, data]) => `
-                                <div class="stat-card">
-                                    <h4>${strategy}</h4>
-                                    <p>테스트 수: ${data.total_tests}회</p>
-                                    <p>평균 수익률: <span class="positive">+${data.avg_return}%</span></p>
-                                    <p>평균 샤프 비율: ${data.avg_sharpe}</p>
-                                    <p>평균 낙폭: <span class="negative">-${data.avg_drawdown}%</span></p>
-                                    <p>승률: ${data.win_rate}%</p>
-                                    <p>최적 심볼: ${data.best_symbol}</p>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-
-                    <div class="stats-section">
-                        <h3>💰 심볼별 통계</h3>
-                        <div class="stats-grid">
-                            ${Object.entries(stats.symbol_stats).map(([symbol, data]) => `
-                                <div class="stat-card">
-                                    <h4>${symbol}</h4>
-                                    <p>테스트 수: ${data.total_tests}회</p>
-                                    <p>평균 수익률: <span class="positive">+${data.avg_return}%</span></p>
-                                    <p>최적 전략: ${data.best_strategy}</p>
-                                    <p>최악 전략: ${data.worst_strategy}</p>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-
-                    <div class="stats-section">
-                        <h3>📅 기간별 통계</h3>
-                        <div class="stats-grid">
-                            ${Object.entries(stats.period_stats).map(([period, data]) => `
-                                <div class="stat-card">
-                                    <h4>${period}</h4>
-                                    <p>테스트 수: ${data.total_tests}회</p>
-                                    <p>평균 수익률: <span class="positive">+${data.avg_return}%</span></p>
-                                    <p>변동성: ${data.volatility}</p>
-                                </div>
-                            `).join('')}
-                        </div>
-                    </div>
-
-                    <div class="stats-summary">
-                        <h3>📈 전체 요약</h3>
-                        <p>총 백테스트 수: <strong>${stats.total_tests}</strong>회</p>
-                        <p>마지막 업데이트: ${new Date(stats.last_updated).toLocaleString()}</p>
-                    </div>
-                `;
-
-                // 모달에 통계 표시
-                document.getElementById('detailContent').innerHTML = statsHtml;
-                document.getElementById('detailModal').style.display = 'block';
-                
-            } catch (error) {
-                console.error('통계 로드 실패:', error);
-                alert('❌ 통계 로드에 실패했습니다: ' + error.message);
-            }
+        function resetBacktestButton() {
+            const btn = document.getElementById('runBacktest');
+            btn.innerHTML = '<i class="fas fa-play"></i> Run Backtest';
+            btn.style.background = 'linear-gradient(135deg, #0066FF, #3D8BFF)';
+            btn.disabled = false;
+            document.getElementById('progressContainer').style.display = 'none';
+            isRunning = false;
         }
 
-        // 전략 통합 분석 관련 함수들
-        
-        // 분석 탭 전환
-        function showAnalysisTab(tabName) {
-            // 모든 탭 버튼 비활성화
-            document.querySelectorAll('.tab-button').forEach(button => {
-                button.classList.remove('active');
-            });
+        function resetBacktest() {
+            // Reset all values to defaults
+            document.getElementById('totalReturn').textContent = '+0.0%';
+            document.getElementById('sharpeRatio').textContent = '0.00';
+            document.getElementById('maxDrawdown').textContent = '0.0%';
+            document.getElementById('winRate').textContent = '0.0%';
+            document.getElementById('profitFactor').textContent = '0.00';
+            document.getElementById('annualReturn').textContent = '0.0%';
             
-            // 모든 탭 내용 숨기기
-            document.querySelectorAll('.tab-content').forEach(content => {
-                content.style.display = 'none';
-            });
-            
-            // 선택된 탭 활성화
-            document.querySelector(`[onclick="showAnalysisTab('${tabName}')"]`).classList.add('active');
-            document.getElementById(tabName + 'Tab').style.display = 'block';
+            resetBacktestButton();
         }
 
-        // 전략 통합 분석 결과 표시
-        function displayComprehensiveAnalysis(analysisData) {
-            const comprehensiveSection = document.getElementById('comprehensiveAnalysisSection');
-            comprehensiveSection.style.display = 'block';
-            
-            // 분석 요약 업데이트
-            document.getElementById('totalStrategiesTested').textContent = analysisData.totalStrategies;
-            document.getElementById('bestStrategy').textContent = analysisData.bestStrategy;
-            document.getElementById('avgReturn').textContent = analysisData.avgReturn + '%';
-            document.getElementById('recommendedStrategies').textContent = analysisData.recommendedStrategies.length;
-            
-            // 추천 전략 목록
-            const recommendedList = document.getElementById('recommendedStrategiesList');
-            recommendedList.innerHTML = '';
-            analysisData.recommendedStrategies.forEach(strategy => {
-                const item = document.createElement('div');
-                item.className = 'strategy-item';
-                item.innerHTML = `
-                    <h4>${strategy.name}</h4>
-                    <p><strong>수익률:</strong> <span class="positive">+${strategy.return}%</span></p>
-                    <p><strong>샤프 비율:</strong> ${strategy.sharpe}</p>
-                    <p><strong>추천 이유:</strong> ${strategy.reason}</p>
-                    <div class="strategy-metrics">
-                        <div class="metric-item">
-                            <div>승률</div>
-                            <div>${strategy.winRate}%</div>
-                        </div>
-                        <div class="metric-item">
-                            <div>낙폭</div>
-                            <div>${strategy.drawdown}%</div>
-                        </div>
-                        <div class="metric-item">
-                            <div>거래수</div>
-                            <div>${strategy.trades}</div>
-                        </div>
-                    </div>
-                `;
-                recommendedList.appendChild(item);
-            });
-            
-            // 수정 필요 전략 목록
-            const modificationList = document.getElementById('modificationNeededList');
-            modificationList.innerHTML = '';
-            analysisData.modificationNeeded.forEach(strategy => {
-                const item = document.createElement('div');
-                item.className = 'strategy-item';
-                item.innerHTML = `
-                    <h4>${strategy.name}</h4>
-                    <p><strong>수익률:</strong> <span class="warning">${strategy.return}%</span></p>
-                    <p><strong>문제점:</strong> ${strategy.issues}</p>
-                    <p><strong>개선 방안:</strong> ${strategy.improvements}</p>
-                `;
-                modificationList.appendChild(item);
-            });
-            
-            // 폐기 권장 전략 목록
-            const discardList = document.getElementById('discardRecommendedList');
-            discardList.innerHTML = '';
-            analysisData.discardRecommended.forEach(strategy => {
-                const item = document.createElement('div');
-                item.className = 'strategy-item';
-                item.innerHTML = `
-                    <h4>${strategy.name}</h4>
-                    <p><strong>수익률:</strong> <span class="negative">${strategy.return}%</span></p>
-                    <p><strong>폐기 이유:</strong> ${strategy.reason}</p>
-                    <p><strong>위험도:</strong> ${strategy.risk}</p>
-                `;
-                discardList.appendChild(item);
-            });
-            
-            // 조합 추천 목록
-            const combinationList = document.getElementById('combinationRecommendations');
-            combinationList.innerHTML = '';
-            analysisData.combinationRecommendations.forEach(combo => {
-                const item = document.createElement('div');
-                item.className = 'recommendation-item';
-                item.innerHTML = `
-                    <div class="recommendation-title">${combo.name}</div>
-                    <div class="recommendation-reason">${combo.reason}</div>
-                    <div class="recommendation-metrics">
-                        <span>예상 수익률: <strong class="positive">+${combo.expectedReturn}%</strong></span>
-                        <span>위험도: <strong>${combo.risk}</strong></span>
-                        <span>상관계수: <strong>${combo.correlation}</strong></span>
-                    </div>
-                `;
-                combinationList.appendChild(item);
-            });
-            
-            // 상세 분석 내용 업데이트
-            updateDetailedAnalysis(analysisData);
-            
-            // 섹션으로 스크롤
-            comprehensiveSection.scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // 상세 분석 업데이트
-        function updateDetailedAnalysis(analysisData) {
-            // 성과 분석
-            const performanceAnalysis = document.getElementById('performanceAnalysis');
-            performanceAnalysis.innerHTML = `
-                <h4>성과 분석 요약</h4>
-                <div class="analysis-summary">
-                    <p><strong>최고 성과 전략:</strong> ${analysisData.bestStrategy} (+${analysisData.bestReturn}%)</p>
-                    <p><strong>최저 성과 전략:</strong> ${analysisData.worstStrategy} (${analysisData.worstReturn}%)</p>
-                    <p><strong>평균 수익률:</strong> ${analysisData.avgReturn}%</p>
-                    <p><strong>수익률 표준편차:</strong> ${analysisData.returnStdDev}%</p>
-                </div>
-                <div class="insights">
-                    <h5>주요 인사이트:</h5>
-                    <ul>
-                        ${analysisData.performanceInsights.map(insight => `<li>${insight}</li>`).join('')}
-                    </ul>
-                </div>
-            `;
-            
-            // 위험 분석
-            const riskAnalysis = document.getElementById('riskAnalysis');
-            riskAnalysis.innerHTML = `
-                <h4>위험 분석 요약</h4>
-                <div class="analysis-summary">
-                    <p><strong>최대 낙폭 평균:</strong> ${analysisData.avgMaxDrawdown}%</p>
-                    <p><strong>최고 위험 전략:</strong> ${analysisData.highestRiskStrategy} (${analysisData.highestRisk}%)</p>
-                    <p><strong>최저 위험 전략:</strong> ${analysisData.lowestRiskStrategy} (${analysisData.lowestRisk}%)</p>
-                </div>
-                <div class="insights">
-                    <h5>위험 관리 제안:</h5>
-                    <ul>
-                        ${analysisData.riskInsights.map(insight => `<li>${insight}</li>`).join('')}
-                    </ul>
-                </div>
-            `;
-            
-            // 상관관계 분석
-            const correlationAnalysis = document.getElementById('correlationAnalysis');
-            correlationAnalysis.innerHTML = `
-                <h4>전략 간 상관관계</h4>
-                <div class="analysis-summary">
-                    <p><strong>평균 상관계수:</strong> ${analysisData.avgCorrelation}</p>
-                    <p><strong>최고 상관계수:</strong> ${analysisData.highestCorrelation}</p>
-                    <p><strong>최저 상관계수:</strong> ${analysisData.lowestCorrelation}</p>
-                </div>
-                <div class="insights">
-                    <h5>다각화 제안:</h5>
-                    <ul>
-                        ${analysisData.correlationInsights.map(insight => `<li>${insight}</li>`).join('')}
-                    </ul>
-                </div>
-            `;
-            
-            // 인사이트
-            const insightsContent = document.getElementById('insightsContent');
-            insightsContent.innerHTML = `
-                <div class="insights-section">
-                    <h4>🎯 핵심 인사이트</h4>
-                    <div class="insight-cards">
-                        ${analysisData.keyInsights.map(insight => `
-                            <div class="card" style="margin-bottom: 1rem; padding: 1.5rem;">
-                                <h5 style="color: #3498db;">${insight.title}</h5>
-                                <p>${insight.description}</p>
-                                <div class="insight-action">
-                                    <strong>액션 아이템:</strong> ${insight.action}
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-                
-                <div class="recommendations-section">
-                    <h4>📋 구체적 권장사항</h4>
-                    <div class="recommendation-cards">
-                        ${analysisData.recommendations.map(rec => `
-                            <div class="card" style="margin-bottom: 1rem; padding: 1.5rem; border-left: 4px solid #27ae60;">
-                                <h5 style="color: #27ae60;">${rec.title}</h5>
-                                <p>${rec.description}</p>
-                                <div class="recommendation-priority">
-                                    <strong>우선순위:</strong> <span class="priority-${rec.priority}">${rec.priority}</span>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-        }
-
-        // 전략 통합 분석 결과 다운로드
-        function exportComprehensiveAnalysis() {
-            alert('전략 통합 분석 결과 다운로드 기능은 준비 중입니다.');
-        }
-
-        // 최적화 포트폴리오 생성
-        function generateOptimizedPortfolio() {
-            alert('최적화 포트폴리오 생성 기능은 준비 중입니다.');
-        }
-
-        // 전략 통합 분석 초기화
-        function resetComprehensiveAnalysis() {
-            if (confirm('전략 통합 분석 결과를 초기화하시겠습니까?')) {
-                document.getElementById('comprehensiveAnalysisSection').style.display = 'none';
-                alert('전략 통합 분석이 초기화되었습니다.');
-            }
-        }
-
-        // 더미 데이터로 전략 통합 분석 테스트 (개발용)
-        function testComprehensiveAnalysis() {
-            const dummyData = {
-                totalStrategies: 8,
-                bestStrategy: 'ML 앙상블',
-                avgReturn: 18.5,
-                bestReturn: 28.6,
-                worstStrategy: '그리드 트레이딩',
-                worstReturn: 15.6,
-                returnStdDev: 6.8,
-                avgMaxDrawdown: 10.2,
-                highestRiskStrategy: '모멘텀 전략',
-                highestRisk: 18.7,
-                lowestRiskStrategy: '차익거래',
-                lowestRisk: 3.2,
-                avgCorrelation: 0.35,
-                highestCorrelation: 0.78,
-                lowestCorrelation: -0.12,
-                recommendedStrategies: [
-                    {
-                        name: 'ML 앙상블',
-                        return: 28.6,
-                        sharpe: 2.15,
-                        reason: '높은 수익률과 안정성을 동시에 제공',
-                        winRate: 71.2,
-                        drawdown: 11.4,
-                        trades: 52
-                    },
-                    {
-                        name: '트리플 콤보',
-                        return: 25.4,
-                        sharpe: 1.85,
-                        reason: '일관된 성과와 적절한 위험 관리',
-                        winRate: 68.9,
-                        drawdown: 8.5,
-                        trades: 45
-                    }
-                ],
-                modificationNeeded: [
-                    {
-                        name: 'MACD 전략',
-                        return: 22.1,
-                        issues: '높은 변동성과 불안정한 신호',
-                        improvements: '신호 필터링 강화, 포지션 크기 조절'
-                    }
-                ],
-                discardRecommended: [
-                    {
-                        name: '그리드 트레이딩',
-                        return: 15.6,
-                        reason: '낮은 수익률과 높은 거래 비용',
-                        risk: '중간'
-                    }
-                ],
-                combinationRecommendations: [
-                    {
-                        name: 'ML 앙상블 + 트리플 콤보',
-                        reason: '상호 보완적인 신호로 안정성 향상',
-                        expectedReturn: 26.8,
-                        risk: '중간',
-                        correlation: 0.42
-                    }
-                ],
-                performanceInsights: [
-                    'ML 최적화된 전략들이 일반적으로 더 높은 수익률을 기록',
-                    '모멘텀 기반 전략들이 높은 수익률을 보이나 위험도도 높음',
-                    '차익거래 전략은 안정적이지만 수익률이 제한적'
-                ],
-                riskInsights: [
-                    '포트폴리오 다각화로 전체 위험도를 30% 이상 감소 가능',
-                    '레버리지 조절을 통한 위험 관리가 필요',
-                    '시장 변동성이 높은 기간에는 보수적 전략 비중 확대 권장'
-                ],
-                correlationInsights: [
-                    '트레이딩 스타일이 다른 전략들의 조합으로 다각화 효과 극대화',
-                    'ML 앙상블과 차익거래 전략의 조합이 가장 효과적',
-                    '모멘텀 전략들 간의 높은 상관관계로 중복 투자 위험 존재'
-                ],
-                keyInsights: [
-                    {
-                        title: '기계학습 전략의 우위',
-                        description: 'ML 최적화된 전략들이 전반적으로 더 높은 위험 조정 수익률을 보여줍니다.',
-                        action: 'ML 최적화를 모든 전략에 적용 검토'
-                    },
-                    {
-                        title: '포트폴리오 다각화의 필요성',
-                        description: '단일 전략 의존도를 줄이고 상관관계가 낮은 전략들을 조합하여 안정성을 높일 수 있습니다.',
-                        action: '3-4개 전략을 조합한 포트폴리오 구성'
-                    }
-                ],
-                recommendations: [
-                    {
-                        title: '핵심 전략 선별',
-                        description: 'ML 앙상블, 트리플 콤보, 모멘텀 전략을 핵심 전략으로 선정하여 포트폴리오의 70% 비중 할당',
-                        priority: '높음'
-                    },
-                    {
-                        title: '위험 관리 강화',
-                        description: '각 전략별 최대 손실 한도를 설정하고 시장 변동성에 따른 동적 포지션 크기 조절',
-                        priority: '높음'
-                    },
-                    {
-                        title: '성과 모니터링',
-                        description: '월별 성과 리뷰를 통해 전략별 성과를 추적하고 필요시 비중 조정',
-                        priority: '중간'
-                    }
-                ]
-            };
-            
-            displayComprehensiveAnalysis(dummyData);
+        function updateChartTimeframe(period) {
+            // Update chart based on selected timeframe
+            // This would typically filter the data
+            console.log('Updating chart for period:', period);
         }
     </script>
 </body>

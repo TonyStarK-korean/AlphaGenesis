@@ -1715,16 +1715,16 @@ def backtest_dashboard():
     """백테스트 대시보드 페이지"""
     return render_template('backtest_dashboard.html')
 
-# 프리미엄 대시보드 라우트들
+# 프리미엄 대시보드 라우트들 (기존 페이지와 통합)
 @api.route('/premium-backtest')
 def premium_backtest():
-    """프리미엄 백테스트 대시보드"""
-    return render_template('premium_backtest.html')
+    """프리미엄 백테스트 대시보드 (백테스트와 동일)"""
+    return render_template('backtest_dashboard.html')
 
 @api.route('/premium-live')
 def premium_live():
     """프리미엄 라이브 트레이딩 대시보드"""
-    return render_template('premium_live_trading.html')
+    return render_template('main_dashboard.html')
 
 # 라이브 트레이딩 API 엔드포인트들
 @api.route('/api/live-trading/start', methods=['POST'])

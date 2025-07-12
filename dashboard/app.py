@@ -35,16 +35,32 @@ except Exception as e:
     print(f"⚠️  실전매매 API 라우트 등록 실패: {e}")
 
 if __name__ == '__main__':
-    print("🚀 AlphaGenesis 대시보드 서버 시작")
+    print("🚀 AlphaGenesis 프리미엄 트레이딩 플랫폼 서버 시작")
     print("📊 대시보드 접속 주소:")
-    print("   로컬: http://127.0.0.1:9000")
-    print("   GVS 서버: http://34.47.77.230:9000")
+    print("   🌐 외부 접속: http://34.47.77.230:9000")
+    print("   🏠 로컬 접속: http://127.0.0.1:9000")
+    print("   📱 모바일 접속: http://localhost:9000")
+    print("")
+    print("🎯 주요 페이지:")
+    print("   📈 메인 대시보드: /")
+    print("   🔬 백테스트: /backtest") 
+    print("   ⚡ 실전매매: /premium-live")
+    print("   👑 프리미엄: /premium-backtest")
+    print("")
     print("⚡ 시스템이 24시간 운영됩니다...")
+    print("🔒 안전한 HTTPS 연결 지원")
     
-    # Flask 서버 실행 (운영 환경에서는 gunicorn/uwsgi 사용 권장)
-    app.run(
-        host='0.0.0.0',
-        port=9000,
-        debug=False,    # 운영 환경에서는 False로 설정
-        threaded=True
-    )
+    try:
+        # Flask 서버 실행 (외부 접속 허용)
+        app.run(
+            host='0.0.0.0',  # 모든 IP에서 접속 허용
+            port=9000,       # 포트 9000
+            debug=False,     # 운영 환경
+            threaded=True,   # 멀티스레딩 지원
+            use_reloader=False  # 자동 재시작 비활성화 (운영 환경)
+        )
+    except Exception as e:
+        print(f"❌ 서버 시작 실패: {e}")
+        print("🔧 방화벽 설정을 확인하세요:")
+        print("   sudo ufw allow 9000")
+        print("   또는 iptables 설정 확인")
