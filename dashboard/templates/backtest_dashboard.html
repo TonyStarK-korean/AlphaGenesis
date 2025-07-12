@@ -1317,14 +1317,17 @@
         let strategies = [];
         let symbols = [];
 
-        // 페이지 로드 시 초기화 (자동 실행 제거)
+        // 페이지 로드 시 초기화 (자동 실행 완전 제거)
         document.addEventListener('DOMContentLoaded', function() {
             initializeDates();
-            loadStrategies();
-            loadSymbols();
+            // loadStrategies(); // 자동 로드 제거 - 수동으로만 로드
+            // loadSymbols(); // 자동 로드 제거 - 수동으로만 로드
             // loadBacktestResults(); // 자동 로드 제거
             setupEventListeners();
-            updateStatus('stopped', '백테스트를 시작하려면 설정 후 시작 버튼을 클릭하세요');
+            updateStatus('stopped', '전략과 심볼을 선택한 후 백테스트를 시작하세요');
+            
+            // 사용자가 수동으로 로드할 수 있도록 버튼 활성화
+            enableManualLoading();
         });
 
         // 날짜 초기화 (시작일: 1달 전, 종료일: 오늘)
@@ -1337,9 +1340,10 @@
             document.getElementById('endDate').value = today.toISOString().split('T')[0];
         }
 
-        // 전략 목록 로드
+        // 전략 목록 로드 (수동으로만 실행)
         async function loadStrategies() {
             try {
+                console.log('사용자 요청으로 전략 목록 로드 중...');
                 const response = await fetch('/api/strategies');
                 const data = await response.json();
                 strategies = data.strategies || [];
@@ -1354,14 +1358,46 @@
                     option.dataset.timeframe = strategy.timeframe;
                     strategySelect.appendChild(option);
                 });
+                
+                console.log(`전략 목록 로드 완료: ${strategies.length}개`);
             } catch (error) {
                 console.error('전략 로드 실패:', error);
+                const strategySelect = document.getElementById('strategy');
+                strategySelect.innerHTML = '<option value="">전략 로드 실패 - 다시 시도</option>';
             }
         }
 
-        // 심볼 목록 로드
+        // 수동 로딩 기능 활성화
+        function enableManualLoading() {
+            // 전략 선택 박스에 로드 버튼 기능 추가
+            const strategySelect = document.getElementById('strategy');
+            if (strategySelect && !strategySelect.hasAttribute('data-loaded')) {
+                strategySelect.innerHTML = '<option value="">전략 목록 로드하기</option>';
+                strategySelect.addEventListener('focus', function() {
+                    if (!this.hasAttribute('data-loaded')) {
+                        loadStrategies();
+                        this.setAttribute('data-loaded', 'true');
+                    }
+                });
+            }
+            
+            // 심볼 선택 박스에 로드 버튼 기능 추가
+            const symbolSelect = document.getElementById('symbolSelect');
+            if (symbolSelect && !symbolSelect.hasAttribute('data-loaded')) {
+                symbolSelect.innerHTML = '<option value="">심볼 목록 로드하기</option>';
+                symbolSelect.addEventListener('focus', function() {
+                    if (!this.hasAttribute('data-loaded')) {
+                        loadSymbols();
+                        this.setAttribute('data-loaded', 'true');
+                    }
+                });
+            }
+        }
+
+        // 심볼 목록 로드 (수동으로만 실행)
         async function loadSymbols() {
             try {
+                console.log('사용자 요청으로 심볼 목록 로드 중...');
                 const response = await fetch('/api/binance/symbols');
                 const data = await response.json();
                 symbols = data.symbols || [];
@@ -1375,8 +1411,12 @@
                     option.textContent = symbol;
                     symbolSelect.appendChild(option);
                 });
+                
+                console.log(`심볼 목록 로드 완료: ${symbols.length}개`);
             } catch (error) {
                 console.error('심볼 로드 실패:', error);
+                const symbolSelect = document.getElementById('symbolSelect');
+                symbolSelect.innerHTML = '<option value="">심볼 로드 실패 - 다시 시도</option>';
             }
         }
 
@@ -1689,28 +1729,94 @@
             };
         }
 
-        // 통계 업데이트
-        function updateStatistics() {
-            // 더미 통계 데이터 (실제로는 백테스트 결과에서 가져옴)
-            const stats = {
-                totalReturn: 25.4,
-                totalTrades: 45,
-                winRate: 68.9,
-                sharpeRatio: 1.85,
-                maxDrawdown: 8.5,
-                avgLeverage: 2.4
+        // 통계 업데이트 - 실제 백테스트 결과 사용
+        async function updateStatistics() {
+            try {
+                // 실제 백테스트 결과에서 통계 계산
+                const response = await fetch('/api/backtest/results');
+                const data = await response.json();
+                
+                if (data.results && data.results.length > 0) {
+                    // 최신 결과들로부터 통계 계산
+                    const results = data.results;
+                    const latestResults = results.slice(-10); // 최근 10개 결과
+                    
+                    const stats = calculateAggregatedStats(latestResults);
+                    updateStatisticsDisplay(stats);
+                } else {
+                    // 결과가 없을 때 초기값 표시
+                    const emptyStats = {
+                        totalReturn: 0,
+                        totalTrades: 0,
+                        winRate: 0,
+                        sharpeRatio: 0,
+                        maxDrawdown: 0,
+                        avgLeverage: 0
+                    };
+                    updateStatisticsDisplay(emptyStats);
+                }
+                
+                // 차트 업데이트
+                updatePerformanceChart();
+                updateStrategyComparisonChart();
+                
+            } catch (error) {
+                console.error('통계 업데이트 실패:', error);
+                // 오류 시 초기값 표시
+                const emptyStats = {
+                    totalReturn: 0,
+                    totalTrades: 0,
+                    winRate: 0,
+                    sharpeRatio: 0,
+                    maxDrawdown: 0,
+                    avgLeverage: 0
+                };
+                updateStatisticsDisplay(emptyStats);
+            }
+        }
+        
+        // 집계 통계 계산 함수
+        function calculateAggregatedStats(results) {
+            if (!results || results.length === 0) {
+                return {
+                    totalReturn: 0,
+                    totalTrades: 0,
+                    winRate: 0,
+                    sharpeRatio: 0,
+                    maxDrawdown: 0,
+                    avgLeverage: 0
+                };
+            }
+            
+            const totalReturn = results.reduce((sum, r) => sum + (r.total_return || 0), 0) / results.length;
+            const totalTrades = results.reduce((sum, r) => sum + (r.total_trades || 0), 0);
+            const avgWinRate = results.reduce((sum, r) => sum + (r.win_rate || 0), 0) / results.length;
+            const avgSharpe = results.reduce((sum, r) => sum + (r.sharpe_ratio || 0), 0) / results.length;
+            const avgDrawdown = results.reduce((sum, r) => sum + (r.max_drawdown || 0), 0) / results.length;
+            const avgLeverage = results.reduce((sum, r) => sum + (r.avg_leverage || 1), 0) / results.length;
+            
+            return {
+                totalReturn: totalReturn.toFixed(1),
+                totalTrades: totalTrades,
+                winRate: avgWinRate.toFixed(1),
+                sharpeRatio: avgSharpe.toFixed(2),
+                maxDrawdown: avgDrawdown.toFixed(1),
+                avgLeverage: avgLeverage.toFixed(1)
             };
-
-            document.getElementById('totalReturn').textContent = `+${stats.totalReturn}%`;
+        }
+        
+        // 통계 표시 업데이트 함수
+        function updateStatisticsDisplay(stats) {
+            const totalReturnElement = document.getElementById('totalReturn');
+            const sign = stats.totalReturn >= 0 ? '+' : '';
+            totalReturnElement.textContent = `${sign}${stats.totalReturn}%`;
+            totalReturnElement.className = stats.totalReturn >= 0 ? 'stat-value positive' : 'stat-value negative';
+            
             document.getElementById('totalTrades').textContent = stats.totalTrades;
             document.getElementById('winRate').textContent = `${stats.winRate}%`;
             document.getElementById('sharpeRatio').textContent = stats.sharpeRatio;
             document.getElementById('maxDrawdown').textContent = `${stats.maxDrawdown}%`;
             document.getElementById('avgLeverage').textContent = `${stats.avgLeverage}x`;
-
-            // 차트 업데이트
-            updatePerformanceChart();
-            updateStrategyComparisonChart();
         }
 
         // 성과 차트 업데이트
@@ -1747,50 +1853,117 @@
             canvas.stroke();
         }
 
-        // 전략 비교 차트 업데이트
-        function updateStrategyComparisonChart() {
-            // 전략 비교 테이블 업데이트
-            const strategies = [
-                { name: '트리플 콤보', return: 25.4, sharpe: 1.85, drawdown: 8.5, winRate: 68.9, trades: 45, leverage: 2.4, risk: '중간', mlOptimized: true },
-                { name: 'RSI 전략', return: 18.2, sharpe: 1.32, drawdown: 12.3, winRate: 58.5, trades: 78, leverage: 1.8, risk: '낮음', mlOptimized: false },
-                { name: 'MACD 전략', return: 22.1, sharpe: 1.65, drawdown: 15.2, winRate: 62.5, trades: 32, leverage: 2.1, risk: '중간', mlOptimized: true },
-                { name: '모멘텀 전략', return: 31.8, sharpe: 2.05, drawdown: 18.7, winRate: 60.7, trades: 28, leverage: 3.2, risk: '높음', mlOptimized: true },
-                { name: 'ML 앙상블', return: 28.6, sharpe: 2.15, drawdown: 11.4, winRate: 71.2, trades: 52, leverage: 2.8, risk: '중간', mlOptimized: true },
-                { name: '볼린저 밴드', return: 19.8, sharpe: 1.45, drawdown: 10.2, winRate: 65.3, trades: 41, leverage: 2.0, risk: '낮음', mlOptimized: false },
-                { name: '그리드 트레이딩', return: 15.6, sharpe: 1.12, drawdown: 7.8, winRate: 72.5, trades: 95, leverage: 1.5, risk: '낮음', mlOptimized: false },
-                { name: '차익거래', return: 12.3, sharpe: 1.85, drawdown: 3.2, winRate: 85.2, trades: 156, leverage: 1.2, risk: '매우낮음', mlOptimized: false }
-            ];
-
-            const tbody = document.getElementById('strategyComparisonBody');
-            if (tbody) {
-                tbody.innerHTML = '';
-
-                strategies.forEach(strategy => {
-                    const row = document.createElement('tr');
-                    const returnClass = strategy.return > 0 ? 'positive' : 'negative';
-                    const riskClass = strategy.risk === '높음' ? 'negative' : strategy.risk === '중간' ? 'warning' : 'positive';
+        // 전략 비교 차트 업데이트 - 실제 백테스트 결과 사용
+        async function updateStrategyComparisonChart() {
+            try {
+                // 실제 백테스트 결과에서 전략별 성과 가져오기
+                const response = await fetch('/api/backtest/results');
+                const data = await response.json();
+                
+                let strategies = [];
+                
+                if (data.results && data.results.length > 0) {
+                    // 전략별로 결과 그룹화
+                    const strategyGroups = {};
+                    data.results.forEach(result => {
+                        const strategyName = result.strategy_name || '알 수 없음';
+                        if (!strategyGroups[strategyName]) {
+                            strategyGroups[strategyName] = [];
+                        }
+                        strategyGroups[strategyName].push(result);
+                    });
                     
-                    row.innerHTML = `
-                        <td>
-                            <div class="strategy-name">
-                                <strong>${strategy.name}</strong>
-                                ${strategy.mlOptimized ? '<span class="ml-badge">🤖 ML</span>' : ''}
-                            </div>
-                        </td>
-                        <td class="${returnClass}">${strategy.return > 0 ? '+' : ''}${strategy.return}%</td>
-                        <td>${strategy.sharpe}</td>
-                        <td class="negative">${strategy.drawdown}%</td>
-                        <td>${strategy.winRate}%</td>
-                        <td>${strategy.trades}</td>
-                        <td>${strategy.leverage}x</td>
-                        <td><span class="risk-${strategy.risk}">${strategy.risk}</span></td>
-                    `;
-                    tbody.appendChild(row);
-                });
-            }
+                    // 각 전략의 평균 성과 계산
+                    strategies = Object.keys(strategyGroups).map(strategyName => {
+                        const results = strategyGroups[strategyName];
+                        const avgReturn = results.reduce((sum, r) => sum + (r.total_return || 0), 0) / results.length;
+                        const avgSharpe = results.reduce((sum, r) => sum + (r.sharpe_ratio || 0), 0) / results.length;
+                        const avgDrawdown = results.reduce((sum, r) => sum + (r.max_drawdown || 0), 0) / results.length;
+                        const avgWinRate = results.reduce((sum, r) => sum + (r.win_rate || 0), 0) / results.length;
+                        const totalTrades = results.reduce((sum, r) => sum + (r.total_trades || 0), 0);
+                        const avgLeverage = results.reduce((sum, r) => sum + (r.avg_leverage || 1), 0) / results.length;
+                        
+                        // 위험 수준 계산 (최대 낙폭 기준)
+                        let risk = '낮음';
+                        if (avgDrawdown > 15) risk = '높음';
+                        else if (avgDrawdown > 10) risk = '중간';
+                        
+                        return {
+                            name: strategyName,
+                            return: parseFloat(avgReturn.toFixed(1)),
+                            sharpe: parseFloat(avgSharpe.toFixed(2)),
+                            drawdown: parseFloat(avgDrawdown.toFixed(1)),
+                            winRate: parseFloat(avgWinRate.toFixed(1)),
+                            trades: totalTrades,
+                            leverage: parseFloat(avgLeverage.toFixed(1)),
+                            risk: risk,
+                            mlOptimized: results.some(r => r.ml_optimized)
+                        };
+                    });
+                } else {
+                    // 백테스트 결과가 없을 때 빈 배열
+                    strategies = [];
+                }
 
-            // 전략 비교 차트 생성
-            createStrategyComparisonChart(strategies);
+                // 전략 비교 테이블 업데이트
+                const tbody = document.getElementById('strategyComparisonBody');
+                if (tbody) {
+                    if (strategies.length === 0) {
+                        // 백테스트 결과가 없을 때 안내 메시지
+                        tbody.innerHTML = `
+                            <tr>
+                                <td colspan="8" style="text-align: center; padding: 20px; color: #666;">
+                                    백테스트를 실행하면 전략별 성과 비교가 표시됩니다.
+                                </td>
+                            </tr>
+                        `;
+                    } else {
+                        tbody.innerHTML = '';
+
+                        strategies.forEach(strategy => {
+                            const row = document.createElement('tr');
+                            const returnClass = strategy.return > 0 ? 'positive' : 'negative';
+                            const riskClass = strategy.risk === '높음' ? 'negative' : strategy.risk === '중간' ? 'warning' : 'positive';
+                            
+                            row.innerHTML = `
+                                <td>
+                                    <div class="strategy-name">
+                                        <strong>${strategy.name}</strong>
+                                        ${strategy.mlOptimized ? '<span class="ml-badge">🤖 ML</span>' : ''}
+                                    </div>
+                                </td>
+                                <td class="${returnClass}">${strategy.return > 0 ? '+' : ''}${strategy.return}%</td>
+                                <td>${strategy.sharpe}</td>
+                                <td class="negative">${strategy.drawdown}%</td>
+                                <td>${strategy.winRate}%</td>
+                                <td>${strategy.trades}</td>
+                                <td>${strategy.leverage}x</td>
+                                <td><span class="risk-${strategy.risk}">${strategy.risk}</span></td>
+                            `;
+                            tbody.appendChild(row);
+                        });
+                    }
+                }
+
+                // 전략 비교 차트 생성 (데이터가 있을 때만)
+                if (strategies.length > 0) {
+                    createStrategyComparisonChart(strategies);
+                }
+                
+            } catch (error) {
+                console.error('전략 비교 차트 업데이트 실패:', error);
+                // 오류 시 안내 메시지 표시
+                const tbody = document.getElementById('strategyComparisonBody');
+                if (tbody) {
+                    tbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" style="text-align: center; padding: 20px; color: #e74c3c;">
+                                전략 비교 데이터를 불러오는 중 오류가 발생했습니다.
+                            </td>
+                        </tr>
+                    `;
+                }
+            }
         }
 
         // 전략 비교 차트 생성
