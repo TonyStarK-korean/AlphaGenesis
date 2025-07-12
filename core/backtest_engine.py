@@ -53,8 +53,64 @@ class RealBacktestEngine:
         self.leverage_manager = DynamicLeverageManager()
         self.results = []
         
-        # 실제 구현된 유의미한 전략 목록만 유지
+        # 새로운 4가지 전략 추가
         self.strategies = {
+            'strategy1_basic': {
+                'name': '전략 1 (기본) - 1시간봉 급등초입',
+                'description': '1시간봉 기준 급등 초입 포착 전략',
+                'timeframe': '1h',
+                'implemented': True,
+                'params': {
+                    'bb_period_20': 20,
+                    'bb_period_80': 80,
+                    'ma_period_200': 200,
+                    'surge_threshold': 0.04
+                }
+            },
+            'strategy1_alpha': {
+                'name': '전략 1-1 (알파) - 1시간봉 급등초입+알파',
+                'description': '1시간봉 기준 급등 초입 + 알파 지표 조합',
+                'timeframe': '1h',
+                'implemented': True,
+                'params': {
+                    'bb_period_20': 20,
+                    'bb_period_80': 80,
+                    'ma_period_200': 200,
+                    'surge_threshold': 0.04,
+                    'volume_threshold': 2.0,
+                    'volatility_threshold': 0.02
+                }
+            },
+            'strategy2_basic': {
+                'name': '전략 2 (기본) - 1시간봉 눌림목 후 급등초입',
+                'description': '1시간봉 눌림목 이후 초급등 초입 포착 전략',
+                'timeframe': '1h',
+                'implemented': True,
+                'params': {
+                    'ma_period_5': 5,
+                    'ma_period_20': 20,
+                    'ma_period_80': 80,
+                    'ma_period_200': 200,
+                    'bb_period_20': 20,
+                    'surge_threshold': 0.04
+                }
+            },
+            'strategy2_alpha': {
+                'name': '전략 2-1 (알파) - 1시간봉 눌림목 후 급등초입+알파',
+                'description': '1시간봉 눌림목 이후 초급등 초입 + 알파 지표 조합',
+                'timeframe': '1h',
+                'implemented': True,
+                'params': {
+                    'ma_period_5': 5,
+                    'ma_period_20': 20,
+                    'ma_period_80': 80,
+                    'ma_period_200': 200,
+                    'bb_period_20': 20,
+                    'surge_threshold': 0.04,
+                    'rsi_period': 14,
+                    'fibonacci_levels': [0.236, 0.382, 0.618]
+                }
+            },
             'triple_combo': {
                 'name': '트리플 콤보 전략',
                 'description': 'RSI, MACD, 볼린저 밴드 조합 (3개 중 2개 충족시 거래)',
@@ -79,26 +135,47 @@ class RealBacktestEngine:
                     'rsi_oversold': (20, 35),
                     'rsi_overbought': (65, 80)
                 }
-            },
-            'macd_strategy': {
-                'name': 'MACD 전략',
-                'description': 'MACD 크로스오버 전략 (구현 예정)',
-                'timeframe': '30m',
-                'implemented': False,
-                'params': {
-                    'macd_fast': (8, 15),
-                    'macd_slow': (18, 30),
-                    'macd_signal': (7, 12)
-                }
             }
         }
         
-        # 주요 USDT 선물 심볼
-        self.major_symbols = [
+        # 동적으로 바이낸스 USDT 선물 심볼 로드
+        self.major_symbols = self._get_initial_symbols()
+    
+    def _get_initial_symbols(self) -> List[str]:
+        """초기 심볼 리스트 가져오기"""
+        try:
+            # 실시간 바이낸스 USDT 선물 심볼 조회 시도
+            import asyncio
+            try:
+                loop = asyncio.get_event_loop()
+            except RuntimeError:
+                loop = asyncio.new_event_loop()
+                asyncio.set_event_loop(loop)
+            
+            symbols = loop.run_until_complete(self.data_manager.get_all_usdt_futures_symbols())
+            if symbols:
+                logger.info(f"동적 심볼 로드 성공: {len(symbols)}개")
+                return symbols
+        except Exception as e:
+            logger.warning(f"동적 심볼 로드 실패: {e}, 기본 심볼 사용")
+        
+        # 기본 심볼 리스트 (fallback)
+        return [
             'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'DOT/USDT',
             'SOL/USDT', 'AVAX/USDT', 'MATIC/USDT', 'LINK/USDT', 'UNI/USDT',
-            'LTC/USDT', 'BCH/USDT', 'XRP/USDT', 'DOGE/USDT', 'SHIB/USDT'
+            'LTC/USDT', 'BCH/USDT', 'XRP/USDT', 'DOGE/USDT', 'SHIB/USDT',
+            'ATOM/USDT', 'FTM/USDT', 'NEAR/USDT', 'ALGO/USDT', 'VET/USDT',
+            'MANA/USDT', 'SAND/USDT', 'CRV/USDT', 'COMP/USDT', 'YFI/USDT'
         ]
+    
+    async def get_all_available_symbols(self) -> List[str]:
+        """모든 사용 가능한 USDT 선물 심볼 조회"""
+        try:
+            symbols = await self.data_manager.get_all_usdt_futures_symbols()
+            return symbols if symbols else self.major_symbols
+        except Exception as e:
+            logger.error(f"심볼 조회 실패: {e}")
+            return self.major_symbols
     
     async def run_backtest(
         self,
@@ -359,6 +436,38 @@ class RealBacktestEngine:
     def get_default_params(self, strategy_id: str) -> Dict[str, Any]:
         """전략 기본 파라미터 반환"""
         defaults = {
+            'strategy1_basic': {
+                'bb_period_20': 20,
+                'bb_period_80': 80,
+                'ma_period_200': 200,
+                'surge_threshold': 0.04
+            },
+            'strategy1_alpha': {
+                'bb_period_20': 20,
+                'bb_period_80': 80,
+                'ma_period_200': 200,
+                'surge_threshold': 0.04,
+                'volume_threshold': 2.0,
+                'volatility_threshold': 0.02
+            },
+            'strategy2_basic': {
+                'ma_period_5': 5,
+                'ma_period_20': 20,
+                'ma_period_80': 80,
+                'ma_period_200': 200,
+                'bb_period_20': 20,
+                'surge_threshold': 0.04
+            },
+            'strategy2_alpha': {
+                'ma_period_5': 5,
+                'ma_period_20': 20,
+                'ma_period_80': 80,
+                'ma_period_200': 200,
+                'bb_period_20': 20,
+                'surge_threshold': 0.04,
+                'rsi_period': 14,
+                'fibonacci_levels': [0.236, 0.382, 0.618]
+            },
             'triple_combo': {
                 'rsi_period': 14,
                 'rsi_oversold': 30,
@@ -631,7 +740,176 @@ class RealBacktestEngine:
         try:
             signals = []
             
-            if strategy_id == 'triple_combo':
+            if strategy_id == 'strategy1_basic':
+                # 전략 1 (기본) - 1시간봉 급등초입
+                for i in range(len(data)):
+                    if i < 200:  # 충분한 데이터가 있을 때까지 대기
+                        signals.append(0)
+                        continue
+                    
+                    try:
+                        # 필요한 지표들
+                        open_price = data['open'].iloc[i]
+                        high_price = data['high'].iloc[i]
+                        low_price = data['low'].iloc[i]
+                        
+                        # 볼린저 밴드 (20기간, 80기간)
+                        bb20_upper = data['BB_Upper'].iloc[i] if 'BB_Upper' in data.columns else data['close'].iloc[i] * 1.02
+                        bb80_upper = data.get('BB80_Upper', data['close']).iloc[i] if 'BB80_Upper' in data.columns else data['close'].iloc[i] * 1.025
+                        
+                        # 200 이동평균선
+                        ma200 = data['MA_200'].iloc[i] if 'MA_200' in data.columns else data['close'].iloc[i-200:i].mean()
+                        
+                        # 전략 1 조건
+                        cond1 = open_price < bb20_upper and open_price < bb80_upper
+                        cond2 = high_price > bb80_upper and high_price > bb20_upper
+                        cond3 = (high_price - low_price) / low_price >= 0.04  # 4% 이상 폭
+                        cond4 = open_price > ma200
+                        cond5 = abs(data['MA_20'].iloc[i] - bb20_upper) / bb20_upper <= 0.02 if 'MA_20' in data.columns else True
+                        
+                        if all([cond1, cond2, cond3, cond4, cond5]):
+                            signals.append(1)
+                        else:
+                            signals.append(0)
+                            
+                    except (KeyError, IndexError):
+                        signals.append(0)
+            
+            elif strategy_id == 'strategy1_alpha':
+                # 전략 1-1 (알파) - 1시간봉 급등초입+알파
+                for i in range(len(data)):
+                    if i < 200:
+                        signals.append(0)
+                        continue
+                    
+                    try:
+                        # 기본 전략 1 조건들
+                        open_price = data['open'].iloc[i]
+                        high_price = data['high'].iloc[i]
+                        low_price = data['low'].iloc[i]
+                        volume = data['volume'].iloc[i]
+                        
+                        bb20_upper = data['BB_Upper'].iloc[i] if 'BB_Upper' in data.columns else data['close'].iloc[i] * 1.02
+                        bb80_upper = data.get('BB80_Upper', data['close']).iloc[i] if 'BB80_Upper' in data.columns else data['close'].iloc[i] * 1.025
+                        ma200 = data['MA_200'].iloc[i] if 'MA_200' in data.columns else data['close'].iloc[i-200:i].mean()
+                        
+                        # 기본 조건
+                        basic_conditions = [
+                            open_price < bb20_upper and open_price < bb80_upper,
+                            high_price > bb80_upper and high_price > bb20_upper,
+                            (high_price - low_price) / low_price >= 0.04,
+                            open_price > ma200,
+                            abs(data['MA_20'].iloc[i] - bb20_upper) / bb20_upper <= 0.02 if 'MA_20' in data.columns else True
+                        ]
+                        
+                        # 알파 조건들
+                        avg_volume = data['volume'].iloc[i-20:i].mean() if i >= 20 else volume
+                        volume_explosion = volume > avg_volume * 2.0
+                        
+                        volatility = data['close'].iloc[i-10:i].std() / data['close'].iloc[i-10:i].mean() if i >= 10 else 0
+                        volatility_filter = volatility > 0.02
+                        
+                        if all(basic_conditions) and volume_explosion and volatility_filter:
+                            signals.append(1)
+                        else:
+                            signals.append(0)
+                            
+                    except (KeyError, IndexError):
+                        signals.append(0)
+            
+            elif strategy_id == 'strategy2_basic':
+                # 전략 2 (기본) - 1시간봉 눌림목 후 급등초입
+                for i in range(len(data)):
+                    if i < 200:
+                        signals.append(0)
+                        continue
+                    
+                    try:
+                        # 필요한 지표들
+                        open_price = data['open'].iloc[i]
+                        high_price = data['high'].iloc[i]
+                        low_price = data['low'].iloc[i]
+                        
+                        ma5 = data['MA_5'].iloc[i] if 'MA_5' in data.columns else data['close'].iloc[i-5:i].mean()
+                        ma20 = data['MA_20'].iloc[i] if 'MA_20' in data.columns else data['close'].iloc[i-20:i].mean()
+                        ma80 = data['MA_80'].iloc[i] if 'MA_80' in data.columns else data['close'].iloc[i-80:i].mean()
+                        ma200 = data['MA_200'].iloc[i] if 'MA_200' in data.columns else data['close'].iloc[i-200:i].mean()
+                        bb20_upper = data['BB_Upper'].iloc[i] if 'BB_Upper' in data.columns else data['close'].iloc[i] * 1.02
+                        bb20_lower = data['BB_Lower'].iloc[i] if 'BB_Lower' in data.columns else data['close'].iloc[i] * 0.98
+                        
+                        # 전략 2 조건들
+                        # 100봉 이내 골든크로스 확인
+                        golden_cross_80_200 = any(
+                            data['MA_80'].iloc[max(0, i-100):i].values > data['MA_200'].iloc[max(0, i-100):i].values
+                        ) if 'MA_80' in data.columns and 'MA_200' in data.columns else True
+                        
+                        # 50봉 이내 골든크로스 확인  
+                        golden_cross_80_bb20_lower = any(
+                            data['MA_80'].iloc[max(0, i-100):i].values > data['BB_Lower'].iloc[max(0, i-100):i].values
+                        ) if 'MA_80' in data.columns and 'BB_Lower' in data.columns else True
+                        
+                        # 5봉 이내 5-20 골든크로스
+                        golden_cross_5_20 = any(
+                            data['MA_5'].iloc[max(0, i-5):i].values > data['MA_20'].iloc[max(0, i-5):i].values
+                        ) if 'MA_5' in data.columns and 'MA_20' in data.columns else True
+                        
+                        cond1 = golden_cross_80_200 and golden_cross_80_bb20_lower
+                        cond2 = abs(ma20 - bb20_upper) / bb20_upper <= 0.02
+                        cond3 = open_price < bb20_upper
+                        cond4 = (high_price - low_price) / low_price >= 0.04
+                        cond5 = golden_cross_5_20
+                        
+                        if all([cond1, cond2, cond3, cond4, cond5]):
+                            signals.append(1)
+                        else:
+                            signals.append(0)
+                            
+                    except (KeyError, IndexError):
+                        signals.append(0)
+            
+            elif strategy_id == 'strategy2_alpha':
+                # 전략 2-1 (알파) - 1시간봉 눌림목 후 급등초입+알파
+                for i in range(len(data)):
+                    if i < 200:
+                        signals.append(0)
+                        continue
+                    
+                    try:
+                        # 기본 전략 2 조건들 + 알파 조건들
+                        open_price = data['open'].iloc[i]
+                        high_price = data['high'].iloc[i]
+                        low_price = data['low'].iloc[i]
+                        close_price = data['close'].iloc[i]
+                        
+                        # 기본 조건들 (전략 2와 동일)
+                        ma5 = data['MA_5'].iloc[i] if 'MA_5' in data.columns else data['close'].iloc[i-5:i].mean()
+                        ma20 = data['MA_20'].iloc[i] if 'MA_20' in data.columns else data['close'].iloc[i-20:i].mean()
+                        bb20_upper = data['BB_Upper'].iloc[i] if 'BB_Upper' in data.columns else data['close'].iloc[i] * 1.02
+                        
+                        # 알파 조건들
+                        rsi = data['RSI'].iloc[i] if 'RSI' in data.columns else 50
+                        rsi_bullish_divergence = rsi > 40 and rsi < 60  # RSI 강세 다이버전스 근사
+                        
+                        # 피보나치 되돌림 계산
+                        recent_high = data['high'].iloc[i-20:i].max() if i >= 20 else high_price
+                        recent_low = data['low'].iloc[i-20:i].min() if i >= 20 else low_price
+                        fib_level = (close_price - recent_low) / (recent_high - recent_low) if recent_high != recent_low else 0.5
+                        fib_support = 0.236 <= fib_level <= 0.618  # 피보나치 지지구간
+                        
+                        # 기본 조건 + 알파 조건
+                        basic_signal = (abs(ma20 - bb20_upper) / bb20_upper <= 0.02 and 
+                                       open_price < bb20_upper and
+                                       (high_price - low_price) / low_price >= 0.04)
+                        
+                        if basic_signal and rsi_bullish_divergence and fib_support:
+                            signals.append(1)
+                        else:
+                            signals.append(0)
+                            
+                    except (KeyError, IndexError):
+                        signals.append(0)
+            
+            elif strategy_id == 'triple_combo':
                 # 트리플 콤보 전략
                 rsi_oversold = params.get('rsi_oversold', 30)
                 rsi_overbought = params.get('rsi_overbought', 70)

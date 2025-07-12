@@ -677,6 +677,195 @@
             to { transform: rotate(360deg); }
         }
 
+        /* Backtest Monitor Styles */
+        .backtest-monitor {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            margin-bottom: 2rem;
+            overflow: hidden;
+            animation: slideDown 0.3s ease-out;
+        }
+
+        @keyframes slideDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .monitor-header {
+            background: linear-gradient(135deg, var(--primary), var(--primary-light));
+            padding: 1.5rem 2rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            color: white;
+        }
+
+        .monitor-title {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin: 0;
+        }
+
+        .monitor-icon {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .monitor-progress {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+
+        .progress-bar {
+            width: 200px;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--success);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+
+        .progress-text {
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .monitor-content {
+            padding: 2rem;
+        }
+
+        .monitor-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: auto auto;
+            gap: 1.5rem;
+        }
+
+        .monitor-card {
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .monitor-logs {
+            grid-column: 1 / -1;
+        }
+
+        .monitor-card-title {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
+        }
+
+        .monitor-stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+        }
+
+        .stat-item {
+            text-align: center;
+        }
+
+        .stat-value {
+            display: block;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+            margin-bottom: 0.25rem;
+        }
+
+        .stat-value.positive { color: var(--success); }
+        .stat-value.negative { color: var(--danger); }
+
+        .stat-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+        }
+
+        .trade-log-container {
+            max-height: 200px;
+            overflow-y: auto;
+            padding: 0.5rem;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 8px;
+        }
+
+        .trade-log-empty {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 2rem;
+            font-style: italic;
+        }
+
+        .trade-log-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0.75rem;
+            border-radius: 6px;
+            margin-bottom: 0.5rem;
+            font-size: 0.875rem;
+            animation: fadeInUp 0.3s ease-out;
+        }
+
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .trade-log-item.buy {
+            background: rgba(0, 208, 132, 0.1);
+            border-left: 3px solid var(--success);
+        }
+
+        .trade-log-item.sell {
+            background: rgba(255, 71, 87, 0.1);
+            border-left: 3px solid var(--danger);
+        }
+
+        .trade-log-symbol {
+            font-weight: 600;
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .trade-log-action {
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .trade-log-action.buy { color: var(--success); }
+        .trade-log-action.sell { color: var(--danger); }
+
+        .trade-log-price {
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
         /* Tooltip */
         .tooltip {
             position: relative;
@@ -716,10 +905,9 @@
                 <span>AlphaGenesis</span>
             </a>
             <nav class="nav-items">
-                <a href="/dashboard" class="nav-link">Dashboard</a>
-                <a href="/backtest" class="nav-link active">Backtest</a>
-                <a href="/live-trading" class="nav-link">Live Trading</a>
-                <a href="/analytics" class="nav-link">Analytics</a>
+                <a href="/" class="nav-link">대시보드</a>
+                <a href="/backtest" class="nav-link active">백테스트</a>
+                <a href="/live" class="nav-link">실전매매</a>
             </nav>
         </div>
     </header>
@@ -744,12 +932,17 @@
 
             <!-- Symbol Selection -->
             <div class="form-group" id="symbolGroup">
-                <label class="form-label">Trading Symbol</label>
-                <select class="form-select" id="symbolSelect">
-                    <option value="BTC/USDT">BTC/USDT</option>
-                    <option value="ETH/USDT">ETH/USDT</option>
-                    <option value="BNB/USDT">BNB/USDT</option>
+                <label class="form-label">거래 심볼</label>
+                <div class="symbol-search-container" style="position: relative; margin-bottom: 0.5rem;">
+                    <input type="text" class="form-input" id="symbolSearch" placeholder="심볼 검색 (예: BTC, ETH)" style="padding-right: 40px;">
+                    <i class="fas fa-search" style="position: absolute; right: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                </div>
+                <select class="form-select" id="symbolSelect" style="height: 120px;" multiple>
+                    <option value="">로딩 중...</option>
                 </select>
+                <div class="symbol-info" style="margin-top: 0.5rem; font-size: 0.875rem; color: var(--text-secondary);">
+                    <span id="symbolCount">0</span>개 심볼 선택됨
+                </div>
             </div>
 
             <!-- Time Period -->
@@ -771,20 +964,16 @@
 
             <!-- Initial Capital -->
             <div class="form-group">
-                <label class="form-label">Initial Capital</label>
+                <label class="form-label">초기 자본 (USDT)</label>
                 <div class="capital-input">
-                    <input type="number" class="form-input" id="capitalAmount" value="10000" min="1000">
-                    <select class="form-select" id="capitalCurrency" style="width: 80px;">
-                        <option value="USD">USD</option>
-                        <option value="USDT">USDT</option>
-                    </select>
+                    <input type="number" class="form-input" id="capitalAmount" value="10000" min="1000" style="width: 100%;">
                 </div>
                 <div class="capital-presets">
-                    <button class="capital-preset" data-amount="1000">$1K</button>
-                    <button class="capital-preset" data-amount="5000">$5K</button>
-                    <button class="capital-preset" data-amount="10000">$10K</button>
-                    <button class="capital-preset" data-amount="50000">$50K</button>
-                    <button class="capital-preset" data-amount="100000">$100K</button>
+                    <button class="capital-preset" data-amount="1000">1K USDT</button>
+                    <button class="capital-preset" data-amount="5000">5K USDT</button>
+                    <button class="capital-preset" data-amount="10000">10K USDT</button>
+                    <button class="capital-preset" data-amount="50000">50K USDT</button>
+                    <button class="capital-preset" data-amount="100000">100K USDT</button>
                 </div>
             </div>
 
@@ -820,18 +1009,88 @@
 
         <!-- Main Content -->
         <div class="main-content">
+            <!-- Live Backtest Monitor -->
+            <div class="backtest-monitor" id="backtestMonitor" style="display: none;">
+                <div class="monitor-header">
+                    <h2 class="monitor-title">
+                        <i class="fas fa-chart-line monitor-icon"></i>
+                        백테스트 진행 중
+                    </h2>
+                    <div class="monitor-progress">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <span class="progress-text" id="progressText">0%</span>
+                    </div>
+                </div>
+                
+                <div class="monitor-content">
+                    <div class="monitor-grid">
+                        <!-- 진행 상황 -->
+                        <div class="monitor-card">
+                            <h3 class="monitor-card-title">
+                                <i class="fas fa-tasks"></i>
+                                진행 상황
+                            </h3>
+                            <div class="monitor-stats">
+                                <div class="stat-item">
+                                    <span class="stat-value" id="currentSymbol">-</span>
+                                    <span class="stat-label">현재 심볼</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value" id="processedSymbols">0</span>
+                                    <span class="stat-label">처리된 심볼</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 실시간 성과 -->
+                        <div class="monitor-card">
+                            <h3 class="monitor-card-title">
+                                <i class="fas fa-chart-bar"></i>
+                                실시간 성과
+                            </h3>
+                            <div class="monitor-stats">
+                                <div class="stat-item">
+                                    <span class="stat-value positive" id="currentReturn">+0.0%</span>
+                                    <span class="stat-label">현재 수익률</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-value" id="currentTrades">0</span>
+                                    <span class="stat-label">거래 횟수</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 거래 로그 -->
+                        <div class="monitor-card monitor-logs">
+                            <h3 class="monitor-card-title">
+                                <i class="fas fa-list-alt"></i>
+                                실시간 거래 로그
+                            </h3>
+                            <div class="trade-log-container" id="tradeLogContainer">
+                                <div class="trade-log-empty">거래 대기 중...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Results Header -->
-            <div class="results-header">
-                <h1 class="results-title">Backtest Results</h1>
+            <div class="results-header" id="resultsHeader">
+                <h1 class="results-title">백테스트 결과</h1>
                 <div class="results-actions">
-                    <button class="results-btn" data-tooltip="Export to CSV">
+                    <button class="results-btn" onclick="exportResults()" data-tooltip="CSV 내보내기">
                         <i class="fas fa-download"></i>
                     </button>
-                    <button class="results-btn" data-tooltip="Share Results">
+                    <button class="results-btn" onclick="shareResults()" data-tooltip="결과 공유">
                         <i class="fas fa-share"></i>
                     </button>
-                    <button class="results-btn" data-tooltip="Save Configuration">
+                    <button class="results-btn" onclick="saveConfiguration()" data-tooltip="설정 저장">
                         <i class="fas fa-save"></i>
+                    </button>
+                    <button class="results-btn" onclick="resetResults()" data-tooltip="초기화">
+                        <i class="fas fa-sync-alt"></i>
                     </button>
                 </div>
             </div>
@@ -911,18 +1170,18 @@
                 </div>
             </div>
 
-            <!-- Performance Chart -->
-            <div class="chart-container">
+            <!-- Compact Performance Chart -->
+            <div class="chart-container compact-chart" style="height: 300px;">
                 <div class="chart-header">
-                    <h3 class="chart-title">Equity Curve</h3>
+                    <h3 class="chart-title">수익 곡선</h3>
                     <div class="chart-controls">
-                        <button class="chart-btn active" data-period="1D">1D</button>
-                        <button class="chart-btn" data-period="1W">1W</button>
-                        <button class="chart-btn" data-period="1M">1M</button>
-                        <button class="chart-btn" data-period="ALL">All</button>
+                        <button class="chart-btn active" data-period="1D">1일</button>
+                        <button class="chart-btn" data-period="1W">1주</button>
+                        <button class="chart-btn" data-period="1M">1월</button>
+                        <button class="chart-btn" data-period="ALL">전체</button>
                     </div>
                 </div>
-                <canvas id="equityChart"></canvas>
+                <canvas id="equityChart" style="height: 220px;"></canvas>
             </div>
 
             <!-- Strategy Comparison -->

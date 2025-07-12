@@ -524,8 +524,7 @@
             <nav class="nav-menu">
                 <a href="/" class="nav-link active">대시보드</a>
                 <a href="/backtest" class="nav-link">백테스트</a>
-                <a href="/premium-live" class="nav-link">실전매매</a>
-                <a href="/premium-backtest" class="nav-link">프리미엄</a>
+                <a href="/live" class="nav-link">실전매매</a>
             </nav>
         </div>
     </header>
@@ -709,65 +708,147 @@
         }
 
         // 포트폴리오 차트 생성
-        function createPortfolioChart() {
+        async function createPortfolioChart() {
             const ctx = document.getElementById('portfolioChart').getContext('2d');
             
-            // 가상의 성과 데이터
-            const dates = [];
-            const values = [];
-            const baseValue = 10000;
-            
-            for (let i = 30; i >= 0; i--) {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                dates.push(date.toLocaleDateString());
+            try {
+                // 실제 백테스트 결과 조회
+                const response = await fetch('/api/backtest/results');
+                const data = await response.json();
                 
-                const randomChange = (Math.random() - 0.5) * 200;
-                const value = baseValue + (30 - i) * 100 + randomChange;
-                values.push(value);
-            }
-            
-            new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: dates,
-                    datasets: [{
-                        label: '포트폴리오 가치',
-                        data: values,
-                        borderColor: '#0066FF',
-                        backgroundColor: 'rgba(0, 102, 255, 0.1)',
-                        borderWidth: 3,
-                        fill: true,
-                        tension: 0.4,
-                        pointRadius: 0,
-                        pointHoverRadius: 6
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: false
-                        }
-                    },
-                    scales: {
-                        x: {
-                            display: false
-                        },
-                        y: {
-                            display: false
-                        }
-                    },
-                    elements: {
-                        point: {
-                            backgroundColor: '#0066FF',
-                            borderColor: '#FFFFFF',
-                            borderWidth: 2
-                        }
+                let chartData = {
+                    labels: [],
+                    values: []
+                };
+                
+                if (data.results && data.results.length > 0) {
+                    // 최신 백테스트 결과 사용
+                    const latestResult = data.results[data.results.length - 1];
+                    
+                    if (latestResult.trade_log && latestResult.trade_log.length > 0) {
+                        // 실제 거래 로그 기반 차트 생성
+                        let portfolioValue = latestResult.initial_capital;
+                        
+                        chartData.labels.push('시작');
+                        chartData.values.push(portfolioValue);
+                        
+                        // 거래별 누적 수익 계산
+                        latestResult.trade_log.forEach((trade, index) => {
+                            if (trade.pnl) {
+                                portfolioValue += trade.pnl;
+                            }
+                            
+                            if (index % Math.max(1, Math.floor(latestResult.trade_log.length / 10)) === 0 || 
+                                index === latestResult.trade_log.length - 1) {
+                                const date = new Date(trade.timestamp);
+                                chartData.labels.push(date.toLocaleDateString());
+                                chartData.values.push(portfolioValue);
+                            }
+                        });
                     }
                 }
-            });
+                
+                // 데이터가 없으면 초기화된 기본 차트
+                if (chartData.values.length === 0) {
+                    const baseValue = 10000000; // 1천만원
+                    for (let i = 0; i <= 7; i++) {
+                        const date = new Date();
+                        date.setDate(date.getDate() - (7 - i));
+                        chartData.labels.push(date.toLocaleDateString());
+                        chartData.values.push(baseValue); // 초기값 유지
+                    }
+                }
+                
+                // Chart.js 차트 생성
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: chartData.labels,
+                        datasets: [{
+                            label: '포트폴리오 가치',
+                            data: chartData.values,
+                            borderColor: '#0066FF',
+                            backgroundColor: 'rgba(0, 102, 255, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 0,
+                            pointHoverRadius: 6
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            x: {
+                                display: false
+                            },
+                            y: {
+                                display: false,
+                                min: Math.min(...chartData.values) * 0.95, // 최소값 고정
+                                max: Math.max(...chartData.values) * 1.05  // 최대값 고정
+                            }
+                        },
+                        elements: {
+                            point: {
+                                backgroundColor: '#0066FF',
+                                borderColor: '#FFFFFF',
+                                borderWidth: 2
+                            }
+                        }
+                    }
+                });
+                
+            } catch (error) {
+                console.error('포트폴리오 차트 로드 실패:', error);
+                
+                // 오류 발생 시 기본 초기화 차트
+                const baseValue = 10000000;
+                const dates = [];
+                const values = [];
+                
+                for (let i = 0; i <= 7; i++) {
+                    const date = new Date();
+                    date.setDate(date.getDate() - (7 - i));
+                    dates.push(date.toLocaleDateString());
+                    values.push(baseValue);
+                }
+                
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [{
+                            label: '포트폴리오 가치',
+                            data: values,
+                            borderColor: '#666',
+                            backgroundColor: 'rgba(102, 102, 102, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.2,
+                            pointRadius: 0
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                display: false
+                            }
+                        },
+                        scales: {
+                            x: { display: false },
+                            y: { display: false }
+                        }
+                    }
+                });
+            }
         }
 
         // 페이지 로드 시 실행

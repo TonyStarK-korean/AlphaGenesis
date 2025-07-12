@@ -1,0 +1,1251 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AlphaGenesis - 고급 분석</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@300;400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --primary: #0066FF;
+            --primary-light: #3D8BFF;
+            --primary-dark: #0052CC;
+            --success: #00D084;
+            --warning: #FFB800;
+            --danger: #FF4757;
+            --dark: #0A0E1A;
+            --dark-light: #151B2D;
+            --dark-lighter: #1E2538;
+            --dark-card: #252D42;
+            --text-primary: #FFFFFF;
+            --text-secondary: #A8B2D1;
+            --text-muted: #6B7280;
+            --border: #3A4A5C;
+            --glass: rgba(255, 255, 255, 0.03);
+            --glass-border: rgba(255, 255, 255, 0.08);
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            --glow: 0 0 20px rgba(0, 102, 255, 0.3);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, var(--dark) 0%, var(--dark-light) 50%, var(--dark-lighter) 100%);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* 헤더 */
+        .header {
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+            backdrop-filter: blur(20px);
+            background: rgba(10, 14, 26, 0.9);
+            border-bottom: 1px solid var(--glass-border);
+            padding: 1rem 2rem;
+        }
+
+        .header-content {
+            max-width: 1600px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .logo i {
+            color: var(--primary);
+        }
+
+        .nav-menu {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-link {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            padding: 0.5rem 1rem;
+            border-radius: 8px;
+        }
+
+        .nav-link:hover {
+            color: var(--primary);
+            background: rgba(0, 102, 255, 0.1);
+        }
+
+        .nav-link.active {
+            color: var(--primary);
+            background: rgba(0, 102, 255, 0.2);
+        }
+
+        /* 메인 컨테이너 */
+        .main-container {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        /* 탭 시스템 */
+        .tab-system {
+            margin-bottom: 2rem;
+        }
+
+        .tab-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .tab-button {
+            padding: 1rem 2rem;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-weight: 500;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            transition: all 0.3s ease;
+        }
+
+        .tab-button.active {
+            color: var(--primary);
+            border-bottom-color: var(--primary);
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* 분석 카드 */
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .analytics-card {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .card-title {
+            font-size: 1.125rem;
+            font-weight: 600;
+            color: var(--text-primary);
+        }
+
+        .card-icon {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.2rem;
+            background: rgba(0, 102, 255, 0.2);
+            color: var(--primary);
+        }
+
+        /* 대형 차트 컨테이너 */
+        .chart-container {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            height: 500px;
+        }
+
+        /* ML 모델 성능 */
+        .model-performance {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        .performance-metric {
+            text-align: center;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+        }
+
+        .metric-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--success);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .metric-label {
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-top: 0.25rem;
+        }
+
+        /* 인사이트 패널 */
+        .insights-panel {
+            background: var(--glass);
+            border: 1px solid var(--glass-border);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+        }
+
+        .insight-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 1rem;
+            padding: 1rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+            margin-bottom: 1rem;
+        }
+
+        .insight-item:hover {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .insight-icon {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            margin-top: 0.25rem;
+            flex-shrink: 0;
+        }
+
+        .insight-icon.bullish { background: rgba(0, 208, 132, 0.2); color: var(--success); }
+        .insight-icon.bearish { background: rgba(255, 71, 87, 0.2); color: var(--danger); }
+        .insight-icon.neutral { background: rgba(255, 184, 0, 0.2); color: var(--warning); }
+
+        .insight-content h4 {
+            color: var(--text-primary);
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+
+        .insight-content p {
+            color: var(--text-secondary);
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        /* 데이터 테이블 */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 1rem;
+        }
+
+        .data-table th,
+        .data-table td {
+            padding: 0.75rem;
+            text-align: left;
+            border-bottom: 1px solid var(--glass-border);
+        }
+
+        .data-table th {
+            color: var(--text-secondary);
+            font-weight: 500;
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .data-table td {
+            color: var(--text-primary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .data-table tr:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        /* 액션 버튼 */
+        .action-buttons {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 2rem;
+            border: none;
+            border-radius: 12px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+            color: white;
+            box-shadow: 0 4px 20px rgba(0, 102, 255, 0.3);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 30px rgba(0, 102, 255, 0.4);
+        }
+
+        .btn-secondary {
+            background: var(--glass);
+            color: var(--text-primary);
+            border: 1px solid var(--glass-border);
+        }
+
+        .btn-secondary:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: var(--primary);
+        }
+
+        /* 로딩 상태 */
+        .loading {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 3rem;
+            color: var(--text-secondary);
+        }
+
+        .loading i {
+            animation: spin 1s linear infinite;
+            margin-right: 0.5rem;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* 반응형 */
+        @media (max-width: 768px) {
+            .analytics-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .tab-buttons {
+                flex-wrap: wrap;
+            }
+            
+            .nav-menu {
+                flex-wrap: wrap;
+                gap: 1rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- 헤더 -->
+    <header class="header">
+        <div class="header-content">
+            <div class="logo">
+                <i class="fas fa-chart-line"></i>
+                <span>AlphaGenesis</span>
+            </div>
+            <nav class="nav-menu">
+                <a href="/" class="nav-link">대시보드</a>
+                <a href="/backtest" class="nav-link">백테스트</a>
+                <a href="/live" class="nav-link">실전매매</a>
+                <a href="/analytics" class="nav-link active">고급분석</a>
+            </nav>
+        </div>
+    </header>
+
+    <!-- 메인 컨테이너 -->
+    <main class="main-container">
+        <!-- 탭 시스템 -->
+        <div class="tab-system">
+            <div class="tab-buttons">
+                <button class="tab-button active" data-tab="strategy-analysis">📊 전략 분석</button>
+                <button class="tab-button" data-tab="ml-insights">🤖 ML 인사이트</button>
+                <button class="tab-button" data-tab="market-analysis">📈 시장 분석</button>
+                <button class="tab-button" data-tab="risk-analysis">⚠️ 리스크 분석</button>
+                <button class="tab-button" data-tab="optimization">⚙️ 최적화</button>
+            </div>
+
+            <!-- 전략 분석 탭 -->
+            <div class="tab-content active" id="strategy-analysis">
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">전략 성과 비교</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-chart-bar"></i>
+                            </div>
+                        </div>
+                        <canvas id="strategyComparisonChart" width="300" height="200"></canvas>
+                    </div>
+
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">승률 분석</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-target"></i>
+                            </div>
+                        </div>
+                        <div class="model-performance">
+                            <div class="performance-metric">
+                                <div class="metric-value" id="strategy1WinRate">72.3%</div>
+                                <div class="metric-label">전략 1 승률</div>
+                            </div>
+                            <div class="performance-metric">
+                                <div class="metric-value" id="strategy2WinRate">68.9%</div>
+                                <div class="metric-label">전략 2 승률</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">최적 진입 시점</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-clock"></i>
+                            </div>
+                        </div>
+                        <div id="entryTimingChart" style="height: 200px;"></div>
+                    </div>
+                </div>
+
+                <!-- 대형 전략 성과 차트 -->
+                <div class="chart-container">
+                    <h3 style="margin-bottom: 1rem;">전략별 누적 수익률 비교</h3>
+                    <canvas id="cumulativeReturnsChart" width="800" height="400"></canvas>
+                </div>
+            </div>
+
+            <!-- ML 인사이트 탭 -->
+            <div class="tab-content" id="ml-insights">
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">ML 모델 성능</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-brain"></i>
+                            </div>
+                        </div>
+                        <div class="model-performance">
+                            <div class="performance-metric">
+                                <div class="metric-value">87.3%</div>
+                                <div class="metric-label">XGBoost 정확도</div>
+                            </div>
+                            <div class="performance-metric">
+                                <div class="metric-value">82.1%</div>
+                                <div class="metric-label">RandomForest 정확도</div>
+                            </div>
+                            <div class="performance-metric">
+                                <div class="metric-value">89.5%</div>
+                                <div class="metric-label">앙상블 정확도</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">특성 중요도</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-ranking-star"></i>
+                            </div>
+                        </div>
+                        <canvas id="featureImportanceChart" width="300" height="200"></canvas>
+                    </div>
+
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">예측 신뢰도</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                        </div>
+                        <div id="confidenceGauge" style="height: 200px;"></div>
+                    </div>
+                </div>
+
+                <!-- ML 인사이트 패널 -->
+                <div class="insights-panel">
+                    <h3 style="margin-bottom: 1rem;">🤖 ML 기반 인사이트</h3>
+                    <div class="insight-item">
+                        <div class="insight-icon bullish">
+                            <i class="fas fa-arrow-up"></i>
+                        </div>
+                        <div class="insight-content">
+                            <h4>강세 패턴 감지</h4>
+                            <p>ML 모델이 향후 24시간 내 BTC/USDT에서 87% 확률로 상승 신호를 감지했습니다. 주요 특성: 거래량 증가, RSI 다이버전스</p>
+                        </div>
+                    </div>
+                    <div class="insight-item">
+                        <div class="insight-icon neutral">
+                            <i class="fas fa-exclamation"></i>
+                        </div>
+                        <div class="insight-content">
+                            <h4>변동성 증가 예상</h4>
+                            <p>여러 알트코인에서 변동성 증가 패턴이 감지되었습니다. 포지션 크기 조정을 권장합니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 시장 분석 탭 -->
+            <div class="tab-content" id="market-analysis">
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">시장 상관관계</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-project-diagram"></i>
+                            </div>
+                        </div>
+                        <div id="correlationHeatmap" style="height: 200px;"></div>
+                    </div>
+
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">섹터 로테이션</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-sync-alt"></i>
+                            </div>
+                        </div>
+                        <canvas id="sectorRotationChart" width="300" height="200"></canvas>
+                    </div>
+
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">유동성 분석</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-water"></i>
+                            </div>
+                        </div>
+                        <div class="model-performance">
+                            <div class="performance-metric">
+                                <div class="metric-value">$2.4B</div>
+                                <div class="metric-label">일일 거래량</div>
+                            </div>
+                            <div class="performance-metric">
+                                <div class="metric-value">15.7%</div>
+                                <div class="metric-label">유동성 지수</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 시장 동향 테이블 -->
+                <div class="analytics-card">
+                    <div class="card-header">
+                        <h3 class="card-title">주요 시장 지표</h3>
+                        <div class="card-icon">
+                            <i class="fas fa-table"></i>
+                        </div>
+                    </div>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>지표</th>
+                                <th>현재값</th>
+                                <th>24h 변화</th>
+                                <th>상태</th>
+                            </tr>
+                        </thead>
+                        <tbody id="marketIndicators">
+                            <tr>
+                                <td>공포&탐욕 지수</td>
+                                <td>67</td>
+                                <td style="color: var(--success);">+5</td>
+                                <td>탐욕</td>
+                            </tr>
+                            <tr>
+                                <td>BTC 도미넌스</td>
+                                <td>42.3%</td>
+                                <td style="color: var(--danger);">-1.2%</td>
+                                <td>하락</td>
+                            </tr>
+                            <tr>
+                                <td>총 시가총액</td>
+                                <td>$2.1T</td>
+                                <td style="color: var(--success);">+3.7%</td>
+                                <td>증가</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- 리스크 분석 탭 -->
+            <div class="tab-content" id="risk-analysis">
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">VaR 분석</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-shield-alt"></i>
+                            </div>
+                        </div>
+                        <div class="model-performance">
+                            <div class="performance-metric">
+                                <div class="metric-value">-5.2%</div>
+                                <div class="metric-label">1일 VaR (95%)</div>
+                            </div>
+                            <div class="performance-metric">
+                                <div class="metric-value">-12.7%</div>
+                                <div class="metric-label">최대 손실</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">포트폴리오 베타</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-chart-line"></i>
+                            </div>
+                        </div>
+                        <canvas id="betaChart" width="300" height="200"></canvas>
+                    </div>
+
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">리스크 지표</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-thermometer-half"></i>
+                            </div>
+                        </div>
+                        <div class="model-performance">
+                            <div class="performance-metric">
+                                <div class="metric-value">1.87</div>
+                                <div class="metric-label">샤프 비율</div>
+                            </div>
+                            <div class="performance-metric">
+                                <div class="metric-value">23.4%</div>
+                                <div class="metric-label">변동성</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 리스크 인사이트 -->
+                <div class="insights-panel">
+                    <h3 style="margin-bottom: 1rem;">⚠️ 리스크 경고</h3>
+                    <div class="insight-item">
+                        <div class="insight-icon bearish">
+                            <i class="fas fa-exclamation-triangle"></i>
+                        </div>
+                        <div class="insight-content">
+                            <h4>높은 상관관계 감지</h4>
+                            <p>포트폴리오 내 자산들 간 상관관계가 0.85를 초과했습니다. 분산 투자 효과가 감소할 위험이 있습니다.</p>
+                        </div>
+                    </div>
+                    <div class="insight-item">
+                        <div class="insight-icon neutral">
+                            <i class="fas fa-info-circle"></i>
+                        </div>
+                        <div class="insight-content">
+                            <h4>레버리지 권장</h4>
+                            <p>현재 시장 조건에서 최적 레버리지는 2.3x입니다. 현재 설정(3.0x)보다 낮춘 것을 권장합니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 최적화 탭 -->
+            <div class="tab-content" id="optimization">
+                <div class="analytics-grid">
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">포트폴리오 최적화</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-cog"></i>
+                            </div>
+                        </div>
+                        <div id="efficientFrontier" style="height: 200px;"></div>
+                    </div>
+
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">가중치 최적화</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-balance-scale"></i>
+                            </div>
+                        </div>
+                        <canvas id="weightOptimizationChart" width="300" height="200"></canvas>
+                    </div>
+
+                    <div class="analytics-card">
+                        <div class="card-header">
+                            <h3 class="card-title">리밸런싱 신호</h3>
+                            <div class="card-icon">
+                                <i class="fas fa-sync"></i>
+                            </div>
+                        </div>
+                        <div class="model-performance">
+                            <div class="performance-metric">
+                                <div class="metric-value">7일</div>
+                                <div class="metric-label">다음 리밸런싱</div>
+                            </div>
+                            <div class="performance-metric">
+                                <div class="metric-value">+2.3%</div>
+                                <div class="metric-label">예상 개선</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 최적화 추천 -->
+                <div class="insights-panel">
+                    <h3 style="margin-bottom: 1rem;">⚙️ 최적화 추천</h3>
+                    <div class="insight-item">
+                        <div class="insight-icon bullish">
+                            <i class="fas fa-lightbulb"></i>
+                        </div>
+                        <div class="insight-content">
+                            <h4>포지션 크기 조정</h4>
+                            <p>BTC 포지션을 45%에서 38%로, ETH를 30%에서 35%로 조정하면 리스크 대비 수익률이 15% 개선될 것으로 예상됩니다.</p>
+                        </div>
+                    </div>
+                    <div class="insight-item">
+                        <div class="insight-icon neutral">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="insight-content">
+                            <h4>진입 타이밍 최적화</h4>
+                            <p>거래량 기반 진입 시점을 UTC 14:00-16:00으로 조정하면 슬리피지가 평균 0.8% 감소할 것으로 분석됩니다.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 액션 버튼 -->
+        <div class="action-buttons">
+            <button class="btn btn-primary" onclick="generateReport()">
+                <i class="fas fa-file-pdf"></i>
+                분석 보고서 생성
+            </button>
+            <button class="btn btn-secondary" onclick="exportData()">
+                <i class="fas fa-download"></i>
+                데이터 내보내기
+            </button>
+            <button class="btn btn-secondary" onclick="refreshAnalytics()">
+                <i class="fas fa-sync-alt"></i>
+                데이터 새로고침
+            </button>
+        </div>
+    </main>
+
+    <script>
+        // 탭 시스템
+        document.querySelectorAll('.tab-button').forEach(button => {
+            button.addEventListener('click', function() {
+                // 모든 탭 버튼과 콘텐츠 비활성화
+                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // 클릭된 탭 활성화
+                this.classList.add('active');
+                document.getElementById(this.dataset.tab).classList.add('active');
+                
+                // 탭별 차트 초기화
+                initializeTabCharts(this.dataset.tab);
+            });
+        });
+
+        // 차트 초기화
+        function initializeTabCharts(tabId) {
+            switch(tabId) {
+                case 'strategy-analysis':
+                    createStrategyComparisonChart();
+                    createCumulativeReturnsChart();
+                    createEntryTimingChart();
+                    break;
+                case 'ml-insights':
+                    createFeatureImportanceChart();
+                    createConfidenceGauge();
+                    break;
+                case 'market-analysis':
+                    createCorrelationHeatmap();
+                    createSectorRotationChart();
+                    break;
+                case 'risk-analysis':
+                    createBetaChart();
+                    break;
+                case 'optimization':
+                    createEfficientFrontier();
+                    createWeightOptimizationChart();
+                    break;
+            }
+        }
+
+        // 전략 비교 차트
+        function createStrategyComparisonChart() {
+            const ctx = document.getElementById('strategyComparisonChart');
+            if (!ctx) return;
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['전략 1', '전략 1α', '전략 2', '전략 2α'],
+                    datasets: [{
+                        label: '수익률 (%)',
+                        data: [24.5, 31.2, 18.7, 27.8],
+                        backgroundColor: [
+                            'rgba(0, 102, 255, 0.8)',
+                            'rgba(0, 208, 132, 0.8)',
+                            'rgba(255, 184, 0, 0.8)',
+                            'rgba(255, 71, 87, 0.8)'
+                        ],
+                        borderColor: [
+                            '#0066FF',
+                            '#00D084',
+                            '#FFB800',
+                            '#FF4757'
+                        ],
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#A8B2D1' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#A8B2D1' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 누적 수익률 차트
+        function createCumulativeReturnsChart() {
+            const ctx = document.getElementById('cumulativeReturnsChart');
+            if (!ctx) return;
+
+            // 가상의 누적 수익률 데이터
+            const dates = [];
+            const strategy1Data = [];
+            const strategy2Data = [];
+            
+            for (let i = 0; i < 30; i++) {
+                const date = new Date();
+                date.setDate(date.getDate() - (30 - i));
+                dates.push(date.toLocaleDateString());
+                
+                strategy1Data.push(i * 0.8 + Math.random() * 2);
+                strategy2Data.push(i * 0.6 + Math.random() * 1.5);
+            }
+
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: dates,
+                    datasets: [
+                        {
+                            label: '전략 1α',
+                            data: strategy1Data,
+                            borderColor: '#0066FF',
+                            backgroundColor: 'rgba(0, 102, 255, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4
+                        },
+                        {
+                            label: '전략 2α',
+                            data: strategy2Data,
+                            borderColor: '#00D084',
+                            backgroundColor: 'rgba(0, 208, 132, 0.1)',
+                            borderWidth: 3,
+                            fill: false,
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            labels: { color: '#A8B2D1' }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#A8B2D1' }
+                        },
+                        x: {
+                            grid: { display: false },
+                            ticks: { color: '#A8B2D1' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 진입 타이밍 분석 (Plotly)
+        function createEntryTimingChart() {
+            const container = document.getElementById('entryTimingChart');
+            if (!container) return;
+
+            const data = [{
+                x: ['00:00', '04:00', '08:00', '12:00', '16:00', '20:00'],
+                y: [65, 59, 80, 81, 87, 72],
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: { color: '#0066FF', width: 3 },
+                marker: { color: '#0066FF', size: 8 }
+            }];
+
+            const layout = {
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                font: { color: '#A8B2D1' },
+                xaxis: { gridcolor: 'rgba(255, 255, 255, 0.1)' },
+                yaxis: { gridcolor: 'rgba(255, 255, 255, 0.1)' },
+                margin: { t: 20, r: 20, b: 40, l: 40 }
+            };
+
+            Plotly.newPlot(container, data, layout, { responsive: true });
+        }
+
+        // 특성 중요도 차트
+        function createFeatureImportanceChart() {
+            const ctx = document.getElementById('featureImportanceChart');
+            if (!ctx) return;
+
+            new Chart(ctx, {
+                type: 'horizontalBar',
+                data: {
+                    labels: ['거래량', 'RSI', 'MACD', '볼린저밴드', '이동평균'],
+                    datasets: [{
+                        label: '중요도',
+                        data: [0.35, 0.28, 0.18, 0.12, 0.07],
+                        backgroundColor: 'rgba(0, 102, 255, 0.8)',
+                        borderColor: '#0066FF',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            max: 0.4,
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#A8B2D1' }
+                        },
+                        y: {
+                            grid: { display: false },
+                            ticks: { color: '#A8B2D1' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 예측 신뢰도 게이지
+        function createConfidenceGauge() {
+            const container = document.getElementById('confidenceGauge');
+            if (!container) return;
+
+            const data = [{
+                domain: { x: [0, 1], y: [0, 1] },
+                value: 89.5,
+                title: { text: "예측 신뢰도 %" },
+                type: "indicator",
+                mode: "gauge+number",
+                gauge: {
+                    axis: { range: [null, 100] },
+                    bar: { color: "#0066FF" },
+                    steps: [
+                        { range: [0, 50], color: "rgba(255, 71, 87, 0.3)" },
+                        { range: [50, 80], color: "rgba(255, 184, 0, 0.3)" },
+                        { range: [80, 100], color: "rgba(0, 208, 132, 0.3)" }
+                    ],
+                    threshold: {
+                        line: { color: "white", width: 4 },
+                        thickness: 0.75,
+                        value: 90
+                    }
+                }
+            }];
+
+            const layout = {
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                font: { color: '#A8B2D1' },
+                margin: { t: 20, r: 20, b: 20, l: 20 }
+            };
+
+            Plotly.newPlot(container, data, layout, { responsive: true });
+        }
+
+        // 상관관계 히트맵
+        function createCorrelationHeatmap() {
+            const container = document.getElementById('correlationHeatmap');
+            if (!container) return;
+
+            const data = [{
+                z: [
+                    [1.0, 0.8, 0.6, 0.4],
+                    [0.8, 1.0, 0.7, 0.5],
+                    [0.6, 0.7, 1.0, 0.3],
+                    [0.4, 0.5, 0.3, 1.0]
+                ],
+                x: ['BTC', 'ETH', 'BNB', 'SOL'],
+                y: ['BTC', 'ETH', 'BNB', 'SOL'],
+                type: 'heatmap',
+                colorscale: 'Blues'
+            }];
+
+            const layout = {
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                font: { color: '#A8B2D1' },
+                margin: { t: 20, r: 20, b: 40, l: 40 }
+            };
+
+            Plotly.newPlot(container, data, layout, { responsive: true });
+        }
+
+        // 섹터 로테이션 차트
+        function createSectorRotationChart() {
+            const ctx = document.getElementById('sectorRotationChart');
+            if (!ctx) return;
+
+            new Chart(ctx, {
+                type: 'polarArea',
+                data: {
+                    labels: ['DeFi', 'Layer 1', 'Layer 2', 'Gaming', 'Metaverse'],
+                    datasets: [{
+                        data: [30, 25, 20, 15, 10],
+                        backgroundColor: [
+                            'rgba(0, 102, 255, 0.8)',
+                            'rgba(0, 208, 132, 0.8)',
+                            'rgba(255, 184, 0, 0.8)',
+                            'rgba(255, 71, 87, 0.8)',
+                            'rgba(156, 39, 176, 0.8)'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: { color: '#A8B2D1' }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#A8B2D1' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 베타 차트
+        function createBetaChart() {
+            const ctx = document.getElementById('betaChart');
+            if (!ctx) return;
+
+            new Chart(ctx, {
+                type: 'scatter',
+                data: {
+                    datasets: [{
+                        label: '포트폴리오 베타',
+                        data: [
+                            {x: -2, y: -1.8},
+                            {x: -1, y: -0.9},
+                            {x: 0, y: 0},
+                            {x: 1, y: 1.1},
+                            {x: 2, y: 2.3}
+                        ],
+                        backgroundColor: 'rgba(0, 102, 255, 0.8)',
+                        borderColor: '#0066FF',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: { display: false }
+                    },
+                    scales: {
+                        x: {
+                            title: { display: true, text: '시장 수익률', color: '#A8B2D1' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#A8B2D1' }
+                        },
+                        y: {
+                            title: { display: true, text: '포트폴리오 수익률', color: '#A8B2D1' },
+                            grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                            ticks: { color: '#A8B2D1' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 효율적 프론티어
+        function createEfficientFrontier() {
+            const container = document.getElementById('efficientFrontier');
+            if (!container) return;
+
+            const data = [{
+                x: [0.1, 0.15, 0.2, 0.25, 0.3, 0.35],
+                y: [0.08, 0.12, 0.15, 0.17, 0.19, 0.20],
+                type: 'scatter',
+                mode: 'lines+markers',
+                line: { color: '#0066FF', width: 3 },
+                marker: { color: '#0066FF', size: 8 },
+                name: '효율적 프론티어'
+            }, {
+                x: [0.18],
+                y: [0.14],
+                type: 'scatter',
+                mode: 'markers',
+                marker: { color: '#FF4757', size: 12, symbol: 'star' },
+                name: '현재 포트폴리오'
+            }];
+
+            const layout = {
+                paper_bgcolor: 'transparent',
+                plot_bgcolor: 'transparent',
+                font: { color: '#A8B2D1' },
+                xaxis: { 
+                    title: '리스크 (변동성)',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)' 
+                },
+                yaxis: { 
+                    title: '기대수익률',
+                    gridcolor: 'rgba(255, 255, 255, 0.1)' 
+                },
+                margin: { t: 20, r: 20, b: 60, l: 60 }
+            };
+
+            Plotly.newPlot(container, data, layout, { responsive: true });
+        }
+
+        // 가중치 최적화 차트
+        function createWeightOptimizationChart() {
+            const ctx = document.getElementById('weightOptimizationChart');
+            if (!ctx) return;
+
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['BTC', 'ETH', 'BNB', 'SOL', '기타'],
+                    datasets: [{
+                        data: [38, 35, 15, 8, 4],
+                        backgroundColor: [
+                            'rgba(0, 102, 255, 0.8)',
+                            'rgba(0, 208, 132, 0.8)',
+                            'rgba(255, 184, 0, 0.8)',
+                            'rgba(255, 71, 87, 0.8)',
+                            'rgba(156, 39, 176, 0.8)'
+                        ],
+                        borderWidth: 2,
+                        borderColor: '#252D42'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'bottom',
+                            labels: { color: '#A8B2D1' }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 액션 함수들
+        function generateReport() {
+            alert('분석 보고서를 생성하고 있습니다...');
+        }
+
+        function exportData() {
+            alert('데이터를 내보내고 있습니다...');
+        }
+
+        function refreshAnalytics() {
+            location.reload();
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeTabCharts('strategy-analysis');
+        });
+    </script>
+</body>
+</html>

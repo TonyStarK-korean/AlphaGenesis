@@ -400,9 +400,33 @@ def get_live_positions():
 
 @api.route('/api/binance/symbols', methods=['GET'])
 def get_binance_symbols():
-    """바이낸스 USDT.P 심볼 조회 API"""
+    """바이낸스 USDT.P 심볼 조회 API - 실시간 조회"""
     try:
-        # 실제 바이낸스 USDT 선물 심볼 목록 (2025년 기준 주요 심볼들)
+        # 동적으로 바이낸스 USDT 선물 심볼 조회
+        try:
+            import asyncio
+            engine = get_backtest_engine()
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            
+            # 실시간 심볼 조회
+            symbols_list = loop.run_until_complete(engine.get_all_available_symbols())
+            
+            # USDT 포맷으로 변환 (BTC/USDT -> BTCUSDT)
+            formatted_symbols = []
+            for symbol in symbols_list:
+                if '/' in symbol:
+                    formatted_symbols.append(symbol.replace('/', ''))
+                else:
+                    formatted_symbols.append(symbol)
+            
+            if formatted_symbols:
+                return jsonify({'symbols': sorted(formatted_symbols)})
+                
+        except Exception as e:
+            logger.warning(f"실시간 심볼 조회 실패: {e}, 기본 목록 사용")
+        
+        # Fallback: 기본 심볼 목록
         symbols = [
             # 주요 암호화폐
             'BTCUSDT', 'ETHUSDT', 'BNBUSDT', 'ADAUSDT', 'DOTUSDT',
@@ -542,8 +566,12 @@ def run_backtest():
         import uuid
         backtest_id = str(uuid.uuid4())
         
-        # 전략 이름을 ID로 매핑
+        # 전략 이름을 ID로 매핑 (새로운 4가지 전략 추가)
         strategy_name_to_id = {
+            '전략 1 (기본) - 1시간봉 급등초입': 'strategy1_basic',
+            '전략 1-1 (알파) - 1시간봉 급등초입+알파': 'strategy1_alpha',
+            '전략 2 (기본) - 1시간봉 눌림목 후 급등초입': 'strategy2_basic',
+            '전략 2-1 (알파) - 1시간봉 눌림목 후 급등초입+알파': 'strategy2_alpha',
             '트리플 콤보 전략': 'triple_combo',
             '심플 트리플 콤보': 'simple_triple_combo',
             'RSI 전략': 'rsi_strategy',
@@ -1711,19 +1739,20 @@ def main_dashboard():
     return render_template('main_dashboard.html')
 
 @api.route('/backtest')
+@api.route('/premium-backtest')  # 동일한 페이지로 리다이렉트
 def backtest_dashboard():
-    """백테스트 대시보드 페이지"""
+    """프로페셔널 백테스트 대시보드"""
     return render_template('backtest_dashboard.html')
 
-# 프리미엄 대시보드 라우트들 (기존 페이지와 통합)
-@api.route('/premium-backtest')
-def premium_backtest():
-    """프리미엄 백테스트 대시보드 (백테스트와 동일)"""
-    return render_template('backtest_dashboard.html')
+@api.route('/analytics')
+def analytics_dashboard():
+    """고급 분석 대시보드 페이지"""
+    return render_template('analytics.html')
 
-@api.route('/premium-live')
-def premium_live():
-    """프리미엄 라이브 트레이딩 대시보드"""
+@api.route('/live')
+@api.route('/premium-live')  # 동일한 페이지로 리다이렉트  
+def live_trading_dashboard():
+    """실전매매 대시보드 (메인 대시보드)"""
     return render_template('main_dashboard.html')
 
 # 라이브 트레이딩 API 엔드포인트들
