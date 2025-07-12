@@ -5,7 +5,13 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(cp:*)",
-      "Bash(rm:*)"
+      "Bash(rm:*)",
+      "Bash(mv:*)",
+      "Bash(findstr:*)",
+      "Bash(powershell:*)",
+      "Bash(rg:*)",
+      "Bash(grep:*)",
+      "Bash(find:*)"
     ],
     "deny": []
   }

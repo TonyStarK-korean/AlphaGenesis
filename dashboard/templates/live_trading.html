@@ -1011,7 +1011,15 @@
                 
                 // 변화율 업데이트
                 const initialCapital = parseFloat(document.getElementById('initialCapital').value);
-                const totalChange = initialCapital > 0 ? ((this.totalAsset - initialCapital) / initialCapital * 100).toFixed(2) : 0;
+                let totalChange;
+                if (initialCapital > 0 && this.totalAsset > 0) {
+                    totalChange = ((this.totalAsset - initialCapital) / initialCapital * 100).toFixed(2);
+                } else if (this.totalAsset === 0 && initialCapital > 0) {
+                    totalChange = 0.00; // 자산이 0이지만 초기자본이 있으면 0%로 표시
+                } else {
+                    totalChange = 0.00; // 둘 다 0이거나 초기자본이 0이면 0%
+                }
+                
                 const totalChangeElement = document.getElementById('totalChange');
                 totalChangeElement.textContent = `${totalChange > 0 ? '+' : ''}${totalChange}%`;
                 totalChangeElement.className = totalChange >= 0 ? 'change positive' : 'change negative';

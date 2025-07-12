@@ -1146,6 +1146,41 @@ def get_backtest_statistics():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@api.route('/api/backtest/start', methods=['POST'])
+def start_backtest():
+    """백테스트 시작 API"""
+    try:
+        data = request.get_json()
+        
+        # 필수 파라미터 검증
+        required_fields = ['start_date', 'end_date', 'symbol', 'strategy', 'initial_capital']
+        for field in required_fields:
+            if field not in data:
+                return jsonify({'error': f'필수 파라미터 누락: {field}'}), 400
+        
+        # 백테스트 실행을 위한 스트리밍 URL 생성
+        params = {
+            'start_date': data['start_date'],
+            'end_date': data['end_date'],
+            'symbol': data['symbol'],
+            'strategy': data['strategy'],
+            'initial_capital': data['initial_capital'],
+            'backtest_mode': data.get('backtest_mode', 'single'),
+            'ml_optimization': 'on' if data.get('ml_optimization', False) else 'off'
+        }
+        
+        # 실시간 스트리밍 URL 반환
+        stream_url = '/api/backtest/stream_log?' + '&'.join([f'{k}={v}' for k, v in params.items()])
+        
+        return jsonify({
+            'success': True,
+            'stream_url': stream_url,
+            'message': '백테스트가 시작됩니다'
+        })
+        
+    except Exception as e:
+        return jsonify({'error': f'백테스트 시작 실패: {str(e)}'}), 500
+
 @api.route('/api/backtest/stream_log')
 def stream_backtest_log():
     """실제 백테스트 로그 실시간 스트리밍 (SSE)"""
