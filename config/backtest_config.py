@@ -1,140 +1,207 @@
 """
-백테스트 설정 파일
+백테스트 설정 파일 - 통합 설정 시스템 사용
+기존 하드코딩 제거 및 중앙 집중식 설정 관리
 """
 
-from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+import os
+from .unified_config import UnifiedConfig, config
 
 class BacktestConfig:
-    """백테스트 설정 클래스"""
+    """백테스트 설정 클래스 - 통합 설정 래퍼"""
     
     def __init__(self):
-        # 기본 백테스트 기간 설정
-        self.start_date = datetime(2023, 1, 1)  # 시작일
-        self.end_date = datetime(2024, 12, 31)  # 종료일
+        # 통합 설정 인스턴스 사용
+        self._config = config
         
-        # 거래 설정
-        self.initial_capital = 10_000_000  # 1000만원
-        self.target_capital = 100_000_000  # 1억원
-        self.max_position_size = 0.1  # 최대 포지션 크기 (10%)
-        self.default_stop_loss = 0.02  # 기본 손절 (2%)
-        self.default_take_profit = 0.05  # 기본 익절 (5%)
+        # 환경변수에서 설정 오버라이드
+        self._load_from_environment()
         
-        # 복리 설정
-        self.compound_mode = 'daily'  # 복리 모드: daily, weekly, monthly, continuous
-        self.compound_ratio = 0.2  # 복리 비율 (20%)
+    def _load_from_environment(self):
+        """환경변수에서 설정 로드"""
+        env_overrides = {}
         
-        # Phase 설정
-        self.phase1_aggressive = {
-            'leverage': 3.0,  # 레버리지
-            'position_size': 0.15,  # 포지션 크기
-            'stop_loss': 0.03,  # 손절
-            'take_profit': 0.08,  # 익절
-            'target_coins': ['BTC', 'ETH', 'BNB', 'ADA', 'DOT'],  # 대상 코인
-            'strategy': 'momentum_breakout'  # 전략
+        # 거래 설정 환경변수
+        if os.getenv('INITIAL_CAPITAL'):
+            env_overrides['initial_capital'] = int(os.getenv('INITIAL_CAPITAL'))
+        if os.getenv('TARGET_CAPITAL'):
+            env_overrides['target_capital'] = int(os.getenv('TARGET_CAPITAL'))
+        if os.getenv('MAX_LEVERAGE'):
+            env_overrides['max_leverage'] = float(os.getenv('MAX_LEVERAGE'))
+        if os.getenv('DEFAULT_LEVERAGE'):
+            env_overrides['default_leverage'] = float(os.getenv('DEFAULT_LEVERAGE'))
+        if os.getenv('MAX_POSITION_SIZE'):
+            env_overrides['max_position_size'] = float(os.getenv('MAX_POSITION_SIZE'))
+        if os.getenv('DEFAULT_STOP_LOSS'):
+            env_overrides['default_stop_loss'] = float(os.getenv('DEFAULT_STOP_LOSS'))
+        if os.getenv('DEFAULT_TAKE_PROFIT'):
+            env_overrides['default_take_profit'] = float(os.getenv('DEFAULT_TAKE_PROFIT'))
+            
+        # 백테스트 설정 환경변수
+        if os.getenv('BACKTEST_START_DATE'):
+            from datetime import datetime
+            start_date = datetime.strptime(os.getenv('BACKTEST_START_DATE'), '%Y-%m-%d')
+            self._config.update_config('backtest', {'start_date': start_date})
+        if os.getenv('BACKTEST_END_DATE'):
+            from datetime import datetime
+            end_date = datetime.strptime(os.getenv('BACKTEST_END_DATE'), '%Y-%m-%d')
+            self._config.update_config('backtest', {'end_date': end_date})
+        if os.getenv('BACKTEST_TIMEFRAME'):
+            self._config.update_config('backtest', {'timeframe': os.getenv('BACKTEST_TIMEFRAME')})
+            
+        # 거래 설정 업데이트
+        if env_overrides:
+            self._config.update_config('trading', env_overrides)
+    
+    # 기존 호환성을 위한 프로퍼티들
+    @property
+    def start_date(self):
+        return self._config.backtest['start_date']
+    
+    @property
+    def end_date(self):
+        return self._config.backtest['end_date']
+    
+    @property
+    def initial_capital(self):
+        return self._config.trading['initial_capital']
+    
+    @property
+    def target_capital(self):
+        return self._config.trading['target_capital']
+    
+    @property
+    def max_position_size(self):
+        return self._config.trading['max_position_size']
+    
+    @property
+    def default_stop_loss(self):
+        return self._config.trading['default_stop_loss']
+    
+    @property
+    def default_take_profit(self):
+        return self._config.trading['default_take_profit']
+    
+    @property
+    def compound_mode(self):
+        return self._config.backtest['compound_mode']
+    
+    @property
+    def compound_ratio(self):
+        return self._config.backtest['compound_ratio']
+    
+    @property
+    def phase1_aggressive(self):
+        return self._config.get_phase_config('aggressive')
+    
+    @property
+    def phase2_defensive(self):
+        return self._config.get_phase_config('defensive')
+    
+    @property
+    def market_analysis(self):
+        return {
+            'volatility_threshold': self._config.risk_management.get('volatility_target', 0.05),
+            'trend_period': 20,
+            'rsi_period': 14,
+            'rsi_oversold': 30,
+            'rsi_overbought': 70,
+            'volume_threshold': 1.5
         }
-        
-        self.phase2_defensive = {
-            'leverage': 1.5,  # 레버리지
-            'position_size': 0.08,  # 포지션 크기
-            'stop_loss': 0.015,  # 손절
-            'take_profit': 0.04,  # 익절
-            'target_coins': ['BTC', 'ETH', 'USDT', 'USDC'],  # 대상 코인
-            'strategy': 'mean_reversion'  # 전략
-        }
-        
-        # 시장 국면 분석 설정
-        self.market_analysis = {
-            'volatility_threshold': 0.05,  # 변동성 임계값
-            'trend_period': 20,  # 트렌드 분석 기간
-            'rsi_period': 14,  # RSI 기간
-            'rsi_oversold': 30,  # RSI 과매도
-            'rsi_overbought': 70,  # RSI 과매수
-            'volume_threshold': 1.5  # 거래량 임계값
-        }
-        
-        # 자동 Phase 전환 조건
-        self.phase_transition = {
+    
+    @property
+    def phase_transition(self):
+        return {
             'aggressive_to_defensive': {
-                'consecutive_losses': 3,  # 연속 손실 횟수
-                'drawdown_threshold': 0.15,  # 낙폭 임계값
-                'market_volatility': 0.08,  # 시장 변동성
-                'rsi_condition': 'overbought'  # RSI 조건
+                'consecutive_losses': 3,
+                'drawdown_threshold': self._config.risk_management['max_portfolio_drawdown'],
+                'market_volatility': 0.08,
+                'rsi_condition': 'overbought'
             },
             'defensive_to_aggressive': {
-                'consecutive_wins': 5,  # 연속 승리 횟수
-                'profit_threshold': 0.05,  # 수익 임계값
-                'market_volatility': 0.03,  # 시장 변동성
-                'rsi_condition': 'oversold'  # RSI 조건
+                'consecutive_wins': 5,
+                'profit_threshold': 0.05,
+                'market_volatility': 0.03,
+                'rsi_condition': 'oversold'
             }
         }
-        
-        # 다중 거래소 설정
-        self.exchanges = {
+    
+    @property
+    def exchanges(self):
+        return {
             'binance': {
                 'enabled': True,
-                'weight': 0.4,  # 가중치
-                'api_key': '',  # API 키
-                'secret_key': ''  # 시크릿 키
+                'weight': 0.4,
+                'api_key': os.getenv('BINANCE_API_KEY', ''),
+                'secret_key': os.getenv('BINANCE_SECRET_KEY', '')
             },
             'upbit': {
                 'enabled': True,
                 'weight': 0.3,
-                'api_key': '',
-                'secret_key': ''
+                'api_key': os.getenv('UPBIT_API_KEY', ''),
+                'secret_key': os.getenv('UPBIT_SECRET_KEY', '')
             },
             'bithumb': {
                 'enabled': True,
                 'weight': 0.2,
-                'api_key': '',
-                'secret_key': ''
+                'api_key': os.getenv('BITHUMB_API_KEY', ''),
+                'secret_key': os.getenv('BITHUMB_SECRET_KEY', '')
             },
             'coinone': {
                 'enabled': True,
                 'weight': 0.1,
-                'api_key': '',
-                'secret_key': ''
+                'api_key': os.getenv('COINONE_API_KEY', ''),
+                'secret_key': os.getenv('COINONE_SECRET_KEY', '')
             }
         }
-        
-        # 데이터 다운로드 설정
-        self.data_download = {
-            'timeframe': '1h',  # 시간프레임: 1m, 5m, 15m, 1h, 4h, 1d
-            'symbols': ['BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'ADA/USDT', 'DOT/USDT'],
-            'limit': 1000,  # 데이터 개수
-            'auto_download': True  # 자동 다운로드
+    
+    @property
+    def data_download(self):
+        return {
+            'timeframe': self._config.data['primary_timeframe'],
+            'symbols': self._config.data['symbols'],
+            'limit': self._config.data['data_limit'],
+            'auto_download': True
         }
-        
-        # 백테스트 결과 저장 설정
-        self.results = {
-            'save_to_file': True,
-            'file_format': 'json',  # json, csv, excel
-            'include_charts': True,
+    
+    @property
+    def results(self):
+        return {
+            'save_to_file': self._config.backtest['save_results'],
+            'file_format': self._config.backtest['save_format'],
+            'include_charts': self._config.backtest['save_charts'],
             'save_path': 'results/'
         }
-        
+    
     def update_date_range(self, start_date: str, end_date: str):
         """날짜 범위 업데이트"""
-        self.start_date = datetime.strptime(start_date, '%Y-%m-%d')
-        self.end_date = datetime.strptime(end_date, '%Y-%m-%d')
+        from datetime import datetime
+        updates = {
+            'start_date': datetime.strptime(start_date, '%Y-%m-%d'),
+            'end_date': datetime.strptime(end_date, '%Y-%m-%d')
+        }
+        self._config.update_config('backtest', updates)
         
-    def update_phase_settings(self, phase: str, settings: Dict):
+    def update_phase_settings(self, phase: str, settings: dict):
         """Phase 설정 업데이트"""
-        if phase == 'phase1':
-            self.phase1_aggressive.update(settings)
-        elif phase == 'phase2':
-            self.phase2_defensive.update(settings)
+        # 통합 설정에서 Phase별 설정은 get_phase_config로 처리
+        # 여기서는 기본 거래 설정을 업데이트
+        if phase in ['phase1', 'aggressive']:
+            self._config.update_config('trading', settings)
+        elif phase in ['phase2', 'defensive']:
+            self._config.update_config('trading', settings)
             
-    def update_market_analysis(self, settings: Dict):
+    def update_market_analysis(self, settings: dict):
         """시장 분석 설정 업데이트"""
-        self.market_analysis.update(settings)
+        self._config.update_config('risk_management', settings)
         
-    def update_exchange_settings(self, exchange: str, settings: Dict):
-        """거래소 설정 업데이트"""
-        if exchange in self.exchanges:
-            self.exchanges[exchange].update(settings)
+    def update_exchange_settings(self, exchange: str, settings: dict):
+        """거래소 설정 업데이트 - 환경변수 사용 권장"""
+        # 보안상 환경변수 사용 권장
+        print(f"거래소 {exchange} 설정은 환경변수로 설정하세요:")
+        print(f"{exchange.upper()}_API_KEY=your_api_key")
+        print(f"{exchange.upper()}_SECRET_KEY=your_secret_key")
             
-    def get_config_summary(self) -> Dict:
+    def get_config_summary(self) -> dict:
         """설정 요약 반환"""
         return {
             'date_range': {
@@ -153,8 +220,16 @@ class BacktestConfig:
                 'phase2': self.phase2_defensive
             },
             'exchanges': {k: v['enabled'] for k, v in self.exchanges.items()},
-            'data_download': self.data_download
+            'data_download': self.data_download,
+            'environment_loaded': {
+                'initial_capital': bool(os.getenv('INITIAL_CAPITAL')),
+                'api_keys': {
+                    'binance': bool(os.getenv('BINANCE_API_KEY')),
+                    'upbit': bool(os.getenv('UPBIT_API_KEY')),
+                    'bithumb': bool(os.getenv('BITHUMB_API_KEY')),
+                }
+            }
         }
 
 # 전역 설정 인스턴스
-backtest_config = BacktestConfig() 
+backtest_config = BacktestConfig()

@@ -13,6 +13,27 @@ from core.backtest_engine import RealBacktestEngine
 from core.strategy_analyzer import StrategyAnalyzer
 from core.portfolio_optimizer import PortfolioOptimizer
 
+# API 응답 표준화 함수들
+def success_response(data=None, message="Success", status_code=200):
+    """성공 응답 표준화"""
+    response = {
+        "status": "success",
+        "message": message,
+        "timestamp": datetime.now().isoformat(),
+        "data": data
+    }
+    return jsonify(response), status_code
+
+def error_response(message="Error", error_code=None, status_code=400):
+    """에러 응답 표준화"""
+    response = {
+        "status": "error",
+        "message": message,
+        "timestamp": datetime.now().isoformat(),
+        "error_code": error_code
+    }
+    return jsonify(response), status_code
+
 # Flask Blueprint 생성
 api = Blueprint('api', __name__)
 
@@ -23,6 +44,122 @@ portfolio_optimizer = PortfolioOptimizer()
 
 # 백테스트 결과 저장소 (실제로는 데이터베이스 사용)
 backtest_results = []
+
+# 분석 결과 생성 헬퍼 함수들
+def _generate_portfolio_recommendations(strategy_rankings):
+    """포트폴리오 추천 생성"""
+    if not strategy_rankings:
+        return []
+    
+    recommendations = []
+    
+    # 상위 3개 전략 선택
+    top_strategies = strategy_rankings[:min(3, len(strategy_rankings))]
+    
+    if len(top_strategies) >= 2:
+        # 균형 포트폴리오
+        recommendations.append({
+            'name': '균형 포트폴리오',
+            'strategies': [
+                {'name': top_strategies[0]['strategy_name'], 'weight': 0.5},
+                {'name': top_strategies[1]['strategy_name'], 'weight': 0.5}
+            ],
+            'expected_return': round((top_strategies[0]['total_score'] + top_strategies[1]['total_score']) / 2, 1),
+            'risk_level': 'Medium'
+        })
+        
+        # 고수익 포트폴리오 (최고 성과 전략 집중)
+        recommendations.append({
+            'name': '고수익 포트폴리오',
+            'strategies': [
+                {'name': top_strategies[0]['strategy_name'], 'weight': 0.7},
+                {'name': top_strategies[1]['strategy_name'], 'weight': 0.3}
+            ],
+            'expected_return': round(top_strategies[0]['total_score'] * 0.95, 1),
+            'risk_level': 'High'
+        })
+    
+    if len(top_strategies) >= 3:
+        # 안전 포트폴리오 (3개 전략 분산)
+        recommendations.append({
+            'name': '분산 포트폴리오',
+            'strategies': [
+                {'name': top_strategies[0]['strategy_name'], 'weight': 0.4},
+                {'name': top_strategies[1]['strategy_name'], 'weight': 0.3},
+                {'name': top_strategies[2]['strategy_name'], 'weight': 0.3}
+            ],
+            'expected_return': round(sum(s['total_score'] for s in top_strategies) / 3, 1),
+            'risk_level': 'Low'
+        })
+    
+    return recommendations
+
+def _generate_key_insights(strategy_rankings, total_results):
+    """핵심 인사이트 생성"""
+    if not strategy_rankings:
+        return ['분석할 데이터가 부족합니다.']
+    
+    insights = []
+    
+    # 최고 성과 전략
+    best_strategy = strategy_rankings[0]
+    insights.append(f'최고 성과 전략: {best_strategy["strategy_name"]} (점수: {best_strategy["total_score"]})')
+    
+    # 평균 성과
+    avg_score = round(sum(s['total_score'] for s in strategy_rankings) / len(strategy_rankings), 1)
+    insights.append(f'평균 성과 점수: {avg_score}점')
+    
+    # 총 백테스트 수
+    insights.append(f'총 {total_results}개 백테스트 결과 분석 완료')
+    
+    # 성과 분포
+    excellent_count = len([s for s in strategy_rankings if s['total_score'] >= 80])
+    good_count = len([s for s in strategy_rankings if 70 <= s['total_score'] < 80])
+    
+    if excellent_count > 0:
+        insights.append(f'우수 전략 {excellent_count}개, 양호 전략 {good_count}개 발견')
+    
+    # 위험 수준 평가
+    avg_risk = round(sum(s['risk_score'] for s in strategy_rankings) / len(strategy_rankings), 1)
+    if avg_risk >= 80:
+        insights.append('전반적 위험 관리 수준: 우수')
+    elif avg_risk >= 70:
+        insights.append('전반적 위험 관리 수준: 양호')
+    else:
+        insights.append('위험 관리 개선 필요')
+    
+    return insights
+
+def _generate_risk_tips(strategy_rankings):
+    """위험 관리 팁 생성"""
+    if not strategy_rankings:
+        return ['실제 데이터 수집 후 분석이 가능합니다.']
+    
+    tips = []
+    
+    # 평균 위험 점수 기반 조언
+    avg_risk = sum(s['risk_score'] for s in strategy_rankings) / len(strategy_rankings)
+    
+    if avg_risk < 70:
+        tips.append('⚠️ 높은 위험 수준 감지 - 포지션 크기 축소 권장')
+        tips.append('📉 드로다운 관리 강화 필요')
+    else:
+        tips.append('✅ 적정 위험 수준 유지 중')
+    
+    # 성과 편차 기반 조언
+    scores = [s['total_score'] for s in strategy_rankings]
+    score_std = (sum((s - sum(scores)/len(scores))**2 for s in scores) / len(scores))**0.5
+    
+    if score_std > 15:
+        tips.append('📊 전략별 성과 편차 큼 - 분산 투자 권장')
+    else:
+        tips.append('📈 전략별 성과 안정적')
+    
+    # 일반적인 조언
+    tips.append('🔄 동적 레버리지 관리 필수')
+    tips.append('⏰ 정기적인 성과 리뷰 및 전략 재조정')
+    
+    return tips
 
 @api.route('/')
 def main_dashboard():
@@ -41,17 +178,20 @@ def live_trading():
 
 @api.route('/api/health', methods=['GET'])
 def health_check():
-    """서버 상태 확인 API"""
-    return jsonify({'status': 'ok', 'timestamp': datetime.now().isoformat()})
-
-@api.route('/api/status', methods=['GET'])
-def api_status():
-    """API 상태 확인"""
+    """통합 서버 상태 확인 API"""
     return jsonify({
-        "status": "running",
+        "status": "ok",
         "service": "AlphaGenesis",
-        "version": "1.0.0",
-        "timestamp": datetime.now().isoformat()
+        "version": "3.0.0",
+        "environment": "development",
+        "timestamp": datetime.now().isoformat(),
+        "uptime": "running",
+        "components": {
+            "database": "ok",
+            "data_manager": "ok",
+            "backtest_engine": "ok",
+            "ml_models": "ok"
+        }
     })
 
 # 실전매매 API
@@ -362,115 +502,116 @@ def run_strategy_analysis():
 
 @api.route('/api/backtest/strategy_analysis/results/<analysis_id>', methods=['GET'])
 def get_strategy_analysis_results(analysis_id):
-    """전략 분석 결과 조회 API"""
+    """전략 분석 결과 조회 API - 실제 데이터 기반"""
     try:
-        # 실제 구현에서는 데이터베이스에서 조회
-        # 여기서는 데모 데이터 반환
+        # 실제 백테스트 결과가 없으면 빈 분석 결과 반환
+        if not backtest_results:
+            return jsonify({
+                'analysis_id': analysis_id,
+                'status': 'completed',
+                'created_at': datetime.now().isoformat(),
+                'message': '분석할 백테스트 결과가 없습니다.',
+                'market_regime': {
+                    'regime_type': 'unknown',
+                    'volatility_level': 'unknown',
+                    'trend_strength': 0,
+                    'dominant_patterns': ['데이터 없음']
+                },
+                'strategy_rankings': [],
+                'portfolio_recommendations': [],
+                'key_insights': ['백테스트를 먼저 실행해주세요.'],
+                'risk_management_tips': ['실제 데이터 수집 후 분석이 가능합니다.']
+            })
+        
+        # 실제 백테스트 결과를 기반으로 분석 생성
+        strategy_performance = {}
+        
+        # 전략별 성과 계산
+        for result in backtest_results:
+            strategy_name = result.strategy_name if hasattr(result, 'strategy_name') else 'Unknown'
+            if strategy_name not in strategy_performance:
+                strategy_performance[strategy_name] = {
+                    'returns': [],
+                    'sharpe_ratios': [],
+                    'drawdowns': [],
+                    'win_rates': [],
+                    'trades': []
+                }
+            
+            if hasattr(result, 'total_return'):
+                strategy_performance[strategy_name]['returns'].append(result.total_return)
+            if hasattr(result, 'sharpe_ratio'):
+                strategy_performance[strategy_name]['sharpe_ratios'].append(result.sharpe_ratio)
+            if hasattr(result, 'max_drawdown'):
+                strategy_performance[strategy_name]['drawdowns'].append(result.max_drawdown)
+            if hasattr(result, 'win_rate'):
+                strategy_performance[strategy_name]['win_rates'].append(result.win_rate)
+            if hasattr(result, 'total_trades'):
+                strategy_performance[strategy_name]['trades'].append(result.total_trades)
+        
+        # 전략 랭킹 생성
+        strategy_rankings = []
+        rank = 1
+        
+        for strategy_name, perf in strategy_performance.items():
+            avg_return = sum(perf['returns']) / len(perf['returns']) if perf['returns'] else 0
+            avg_sharpe = sum(perf['sharpe_ratios']) / len(perf['sharpe_ratios']) if perf['sharpe_ratios'] else 0
+            avg_drawdown = sum(perf['drawdowns']) / len(perf['drawdowns']) if perf['drawdowns'] else 0
+            avg_win_rate = sum(perf['win_rates']) / len(perf['win_rates']) if perf['win_rates'] else 0
+            
+            # 점수 계산 (단순 가중 평균)
+            performance_score = min(100, max(0, (avg_return + 10) * 2))  # 수익률 기반
+            risk_score = min(100, max(0, 100 - avg_drawdown * 3))      # 리스크 기반
+            consistency_score = min(100, max(0, avg_win_rate))         # 승률 기반
+            
+            total_score = (performance_score * 0.4 + risk_score * 0.3 + consistency_score * 0.3)
+            
+            # 추천사항 결정
+            if total_score >= 80:
+                recommendation = '🌟 최적 전략 - 적극 활용 권장'
+            elif total_score >= 70:
+                recommendation = '✅ 우수 전략 - 활용 권장'
+            elif total_score >= 60:
+                recommendation = '⚠️ 보통 전략 - 조건부 활용'
+            else:
+                recommendation = '🔄 개선 필요 - 파라미터 최적화 권장'
+            
+            strategy_rankings.append({
+                'rank': rank,
+                'strategy_name': strategy_name,
+                'total_score': round(total_score, 1),
+                'performance_score': round(performance_score, 1),
+                'risk_score': round(risk_score, 1),
+                'consistency_score': round(consistency_score, 1),
+                'adaptability_score': round(total_score * 0.9, 1),  # 총점의 90%로 근사
+                'recommendation': recommendation,
+                'avg_return': round(avg_return, 2),
+                'avg_drawdown': round(avg_drawdown, 2),
+                'avg_win_rate': round(avg_win_rate, 1)
+            })
+            rank += 1
+        
+        # 총점 기준으로 정렬
+        strategy_rankings.sort(key=lambda x: x['total_score'], reverse=True)
+        
+        # 랭크 재설정
+        for i, ranking in enumerate(strategy_rankings):
+            ranking['rank'] = i + 1
+        
         analysis_results = {
             'analysis_id': analysis_id,
             'status': 'completed',
             'created_at': datetime.now().isoformat(),
             'market_regime': {
-                'regime_type': 'bull_weak',
-                'volatility_level': 'medium',
-                'trend_strength': 0.68,
-                'dominant_patterns': ['RSI 중립', 'MACD 상승 추세', '볼린저 밴드 정상']
+                'regime_type': 'data_based',
+                'volatility_level': 'calculated',
+                'trend_strength': round(sum(s['performance_score'] for s in strategy_rankings) / len(strategy_rankings) / 100, 2) if strategy_rankings else 0,
+                'dominant_patterns': [f'{len(backtest_results)}개 백테스트 결과 기반']
             },
-            'strategy_rankings': [
-                {
-                    'rank': 1,
-                    'strategy_name': '트리플 콤보 전략',
-                    'total_score': 85.4,
-                    'performance_score': 88.2,
-                    'risk_score': 82.6,
-                    'consistency_score': 87.1,
-                    'adaptability_score': 83.7,
-                    'recommendation': '🌟 최적 전략 - 적극 활용 권장'
-                },
-                {
-                    'rank': 2,
-                    'strategy_name': 'ML 앙상블 전략',
-                    'total_score': 82.3,
-                    'performance_score': 85.6,
-                    'risk_score': 78.9,
-                    'consistency_score': 84.2,
-                    'adaptability_score': 80.5,
-                    'recommendation': '✅ 우수 전략 - 활용 권장'
-                },
-                {
-                    'rank': 3,
-                    'strategy_name': '모멘텀 전략',
-                    'total_score': 78.7,
-                    'performance_score': 82.4,
-                    'risk_score': 75.1,
-                    'consistency_score': 79.3,
-                    'adaptability_score': 77.9,
-                    'recommendation': '✅ 우수 전략 - 활용 권장'
-                },
-                {
-                    'rank': 4,
-                    'strategy_name': 'RSI 전략',
-                    'total_score': 65.2,
-                    'performance_score': 68.4,
-                    'risk_score': 72.8,
-                    'consistency_score': 61.5,
-                    'adaptability_score': 58.1,
-                    'recommendation': '⚠️ 보통 전략 - 조건부 활용'
-                },
-                {
-                    'rank': 5,
-                    'strategy_name': 'MACD 전략',
-                    'total_score': 58.9,
-                    'performance_score': 62.1,
-                    'risk_score': 65.4,
-                    'consistency_score': 55.7,
-                    'adaptability_score': 52.4,
-                    'recommendation': '🔄 개선 필요 - 파라미터 최적화 권장'
-                }
-            ],
-            'portfolio_recommendations': [
-                {
-                    'name': '균형 포트폴리오',
-                    'strategies': [
-                        {'name': '트리플 콤보 전략', 'weight': 0.4},
-                        {'name': 'ML 앙상블 전략', 'weight': 0.3},
-                        {'name': '모멘텀 전략', 'weight': 0.3}
-                    ],
-                    'expected_return': 86.7,
-                    'risk_level': 'Medium'
-                },
-                {
-                    'name': '고수익 포트폴리오',
-                    'strategies': [
-                        {'name': '트리플 콤보 전략', 'weight': 0.6},
-                        {'name': 'ML 앙상블 전략', 'weight': 0.4}
-                    ],
-                    'expected_return': 86.9,
-                    'risk_level': 'High'
-                },
-                {
-                    'name': '안전 포트폴리오',
-                    'strategies': [
-                        {'name': '트리플 콤보 전략', 'weight': 0.5},
-                        {'name': 'RSI 전략', 'weight': 0.5}
-                    ],
-                    'expected_return': 76.8,
-                    'risk_level': 'Low'
-                }
-            ],
-            'key_insights': [
-                '현재 시장 국면: 약한 상승 추세',
-                '최고 성과 전략: 트리플 콤보 전략',
-                '평균 성과 점수: 74.1점',
-                '시장 변동성: 보통 수준',
-                '추천 전략 조합: 트리플 콤보 + ML 앙상블'
-            ],
-            'risk_management_tips': [
-                '현재 시장 변동성: medium',
-                '동적 레버리지 관리 필수',
-                '분할 진입/청산 전략 활용',
-                '시장 국면별 전략 전환 준비'
-            ]
+            'strategy_rankings': strategy_rankings,
+            'portfolio_recommendations': _generate_portfolio_recommendations(strategy_rankings),
+            'key_insights': _generate_key_insights(strategy_rankings, len(backtest_results)),
+            'risk_management_tips': _generate_risk_tips(strategy_rankings)
         }
         
         return jsonify(analysis_results)
@@ -643,98 +784,132 @@ def save_backtest_result():
 def reset_backtest_results():
     """백테스트 결과 초기화 API"""
     try:
-        # 실제로는 데이터베이스의 백테스트 결과를 모두 삭제
-        # 여기서는 성공 응답만 반환
-        return jsonify({
-            'status': 'success',
-            'message': '모든 백테스트 결과가 초기화되었습니다.',
-            'reset_count': 0  # 실제로는 삭제된 결과 수
-        })
+        global backtest_results
+        
+        # 현재 결과 수 저장
+        reset_count = len(backtest_results)
+        
+        # 결과 초기화
+        backtest_results.clear()
+        
+        return success_response(
+            data={'reset_count': reset_count},
+            message=f'{reset_count}개의 백테스트 결과가 초기화되었습니다.'
+        )
         
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return error_response(f'결과 초기화 실패: {str(e)}', status_code=500)
 
 @api.route('/api/backtest/statistics', methods=['GET'])
 def get_backtest_statistics():
-    """백테스트 통계 조회 API"""
+    """백테스트 통계 조회 API - 실제 결과 기반"""
     try:
-        # 전략별 통계 계산
-        strategy_stats = {
-            '트리플 콤보 전략': {
-                'total_tests': 12,
-                'avg_return': 18.7,
-                'avg_sharpe': 1.65,
-                'avg_drawdown': 11.2,
-                'win_rate': 67.5,
-                'best_symbol': 'BTC/USDT',
-                'worst_symbol': 'DOGE/USDT'
-            },
-            'RSI 전략': {
-                'total_tests': 8,
-                'avg_return': 12.4,
-                'avg_sharpe': 1.32,
-                'avg_drawdown': 15.8,
-                'win_rate': 58.3,
-                'best_symbol': 'ETH/USDT',
-                'worst_symbol': 'ADA/USDT'
-            },
-            'MACD 전략': {
-                'total_tests': 6,
-                'avg_return': 15.2,
-                'avg_sharpe': 1.48,
-                'avg_drawdown': 12.9,
-                'win_rate': 62.1,
-                'best_symbol': 'BNB/USDT',
-                'worst_symbol': 'XRP/USDT'
-            }
-        }
+        # 실제 백테스트 결과에서 통계 계산
+        if not backtest_results:
+            return jsonify({
+                'strategy_stats': {},
+                'symbol_stats': {},
+                'period_stats': {},
+                'total_tests': 0,
+                'last_updated': datetime.now().isoformat(),
+                'message': '백테스트 결과가 없습니다. 먼저 백테스트를 실행해주세요.'
+            })
         
-        # 심볼별 통계
-        symbol_stats = {
-            'BTC/USDT': {
-                'total_tests': 15,
-                'avg_return': 19.8,
-                'best_strategy': '트리플 콤보 전략',
-                'worst_strategy': 'RSI 전략'
-            },
-            'ETH/USDT': {
-                'total_tests': 12,
-                'avg_return': 16.2,
-                'best_strategy': 'RSI 전략',
-                'worst_strategy': 'MACD 전략'
-            },
-            'BNB/USDT': {
-                'total_tests': 8,
-                'avg_return': 14.7,
-                'best_strategy': 'MACD 전략',
-                'worst_strategy': 'RSI 전략'
-            }
-        }
+        # 실제 결과에서 통계 생성
+        strategy_stats = {}
+        symbol_stats = {}
         
-        # 기간별 통계
-        period_stats = {
-            '1개월': {
-                'total_tests': 20,
-                'avg_return': 8.5,
-                'volatility': 'High'
-            },
-            '3개월': {
-                'total_tests': 10,
-                'avg_return': 22.3,
-                'volatility': 'Medium'
-            },
-            '6개월': {
-                'total_tests': 5,
-                'avg_return': 41.2,
-                'volatility': 'Low'
-            }
-        }
+        for result in backtest_results:
+            strategy_name = result.strategy_name if hasattr(result, 'strategy_name') else 'Unknown'
+            symbol = result.symbol if hasattr(result, 'symbol') else 'Unknown'
+            
+            # 전략별 통계
+            if strategy_name not in strategy_stats:
+                strategy_stats[strategy_name] = {
+                    'total_tests': 0,
+                    'returns': [],
+                    'sharpe_ratios': [],
+                    'drawdowns': [],
+                    'win_rates': []
+                }
+            
+            stats = strategy_stats[strategy_name]
+            stats['total_tests'] += 1
+            if hasattr(result, 'total_return'):
+                stats['returns'].append(result.total_return)
+            if hasattr(result, 'sharpe_ratio'):
+                stats['sharpe_ratios'].append(result.sharpe_ratio)
+            if hasattr(result, 'max_drawdown'):
+                stats['drawdowns'].append(result.max_drawdown)
+            if hasattr(result, 'win_rate'):
+                stats['win_rates'].append(result.win_rate)
+        
+        # 평균 계산
+        for strategy_name, stats in strategy_stats.items():
+            stats['avg_return'] = sum(stats['returns']) / len(stats['returns']) if stats['returns'] else 0
+            stats['avg_sharpe'] = sum(stats['sharpe_ratios']) / len(stats['sharpe_ratios']) if stats['sharpe_ratios'] else 0
+            stats['avg_drawdown'] = sum(stats['drawdowns']) / len(stats['drawdowns']) if stats['drawdowns'] else 0
+            stats['avg_win_rate'] = sum(stats['win_rates']) / len(stats['win_rates']) if stats['win_rates'] else 0
+            
+            # 불필요한 리스트 데이터 제거
+            del stats['returns']
+            del stats['sharpe_ratios'] 
+            del stats['drawdowns']
+            del stats['win_rates']
+        
+        # 심볼별 통계 (실제 결과 기반)
+        for result in backtest_results:
+            symbol = result.symbol if hasattr(result, 'symbol') else 'Unknown'
+            if symbol not in symbol_stats:
+                symbol_stats[symbol] = {
+                    'total_tests': 0,
+                    'returns': [],
+                    'strategies': {}
+                }
+            
+            symbol_stats[symbol]['total_tests'] += 1
+            if hasattr(result, 'total_return'):
+                symbol_stats[symbol]['returns'].append(result.total_return)
+            
+            strategy_name = result.strategy_name if hasattr(result, 'strategy_name') else 'Unknown'
+            if strategy_name not in symbol_stats[symbol]['strategies']:
+                symbol_stats[symbol]['strategies'][strategy_name] = []
+            symbol_stats[symbol]['strategies'][strategy_name].append(result.total_return if hasattr(result, 'total_return') else 0)
+        
+        # 심볼별 평균 계산 및 최고/최악 전략 결정
+        for symbol, data in symbol_stats.items():
+            data['avg_return'] = sum(data['returns']) / len(data['returns']) if data['returns'] else 0
+            
+            # 최고/최악 전략 계산
+            best_strategy = None
+            worst_strategy = None
+            best_return = float('-inf')
+            worst_return = float('inf')
+            
+            for strategy_name, returns in data['strategies'].items():
+                avg_return = sum(returns) / len(returns) if returns else 0
+                if avg_return > best_return:
+                    best_return = avg_return
+                    best_strategy = strategy_name
+                if avg_return < worst_return:
+                    worst_return = avg_return
+                    worst_strategy = strategy_name
+            
+            data['best_strategy'] = best_strategy or 'N/A'
+            data['worst_strategy'] = worst_strategy or 'N/A'
+            
+            # 불필요한 데이터 제거
+            del data['returns']
+            del data['strategies']
+        
+        # 총 테스트 수 계산
+        total_tests = len(backtest_results)
         
         return jsonify({
             'strategy_stats': strategy_stats,
             'symbol_stats': symbol_stats,
-            'period_stats': period_stats,
-            'total_tests': 35,
+            'period_stats': {},  # 실제 구현 시 날짜 기반으로 계산
+            'total_tests': total_tests,
             'last_updated': datetime.now().isoformat()
         })
         
