@@ -14,6 +14,14 @@ CORS(app)
 from dashboard.routes import api as api_blueprint
 app.register_blueprint(api_blueprint)
 
+# 실전매매 API Blueprint 등록
+from live_trading.routes import live_trading_api
+app.register_blueprint(live_trading_api)
+
+# 다운로드 API Blueprint 등록
+from dashboard.download_routes import download_api
+app.register_blueprint(download_api)
+
 if __name__ == '__main__':
     print("🚀 AlphaGenesis 대시보드 서버 시작")
     print("📊 대시보드 접속 주소:")
