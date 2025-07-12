@@ -11,16 +11,28 @@ app = Flask(__name__, template_folder='templates', static_folder='static')
 CORS(app)
 
 # routes.py에 정의된 API Blueprint 등록
-from dashboard.routes import api as api_blueprint
-app.register_blueprint(api_blueprint)
+try:
+    from dashboard.routes import api as api_blueprint
+    app.register_blueprint(api_blueprint)
+    print("✅ 메인 API 라우트 등록 완료")
+except Exception as e:
+    print(f"❌ 메인 API 라우트 등록 실패: {e}")
 
-# 실전매매 API Blueprint 등록
-from live_trading.routes import live_trading_api
-app.register_blueprint(live_trading_api)
+# 다운로드 API Blueprint 등록 (존재하는 경우에만)
+try:
+    from dashboard.download_routes import download_api
+    app.register_blueprint(download_api)
+    print("✅ 다운로드 API 라우트 등록 완료")
+except Exception as e:
+    print(f"⚠️  다운로드 API 라우트 등록 실패: {e}")
 
-# 다운로드 API Blueprint 등록
-from dashboard.download_routes import download_api
-app.register_blueprint(download_api)
+# 실전매매 API Blueprint 등록 (존재하는 경우에만)
+try:
+    from live_trading.routes import live_trading_api
+    app.register_blueprint(live_trading_api)
+    print("✅ 실전매매 API 라우트 등록 완료")
+except Exception as e:
+    print(f"⚠️  실전매매 API 라우트 등록 실패: {e}")
 
 if __name__ == '__main__':
     print("🚀 AlphaGenesis 대시보드 서버 시작")

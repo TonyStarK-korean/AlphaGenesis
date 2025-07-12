@@ -46,16 +46,60 @@ def error_response(message="Error", error_code=None, status_code=400):
 api = Blueprint('api', __name__)
 
 # 라이브 트레이딩 매니저 import
-from live_trading_integration import get_live_trading_manager
+try:
+    from live_trading_integration import get_live_trading_manager
+    LIVE_TRADING_AVAILABLE = True
+except Exception as e:
+    print(f"⚠️  라이브 트레이딩 모듈 import 실패: {e}")
+    LIVE_TRADING_AVAILABLE = False
+    def get_live_trading_manager():
+        return None
 
 # 포트폴리오 분석기 import
-from portfolio_analytics import get_portfolio_analytics
+try:
+    from portfolio_analytics import get_portfolio_analytics
+    PORTFOLIO_ANALYTICS_AVAILABLE = True
+except Exception as e:
+    print(f"⚠️  포트폴리오 분석 모듈 import 실패: {e}")
+    PORTFOLIO_ANALYTICS_AVAILABLE = False
+    def get_portfolio_analytics():
+        return None
 
 # 전략 매니저 import
-from strategy_manager import get_strategy_manager
+try:
+    from strategy_manager import get_strategy_manager
+    STRATEGY_MANAGER_AVAILABLE = True
+except Exception as e:
+    print(f"⚠️  전략 매니저 모듈 import 실패: {e}")
+    STRATEGY_MANAGER_AVAILABLE = False
+    def get_strategy_manager():
+        return None
 
 # 성능 최적화기 import
-from performance_optimizer import get_performance_optimizer, cache_api_response, monitor_api_performance
+try:
+    from performance_optimizer import get_performance_optimizer, cache_api_response, monitor_api_performance
+    PERFORMANCE_OPTIMIZER_AVAILABLE = True
+except Exception as e:
+    print(f"⚠️  성능 최적화 모듈 import 실패: {e}")
+    PERFORMANCE_OPTIMIZER_AVAILABLE = False
+    def get_performance_optimizer():
+        return None
+    def cache_api_response(ttl=300):
+        def decorator(func):
+            return func
+        return decorator
+    def monitor_api_performance(func):
+        return func
+
+# 안전한 API 호출을 위한 wrapper 함수들
+def safe_call(func, error_msg="기능을 사용할 수 없습니다", *args, **kwargs):
+    """안전하게 함수를 호출하고 오류 시 기본값 반환"""
+    try:
+        if func is None:
+            return error_response(error_msg)
+        return func(*args, **kwargs)
+    except Exception as e:
+        return error_response(f"{error_msg}: {str(e)}")
 
 # 백테스트 엔진 지연 초기화 (필요할 때만 초기화)
 backtest_engine = None
@@ -1660,6 +1704,17 @@ def get_enhanced_strategies():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+# 메인 페이지 라우트
+@api.route('/')
+def main_dashboard():
+    """메인 대시보드 페이지"""
+    return render_template('main_dashboard.html')
+
+@api.route('/backtest')
+def backtest_dashboard():
+    """백테스트 대시보드 페이지"""
+    return render_template('backtest_dashboard.html')
+
 # 프리미엄 대시보드 라우트들
 @api.route('/premium-backtest')
 def premium_backtest():
@@ -1676,6 +1731,9 @@ def premium_live():
 def start_live_trading():
     """라이브 트레이딩 시작"""
     try:
+        if not LIVE_TRADING_AVAILABLE:
+            return error_response("라이브 트레이딩 모듈이 사용 불가능합니다")
+        
         data = request.get_json()
         config = {
             'api_key': data.get('api_key', ''),
@@ -1689,6 +1747,8 @@ def start_live_trading():
         
         # 라이브 트레이딩 매니저 가져오기
         manager = get_live_trading_manager(config)
+        if not manager:
+            return error_response("라이브 트레이딩 매니저 초기화 실패")
         
         # 트레이딩 시작
         manager.start_trading()
