@@ -37,13 +37,34 @@ def error_response(message="Error", error_code=None, status_code=400):
 # Flask Blueprint 생성
 api = Blueprint('api', __name__)
 
-# 백테스트 엔진 초기화
-backtest_engine = RealBacktestEngine()
-strategy_analyzer = StrategyAnalyzer()
-portfolio_optimizer = PortfolioOptimizer()
+# 백테스트 엔진 지연 초기화 (필요할 때만 초기화)
+backtest_engine = None
+strategy_analyzer = None
+portfolio_optimizer = None
 
 # 백테스트 결과 저장소 (실제로는 데이터베이스 사용)
 backtest_results = []
+
+def get_backtest_engine():
+    """백테스트 엔진 지연 초기화"""
+    global backtest_engine
+    if backtest_engine is None:
+        backtest_engine = RealBacktestEngine()
+    return backtest_engine
+
+def get_strategy_analyzer():
+    """전략 분석기 지연 초기화"""
+    global strategy_analyzer
+    if strategy_analyzer is None:
+        strategy_analyzer = StrategyAnalyzer()
+    return strategy_analyzer
+
+def get_portfolio_optimizer():
+    """포트폴리오 최적화기 지연 초기화"""
+    global portfolio_optimizer
+    if portfolio_optimizer is None:
+        portfolio_optimizer = PortfolioOptimizer()
+    return portfolio_optimizer
 
 # 분석 결과 생성 헬퍼 함수들
 def _generate_portfolio_recommendations(strategy_rankings):
@@ -324,7 +345,7 @@ def get_strategies():
     """전략 목록 조회 API - 실제 구현된 전략만 반환"""
     try:
         # 백테스트 엔진의 실제 전략 목록을 가져오기
-        engine_strategies = backtest_engine.strategies
+        engine_strategies = get_backtest_engine().strategies
         
         strategies = []
         for strategy_id, strategy_info in engine_strategies.items():
@@ -454,12 +475,12 @@ def reset_backtest():
         backtest_results.clear()
         
         # 백테스트 엔진 상태 초기화
-        if hasattr(backtest_engine, 'results'):
-            backtest_engine.results.clear()
+        if hasattr(get_backtest_engine(), 'results'):
+            get_backtest_engine().results.clear()
         
         # 전략 분석기 상태 초기화
-        if hasattr(strategy_analyzer, 'analysis_results'):
-            strategy_analyzer.analysis_results.clear()
+        if hasattr(get_strategy_analyzer(), 'analysis_results'):
+            get_strategy_analyzer().analysis_results.clear()
         
         return jsonify({
             'status': 'success',
@@ -1012,7 +1033,7 @@ def stream_backtest_log():
                     start_dt = datetime.strptime(start_date, '%Y-%m-%d')
                     end_dt = datetime.strptime(end_date, '%Y-%m-%d')
                     
-                    result = await strategy_analyzer.analyze_all_strategies(
+                    result = await get_strategy_analyzer().analyze_all_strategies(
                         start_dt, end_dt, initial_capital, log_callback
                     )
                     
@@ -1030,7 +1051,7 @@ def stream_backtest_log():
             else:
                 # 일반 백테스트 모드
                 async def run_backtest():
-                    result = await backtest_engine.run_backtest(config, log_callback)
+                    result = await get_backtest_engine().run_backtest(config, log_callback)
                     
                     # 결과 저장
                     backtest_results.append(result)
@@ -1100,7 +1121,7 @@ def run_comprehensive_analysis():
             start_dt = datetime.strptime(data['startDate'], '%Y-%m-%d')
             end_dt = datetime.strptime(data['endDate'], '%Y-%m-%d')
             
-            result = await strategy_analyzer.analyze_all_strategies(
+            result = await get_strategy_analyzer().analyze_all_strategies(
                 start_dt, end_dt, analysis_config['initial_capital']
             )
             
@@ -1154,7 +1175,7 @@ def optimize_portfolio():
                 return jsonify({'error': f'{field}가 누락되었습니다.'}), 400
         
         # 포트폴리오 최적화 실행
-        optimized_portfolios = portfolio_optimizer.optimize_portfolio(
+        optimized_portfolios = get_portfolio_optimizer().optimize_portfolio(
             strategy_results=data['strategy_results'],
             optimization_method=data['optimization_method'],
             risk_level=data['risk_level'],
@@ -1162,7 +1183,7 @@ def optimize_portfolio():
         )
         
         # 포트폴리오 보고서 생성
-        report = portfolio_optimizer.generate_portfolio_report(optimized_portfolios)
+        report = get_portfolio_optimizer().generate_portfolio_report(optimized_portfolios)
         
         return jsonify({
             'status': 'success',
@@ -1213,7 +1234,7 @@ def analyze_portfolio_with_optimization():
         # 전략 분석 실행
         async def run_integrated_analysis():
             # 1. 전략 분석 실행
-            strategy_results = await strategy_analyzer.analyze_all_strategies(
+            strategy_results = await get_strategy_analyzer().analyze_all_strategies(
                 start_dt, end_dt, initial_capital
             )
             
@@ -1235,7 +1256,7 @@ def analyze_portfolio_with_optimization():
             all_portfolios = []
             
             for method in optimization_methods:
-                portfolios = portfolio_optimizer.optimize_portfolio(
+                portfolios = get_portfolio_optimizer().optimize_portfolio(
                     strategy_results=portfolio_strategy_results,
                     optimization_method=method,
                     risk_level=data.get('risk_level', 'medium'),
@@ -1244,7 +1265,7 @@ def analyze_portfolio_with_optimization():
                 all_portfolios.extend(portfolios)
             
             # 4. 포트폴리오 보고서 생성
-            report = portfolio_optimizer.generate_portfolio_report(all_portfolios)
+            report = get_portfolio_optimizer().generate_portfolio_report(all_portfolios)
             
             return {
                 'analysis_id': analysis_id,
@@ -1327,7 +1348,7 @@ def backtest_portfolio():
                     }
                     
                     try:
-                        result = await backtest_engine.run_backtest(strategy_config)
+                        result = await get_backtest_engine().run_backtest(strategy_config)
                         portfolio_results.append({
                             'strategy': strategy_name,
                             'weight': weight,
