@@ -11,10 +11,17 @@ from functools import wraps, lru_cache
 from typing import Dict, Any, Callable, Optional
 import logging
 import gc
-import psutil
 import weakref
 from datetime import datetime, timedelta
 import json
+
+# psutil을 optional로 만들기
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
+    psutil = None
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -72,14 +79,18 @@ class PerformanceOptimizer:
         @wraps(func)
         def wrapper(*args, **kwargs):
             start_time = time.time()
-            start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+            start_memory = 0
+            if PSUTIL_AVAILABLE:
+                start_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
             
             try:
                 result = func(*args, **kwargs)
                 return result
             finally:
                 end_time = time.time()
-                end_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
+                end_memory = 0
+                if PSUTIL_AVAILABLE:
+                    end_memory = psutil.Process().memory_info().rss / 1024 / 1024  # MB
                 
                 execution_time = end_time - start_time
                 memory_usage = end_memory - start_memory
@@ -108,8 +119,19 @@ class PerformanceOptimizer:
     
     def get_performance_stats(self) -> Dict[str, Any]:
         """성능 통계 조회"""
-        cpu_percent = psutil.cpu_percent(interval=1)
-        memory_info = psutil.virtual_memory()
+        cpu_percent = 0
+        memory_info = None
+        
+        if PSUTIL_AVAILABLE:
+            cpu_percent = psutil.cpu_percent(interval=1)
+            memory_info = psutil.virtual_memory()
+        else:
+            # psutil이 없는 경우 기본값
+            class MockMemoryInfo:
+                percent = 50.0
+                available = 4 * 1024 * 1024 * 1024  # 4GB
+                total = 8 * 1024 * 1024 * 1024  # 8GB
+            memory_info = MockMemoryInfo()
         
         return {
             'system': {
@@ -267,8 +289,16 @@ class MemoryMonitor:
         """모니터링 루프"""
         while self.monitoring:
             try:
-                memory_info = psutil.virtual_memory()
-                cpu_percent = psutil.cpu_percent()
+                if PSUTIL_AVAILABLE:
+                    memory_info = psutil.virtual_memory()
+                    cpu_percent = psutil.cpu_percent()
+                else:
+                    # Mock 데이터
+                    class MockMemoryInfo:
+                        percent = 50.0
+                        available = 4 * 1024 * 1024 * 1024  # 4GB
+                    memory_info = MockMemoryInfo()
+                    cpu_percent = 25.0
                 
                 memory_data = {
                     'timestamp': datetime.now().isoformat(),

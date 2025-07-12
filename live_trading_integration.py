@@ -6,13 +6,20 @@
 
 import pandas as pd
 import numpy as np
-import ccxt
 import time
 import threading
 from datetime import datetime, timedelta
 import warnings
 import json
 import logging
+
+# ccxt를 optional로 만들기
+try:
+    import ccxt
+    CCXT_AVAILABLE = True
+except ImportError:
+    CCXT_AVAILABLE = False
+    ccxt = None
 
 warnings.filterwarnings('ignore')
 
@@ -93,6 +100,10 @@ class LiveTradingManager:
         try:
             if not self.config.get('api_key') or not self.config.get('api_secret'):
                 logger.warning("API 키가 설정되지 않음 - 시뮬레이션 모드로 실행")
+                return
+            
+            if not CCXT_AVAILABLE:
+                logger.warning("CCXT 모듈이 없음 - 시뮬레이션 모드로 실행")
                 return
             
             self.exchange = ccxt.binance({

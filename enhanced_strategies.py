@@ -9,7 +9,6 @@ import numpy as np
 from datetime import datetime, timedelta
 import warnings
 import requests
-import talib
 warnings.filterwarnings('ignore')
 
 from hourly_strategy import HourlyTradingStrategy
@@ -61,7 +60,12 @@ class AlphaIndicators:
     @staticmethod
     def bullish_divergence_detector(df, rsi_period=14, lookback=10):
         """RSI 강세 다이버전스 감지"""
-        rsi = talib.RSI(df['close'], timeperiod=rsi_period)
+        # RSI 계산 (numpy/pandas 버전)
+        delta = df['close'].diff()
+        gain = (delta.where(delta > 0, 0)).rolling(window=rsi_period).mean()
+        loss = (-delta.where(delta < 0, 0)).rolling(window=rsi_period).mean()
+        rs = gain / loss
+        rsi = 100 - (100 / (1 + rs))
         
         # 최근 가격 저점들
         price_lows = df['low'].rolling(3, center=True).min()
@@ -99,8 +103,9 @@ class AlphaIndicators:
     @staticmethod
     def smart_money_flow(df):
         """스마트 머니 플로우 지표"""
-        # On-Balance Volume 변화율
-        obv = talib.OBV(df['close'], df['volume'])
+        # On-Balance Volume 계산 (numpy/pandas 버전)
+        price_change = df['close'].diff()
+        obv = (df['volume'] * np.sign(price_change)).fillna(0).cumsum()
         obv_slope = obv.pct_change(5)  # 5봉 변화율
         
         # 가격과 OBV 동조성
